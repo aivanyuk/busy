@@ -24,5 +24,8 @@ windows = { workspace = true, features = [
     "Win32_System_WindowsProgramming",
 ] }
 
+[dev-dependencies]
+windows = { workspace = true, features = ["Win32_System_Com"] }
+
 [lints]
 workspace = true
