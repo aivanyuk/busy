@@ -1,0 +1,29 @@
+//! Runs both sources against the real machine. Hardware-dependent fields are only range-checked.
+
+use busy_core::{Module, Snapshot};
+use std::time::Duration;
+use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx};
+
+#[test]
+fn sources_sample_without_panicking() {
+    unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.ok().unwrap();
+    let mut sources = busy_sensors::sources();
+    let modules: Vec<Module> = sources.iter().map(|s| s.module()).collect();
+    assert_eq!(modules, [Module::Gpu, Module::Sensors]);
+
+    let mut snap = Snapshot::default();
+    for _ in 0..2 {
+        snap = Snapshot::default();
+        for s in &mut sources {
+            s.sample(&mut snap);
+        }
+        std::thread::sleep(Duration::from_millis(300));
+    }
+
+    for g in &snap.gpus {
+        assert!((0.0..=100.0).contains(&g.util_pct), "{g:?}");
+        assert!(g.engines.iter().all(|(_, v)| (0.0..=100.0).contains(v)));
+        assert!(g.temp_c.is_none_or(|t| (-20.0..150.0).contains(&t)));
+    }
+    assert!(snap.sensors.iter().all(|r| r.value.is_finite()));
+}
