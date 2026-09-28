@@ -1,7 +1,8 @@
-//! GPU metrics (DXGI + PDH + D3DKMT + NVML/ADL) and hardware sensors.
+//! GPU metrics (DXGI + PDH + D3DKMT + NVML/ADL) and hardware sensors (LibreHardwareMonitor).
 
 mod adl;
 mod gpu;
+mod lhm;
 mod nvml;
 
 use std::cell::RefCell;
@@ -9,7 +10,7 @@ use std::ffi::CStr;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use busy_core::{Module, SensorKind, SensorReading, Snapshot, Source};
+use busy_core::{GpuInfo, Module, SensorKind, SensorReading, Snapshot, Source};
 use windows::Win32::Foundation::{FreeLibrary, HMODULE};
 use windows::Win32::System::LibraryLoader::{GetProcAddress, LOAD_LIBRARY_SEARCH_SYSTEM32, LoadLibraryExW};
 use windows::core::{PCSTR, PCWSTR};
@@ -55,11 +56,12 @@ pub(crate) fn reading(source: &str, hardware: &str, name: &str, kind: SensorKind
 
 struct SensorsSource {
     shared: Rc<RefCell<Shared>>,
+    lhm: lhm::Lhm,
 }
 
 impl SensorsSource {
     fn new(shared: Rc<RefCell<Shared>>) -> Self {
-        Self { shared }
+        Self { shared, lhm: lhm::Lhm::new() }
     }
 }
 
@@ -69,9 +71,44 @@ impl Source for SensorsSource {
     }
 
     fn sample(&mut self, snap: &mut Snapshot) {
-        let sh = self.shared.borrow();
-        if sh.at.is_some_and(|t| t.elapsed() < Duration::from_secs(3)) {
-            snap.sensors.extend(sh.vendor.iter().cloned());
+        // Third-party source preferred; vendor readings only without it (avoids duplicates).
+        let mut out = self.lhm.read();
+        if out.is_empty() {
+            let sh = self.shared.borrow();
+            if sh.at.is_some_and(|t| t.elapsed() < Duration::from_secs(3)) {
+                out = sh.vendor.clone();
+            }
+        } else {
+            fill_gpus(&mut snap.gpus, &out);
+        }
+        snap.sensors.extend(out);
+    }
+}
+
+fn fill_gpus(gpus: &mut [GpuInfo], rs: &[SensorReading]) {
+    for g in gpus {
+        let name = g.name.to_lowercase();
+        let mine = || rs.iter().filter(|r| r.hardware.to_lowercase().contains(&name));
+        let temps = || mine().filter(|r| r.kind == SensorKind::Temperature);
+        let is_hot = |r: &&SensorReading| {
+            let n = r.name.to_lowercase();
+            n.contains("hot spot") || n.contains("hotspot")
+        };
+        if g.hotspot_c.is_none() {
+            g.hotspot_c = temps().find(is_hot).map(|r| r.value);
+        }
+        if g.temp_c.is_none() {
+            g.temp_c = temps()
+                .filter(|r| !is_hot(r))
+                .find(|r| {
+                    let n = r.name.to_lowercase();
+                    n.contains("core") || n.contains("gpu temperature") || n == "gpu"
+                })
+                .or_else(|| temps().find(|r| !is_hot(r)))
+                .map(|r| r.value);
+        }
+        if g.fan_rpm.is_none() {
+            g.fan_rpm = mine().find(|r| r.kind == SensorKind::Fan).map(|r| r.value as u32);
         }
     }
 }
