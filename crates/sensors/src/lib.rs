@@ -1,7 +1,8 @@
-//! GPU metrics (DXGI + PDH + D3DKMT + NVML/ADL) and hardware sensors (LibreHardwareMonitor).
+//! GPU metrics (DXGI + PDH + D3DKMT + NVML/ADL) and hardware sensors (LibreHardwareMonitor / HWiNFO).
 
 mod adl;
 mod gpu;
+mod hwinfo;
 mod lhm;
 mod nvml;
 
@@ -54,14 +55,20 @@ pub(crate) fn reading(source: &str, hardware: &str, name: &str, kind: SensorKind
     SensorReading { source: source.into(), hardware: hardware.into(), name: name.into(), kind, value }
 }
 
+/// Latin-1 decode of a NUL-terminated byte buffer (HWiNFO ANSI strings; `°` is 0xB0 in cp1252 too).
+pub(crate) fn ansi(b: &[u8]) -> String {
+    b.iter().take_while(|&&c| c != 0).map(|&c| c as char).collect::<String>().trim().to_owned()
+}
+
 struct SensorsSource {
     shared: Rc<RefCell<Shared>>,
     lhm: lhm::Lhm,
+    hwinfo: hwinfo::HwInfo,
 }
 
 impl SensorsSource {
     fn new(shared: Rc<RefCell<Shared>>) -> Self {
-        Self { shared, lhm: lhm::Lhm::new() }
+        Self { shared, lhm: lhm::Lhm::new(), hwinfo: hwinfo::HwInfo::new() }
     }
 }
 
@@ -71,8 +78,11 @@ impl Source for SensorsSource {
     }
 
     fn sample(&mut self, snap: &mut Snapshot) {
-        // Third-party source preferred; vendor readings only without it (avoids duplicates).
+        // One third-party source only (avoids duplicates); LHM preferred.
         let mut out = self.lhm.read();
+        if out.is_empty() {
+            out = self.hwinfo.read();
+        }
         if out.is_empty() {
             let sh = self.shared.borrow();
             if sh.at.is_some_and(|t| t.elapsed() < Duration::from_secs(3)) {
