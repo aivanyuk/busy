@@ -2,19 +2,34 @@
 
 `app/` — the binary. Files: `main.rs` (single instance, `--open-flyout` debug flag), `app.rs` (state, config, message routing), `sampler.rs`, `history.rs`, `fake.rs` (synthetic Source for UI dev), `taskbar.rs`, `flyout.rs`, `render.rs` (D2D/DWrite helpers), `theme.rs`, `fmt.rs`. Manifest: `app/app.manifest` embedded by `app/build.rs` via `/MANIFEST:EMBED /MANIFESTINPUT` (PerMonitorV2, comctl32 v6, supportedOS Win8/10 — required for layered child windows).
 
+Verified on Windows 11 build 26200.9457 (25H2), 3840×2160 @ 200 %, centered taskbar icons. Release exe ~500 KB.
+
+## Threads and state
+
+- UI state lives in a `thread_local RefCell` accessed via `app::with()` using `try_borrow_mut`: re-entrant messages are skipped, never panic. Messages that can arrive during our own calls (flyout deactivate, re-render, new config) are posted back to ourselves.
+- A hidden top-level `busy.main` window receives `TaskbarCreated`, `WM_SETTINGCHANGE("ImmersiveColorSet")`, colorization changes, snapshots (`WM_APP+1`) and new configs (`WM_APP_CONFIG`).
+- `app::submit_config(Config)` is callable from any thread; the UI thread applies it live (sampler interval/modules, history size, theme, re-layout) and saves on a worker thread. Config load/save never run on the UI thread.
+- Sampler: own thread, COM MTA, sources built there; Mutex+Condvar carries config and stop flag (interruptible waits, joined on drop, poison-tolerant).
+- `BUSY_FAKE=1` swaps in `fake.rs` (fills every field) — for UI work on machines without GPU/battery/sensors.
+- Debug builds only: `BUSY_DUMP=<dir>` writes `taskbar.bmp`; `BUSY_PIN_FLYOUT=1` keeps the flyout open on focus loss. `--open-flyout` opens it after the first sample.
+
 ## Taskbar widget
 
-- Hosting: our window is `WS_CHILD` of `Shell_TrayWnd` (primary monitor only), `SetParent` cross-process (TrafficMonitor approach). Win11 removed deskbands; this is undocumented and may need fixes after Windows updates.
-- Rendering: layered child window, D2D `ID2D1DCRenderTarget` (premultiplied BGRA) into a 32-bit DIB → `UpdateLayeredWindow`. Background alpha = 1 (not 0) so clicks hit us.
-- Positioning: `Anchor::NearTray` = left of `TrayNotifyWnd`; `Anchor::Left` = taskbar left edge; plus DPI-scaled `offset_px`. Re-checked each render tick, repositioned only on change.
-- Explorer restart: handle `RegisterWindowMessageW("TaskbarCreated")` → re-find and re-parent.
-- On exit, destroy the child window so explorer isn't left with a dead child.
+- Hosting: `WS_CHILD` created directly with `Shell_TrayWnd` as parent (primary monitor only) — same end state as TrafficMonitor's `SetParent`. Win11 removed deskbands; this is undocumented and may need fixes after Windows updates.
+- Rendering: `WS_EX_LAYERED | WS_EX_NOPARENTNOTIFY` child, D2D `ID2D1DCRenderTarget` (premultiplied BGRA) into a 32-bpp DIB → `UpdateLayeredWindow`; DWM honours per-pixel alpha on the layered child. Background alpha 1/255 so the whole widget is clickable. Returns `MA_NOACTIVATE`.
+- Positioning (re-checked by a 1 s timer, moved only when the rect changes; the timer also re-embeds if the widget or taskbar died):
+  - `NearTray`: left of `TrayNotifyWnd` — still present on 26200 and matching the XAML notification area.
+  - `Left`: taskbar left edge + offset with centered icons; after the task list with left-aligned icons.
+  - Task-button extent: `ReBarWindow32` is **not** kept in sync on 26200; the hidden `Start` window's rect is, and with centered icons it is mirrored around the taskbar centre to find the icon group's right end.
+  - Cells that don't fit are dropped from the end of the config order — the widget never covers task buttons.
+- Z-order: `SetWindowPos(HWND_TOP)` above `Windows.UI.Composition.DesktopWindowContentBridge` (the XAML island); each tick re-raised if `GetWindow(GW_HWNDPREV)` finds a sibling above.
+- Explorer restart: `RegisterWindowMessageW("TaskbarCreated")` → re-find and re-parent. Exit: state drop destroys the child and joins the sampler.
 
 **Critical:** cross-process parenting attaches our input queue to explorer's. Any blocking on the UI thread freezes the user's taskbar. No sampling, file I/O, or waits on the UI thread.
 
 ## Flyout
 
-Top-level `WS_POPUP` with `WS_EX_TOOLWINDOW | WS_EX_TOPMOST`, opened above the widget, clamped to the work area. Dismissed on deactivate, Esc, or re-click (watch the deactivate→click toggle race). DWM rounded corners + transient-window backdrop + immersive dark mode per theme. Sections follow `Config.modules` order where `flyout = true`.
+`WS_POPUP` tool window, topmost, rounded corners, acrylic (`DWMSBT_TRANSIENTWINDOW`), dark-mode attribute, frame extended over the client area; drawn with `ID2D1HwndRenderTarget` (premultiplied) plus a translucent tint; solid fallback if the backdrop attribute fails (Win10). Height fits content, clamped to the work area, wheel scrolling with indicator; redraws per snapshot. Closes on Esc, re-click and focus loss; a 250 ms guard after deactivation handles the click-toggle race.
 
 ## Theme
 
@@ -22,7 +37,19 @@ Taskbar follows `SystemUsesLightTheme` (not `AppsUseLightTheme`) unless `Config.
 
 ## Integration points
 
-- Sources: in `sampler.rs`, sources are built on the sampler thread (`busy_metrics::sources()` + `busy_sensors::sources()`; `fake.rs` during UI-only work).
-- Settings: context menu "Settings…" → `busy_settings::open(hwnd, &cfg, on_apply)`; message loop calls `busy_settings::is_dialog_message` first.
+- Sources: `sampler.rs` `build_sources()` — `busy_metrics::sources()` then `busy_sensors::sources()` (GPU before Sensors).
+- Settings: context menu "Settings…" → `busy_settings::open(main, &cfg, Box::new(submit_config))`; the message loop calls `busy_settings::is_dialog_message` first.
 
-> This doc is written from the design spec; update it with measured facts (z-order under Win11 XAML, verified Windows build, known issues) as they are confirmed.
+## Gotchas
+
+- `windows` uses `windows-numerics::Vector2` for D2D points without re-exporting it; instead of adding the crate, `render::point` builds them with a size-checked `transmute_copy`.
+- `#![allow(linker_messages)]` in `main.rs`: link.exe's manifest validator doesn't know `<dpiAwareness>` (warning 81010002); it is embedded anyway.
+- Screenshots: PowerShell isn't DPI-aware, so coordinates are virtualized and `CopyFromScreen` is wrong unless the thread calls `SetThreadDpiAwarenessContext(-4)` first.
+- Test interaction by posting messages to our own windows only — never synthetic input.
+
+## Known issues
+
+- Right-click menu stays light in dark mode (dark menus need undocumented uxtheme calls).
+- Not exercised live: theme-change reaction, explorer restart path, graph hover readout.
+- Left anchor overlaps the Win11 Widgets button if enabled (`offset_px` works around it).
+- Left-aligned taskbars fall back to `ReBarWindow32` for the icon-group extent, which is stale on 26200.
