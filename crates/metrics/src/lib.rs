@@ -3,6 +3,7 @@
 mod cpu;
 mod disk;
 mod memory;
+mod network;
 mod pdh;
 mod util;
 
@@ -10,5 +11,10 @@ use busy_core::Source;
 
 /// Called on the sampler thread after `CoInitializeEx(COINIT_MULTITHREADED)`.
 pub fn sources() -> Vec<Box<dyn Source>> {
-    vec![Box::new(cpu::Cpu::new()), Box::new(memory::Memory), Box::new(disk::Disk::new())]
+    vec![
+        Box::new(cpu::Cpu::new()),
+        Box::new(memory::Memory),
+        Box::new(disk::Disk::new()),
+        Box::new(network::Network::default()),
+    ]
 }
