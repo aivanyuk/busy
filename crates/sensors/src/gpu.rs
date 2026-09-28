@@ -1,10 +1,12 @@
 //! GPU adapters (DXGI), utilization/memory/per-process (PDH "GPU Engine"/"GPU Adapter Memory"),
 //! generic temperature/fan (D3DKMT ADAPTERPERFDATA, what Task Manager shows) and NVML/ADL extras.
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use busy_core::{GpuInfo, Module, ProcEntry, Snapshot, Source, TOP_N};
+use busy_core::{GpuInfo, Module, ProcEntry, SensorKind, SensorReading, Snapshot, Source, TOP_N};
 use windows::Wdk::Graphics::Direct3D::*;
 use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SYSTEM_INFORMATION_CLASS};
 use windows::Win32::Foundation::{CloseHandle, LUID};
@@ -15,7 +17,7 @@ use windows::Win32::System::Threading::{
 };
 use windows::core::{PWSTR, w};
 
-use crate::{adl::Adl, nvml::Nvml};
+use crate::{Shared, adl::Adl, nvml::Nvml, reading};
 
 const REENUM: Duration = Duration::from_secs(60);
 const PDH_FMT_NOCAP100: u32 = 0x8000;
@@ -43,6 +45,19 @@ impl Stats {
             core_mhz: self.core_mhz.or(o.core_mhz),
             mem_mhz: self.mem_mhz.or(o.mem_mhz),
         }
+    }
+
+    fn readings(&self, src: &str, hw: &str, out: &mut Vec<SensorReading>) {
+        let f = [
+            ("GPU Core", SensorKind::Temperature, self.temp_c),
+            ("GPU Hot Spot", SensorKind::Temperature, self.hotspot_c),
+            ("GPU Fan", SensorKind::Fan, self.fan_rpm.map(|v| v as f32)),
+            ("GPU Fan", SensorKind::Load, self.fan_pct),
+            ("GPU Power", SensorKind::Power, self.power_w),
+            ("GPU Core", SensorKind::Clock, self.core_mhz.map(|v| v as f32)),
+            ("GPU Memory", SensorKind::Clock, self.mem_mhz.map(|v| v as f32)),
+        ];
+        out.extend(f.into_iter().filter_map(|(n, k, v)| Some(reading(src, hw, n, k, v?))));
     }
 
     fn apply(&self, g: &mut GpuInfo) {
@@ -270,6 +285,7 @@ fn nt_image_name(pid: u32, buf: &mut [u16], n: &mut u32) -> bool {
 }
 
 pub struct GpuSource {
+    shared: Rc<RefCell<Shared>>,
     adapters: Vec<Adapter>,
     enum_at: Option<Instant>,
     pdh: Option<Pdh>,
@@ -280,8 +296,9 @@ pub struct GpuSource {
 }
 
 impl GpuSource {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(shared: Rc<RefCell<Shared>>) -> Self {
         Self {
+            shared,
             adapters: Vec::new(),
             enum_at: None,
             pdh: None,
@@ -370,6 +387,7 @@ impl Source for GpuSource {
             }
         }
 
+        let mut vendor_readings = Vec::new();
         snap.gpus = self
             .adapters
             .iter()
@@ -398,15 +416,31 @@ impl Source for GpuSource {
                 g.engines = types;
 
                 let kmt = a.kmt_stats();
-                let vs = match (&a.vendor, &self.nvml, &self.adl) {
-                    (Vendor::Nvml(d), Some(n), _) => n.stats(*d),
-                    (Vendor::Adl(i), _, Some(adl)) => adl.stats(*i),
-                    _ => Stats::default(),
+                let (src, vs) = match (&a.vendor, &self.nvml, &self.adl) {
+                    (Vendor::Nvml(d), Some(n), _) => ("NVML", n.stats(*d)),
+                    (Vendor::Adl(i), _, Some(adl)) => ("ADL", adl.stats(*i)),
+                    _ => ("", Stats::default()),
                 };
+                if !src.is_empty() {
+                    vs.readings(src, &a.name, &mut vendor_readings);
+                }
+                // WDDM values not already covered by the vendor library.
+                let rest = Stats {
+                    temp_c: kmt.temp_c.filter(|_| vs.temp_c.is_none()),
+                    fan_rpm: kmt.fan_rpm.filter(|_| vs.fan_rpm.is_none()),
+                    mem_mhz: kmt.mem_mhz.filter(|_| vs.mem_mhz.is_none()),
+                    ..Default::default()
+                };
+                rest.readings("WDDM", &a.name, &mut vendor_readings);
                 vs.or(kmt).apply(&mut g);
                 g
             })
             .collect();
+        {
+            let mut sh = self.shared.borrow_mut();
+            sh.vendor = vendor_readings;
+            sh.at = Some(Instant::now());
+        }
 
         let mut per_pid: HashMap<u32, f64> = HashMap::new();
         for (&(pid, _, _), &v) in &procs {
