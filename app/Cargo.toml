@@ -1,0 +1,11 @@
+[package]
+name = "busy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+busy-core.workspace = true
+
+[lints]
+workspace = true
