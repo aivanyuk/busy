@@ -4,12 +4,16 @@
 
 mod app;
 mod fake;
-// Pure helpers for the UI added in the following commits; partly unused until then.
+// Building blocks for the UI added in the following commits; unused until then.
 #[allow(dead_code)]
 mod fmt;
 #[allow(dead_code)]
 mod history;
+#[allow(dead_code)]
+mod render;
 mod sampler;
+#[allow(dead_code)]
+mod theme;
 
 use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError};
 use windows::Win32::System::Threading::CreateMutexW;
