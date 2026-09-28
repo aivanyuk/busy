@@ -8,6 +8,7 @@ busy-core.workspace = true
 windows = { workspace = true, features = [
     "Wdk_System_SystemInformation",
     "Win32_Foundation",
+    "Win32_Storage_FileSystem",
     "Win32_System_Performance",
     "Win32_System_Power",
     "Win32_System_ProcessStatus",

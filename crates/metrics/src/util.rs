@@ -1,3 +1,4 @@
+use std::time::{Duration, Instant};
 use windows::Win32::Foundation::ERROR_SUCCESS;
 use windows::Win32::System::ProcessStatus::{GetPerformanceInfo, PERFORMANCE_INFORMATION};
 use windows::Win32::System::Registry::{
@@ -48,4 +49,24 @@ pub fn perf_info() -> Option<PERFORMANCE_INFORMATION> {
     let mut pi = PERFORMANCE_INFORMATION::default();
     unsafe { GetPerformanceInfo(&mut pi, size_of::<PERFORMANCE_INFORMATION>() as u32) }.ok()?;
     Some(pi)
+}
+
+/// Rate-limits refreshes of slow-changing data.
+#[derive(Default)]
+pub struct Every(Option<Instant>);
+
+impl Every {
+    pub fn due(&mut self, secs: u64) -> bool {
+        let now = Instant::now();
+        let due = self.0.is_none_or(|t| now - t >= Duration::from_secs(secs));
+        if due {
+            self.0 = Some(now);
+        }
+        due
+    }
+
+    /// Restart the period from now.
+    pub fn arm(&mut self) {
+        self.0 = Some(Instant::now());
+    }
 }
