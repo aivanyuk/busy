@@ -6,6 +6,7 @@ mod disk;
 mod memory;
 mod network;
 mod pdh;
+mod processes;
 mod util;
 
 use busy_core::Source;
@@ -18,5 +19,6 @@ pub fn sources() -> Vec<Box<dyn Source>> {
         Box::new(disk::Disk::new()),
         Box::new(network::Network::default()),
         Box::new(battery::Battery::default()),
+        Box::new(processes::Processes::default()),
     ]
 }
