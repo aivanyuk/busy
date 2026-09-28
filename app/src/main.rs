@@ -4,7 +4,7 @@
 
 mod app;
 mod fake;
-// Building blocks for the UI added in the following commits; unused until then.
+// Building blocks partly used only by the flyout, which lands in a later commit.
 #[allow(dead_code)]
 mod fmt;
 #[allow(dead_code)]
@@ -12,6 +12,7 @@ mod history;
 #[allow(dead_code)]
 mod render;
 mod sampler;
+mod taskbar;
 #[allow(dead_code)]
 mod theme;
 
