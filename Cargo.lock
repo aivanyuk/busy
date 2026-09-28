@@ -9,6 +9,7 @@ dependencies = [
  "busy-core",
  "busy-metrics",
  "busy-sensors",
+ "busy-settings",
  "windows",
 ]
 

@@ -11,6 +11,7 @@ use crate::taskbar::Taskbar;
 use crate::theme::Theme;
 use busy_core::{Anchor, Config, Module, SensorKind, SensorReading, Snapshot};
 use std::cell::RefCell;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use windows::Win32::Foundation::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -20,9 +21,11 @@ use windows::core::{PCWSTR, Result, w};
 
 pub const WM_APP_SNAPSHOT: u32 = WM_APP + 1;
 pub const WM_APP_RENDER: u32 = WM_APP + 2;
+pub const WM_APP_CONFIG: u32 = WM_APP + 3;
 pub const WM_APP_FLYOUT_DEACTIVATED: u32 = WM_APP + 4;
 
 const TIMER_WATCH: usize = 1;
+const ID_SETTINGS: u32 = 1;
 const ID_EXIT: u32 = 2;
 const ID_ANCHOR_TRAY: u32 = 3;
 const ID_ANCHOR_LEFT: u32 = 4;
@@ -31,6 +34,8 @@ const ID_TOGGLE: u32 = 100;
 static MAIN: AtomicIsize = AtomicIsize::new(0);
 static FLYOUT: AtomicIsize = AtomicIsize::new(0);
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
+/// Config handed over from another thread / the settings window, applied on WM_APP_CONFIG.
+static PENDING: Mutex<Option<Config>> = Mutex::new(None);
 
 thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
@@ -46,6 +51,7 @@ pub struct Ctx<'a> {
 }
 
 pub struct App {
+    main: HWND,
     cfg: Config,
     sampler: Sampler,
     hist: History,
@@ -70,6 +76,12 @@ pub fn post(msg: u32) {
     unsafe {
         let _ = PostMessageW(Some(main_hwnd()), msg, WPARAM(0), LPARAM(0));
     }
+}
+
+/// Hands a new config to the UI thread (safe from any thread).
+pub fn submit_config(cfg: Config) {
+    *crate::sampler::lock(&PENDING) = Some(cfg);
+    post(WM_APP_CONFIG);
 }
 
 pub fn hinstance() -> HINSTANCE {
@@ -144,6 +156,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
         FLYOUT.store(f.hwnd.0 as isize, Ordering::Relaxed);
     }
     let app = App {
+        main,
         sampler: Sampler::start(cfg.clone(), main, WM_APP_SNAPSHOT),
         hist: History::new(capacity(cfg.history_secs, cfg.interval_ms)),
         snap: Snapshot::default(),
@@ -159,6 +172,10 @@ pub fn run(open_flyout: bool) -> Result<()> {
     let mut msg = MSG::default();
     unsafe {
         while GetMessageW(&mut msg, None, 0, 0).0 > 0 {
+            // Keyboard navigation (Tab, Enter, Esc) for the modeless settings window.
+            if busy_settings::is_dialog_message(&msg) {
+                continue;
+            }
             let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
@@ -176,6 +193,11 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             }
             WM_APP_RENDER => {
                 with(App::render_all);
+            }
+            WM_APP_CONFIG => {
+                if let Some(cfg) = crate::sampler::lock(&PENDING).take() {
+                    with(|a| a.apply_config(cfg, true));
+                }
             }
             WM_APP_FLYOUT_DEACTIVATED => {
                 with(|a| {
@@ -324,9 +346,14 @@ impl App {
         }
     }
 
+    fn open_settings(&mut self) {
+        busy_settings::open(self.main, &self.cfg, Box::new(submit_config));
+    }
+
     fn on_command(&mut self, id: u32) {
         let mut cfg = self.cfg.clone();
         match id {
+            ID_SETTINGS => return self.open_settings(),
             ID_EXIT => return post_close(),
             ID_ANCHOR_TRAY => cfg.anchor = Anchor::NearTray,
             ID_ANCHOR_LEFT => cfg.anchor = Anchor::Left,
@@ -384,6 +411,8 @@ pub fn context_menu() {
             ID_ANCHOR_LEFT as usize,
             w!("Left edge"),
         );
+        let _ = AppendMenuW(menu, MF_STRING, ID_SETTINGS as usize, w!("Settings…"));
+        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
         let _ = AppendMenuW(menu, MF_POPUP, sub_mods.0 as usize, w!("Show on taskbar"));
         let _ = AppendMenuW(menu, MF_POPUP, sub_pos.0 as usize, w!("Position"));
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
