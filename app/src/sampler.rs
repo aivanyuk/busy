@@ -10,8 +10,14 @@ use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
 
 /// The single place where collectors are registered.
 fn build_sources() -> Vec<Box<dyn Source>> {
-    // Synthetic data until the real collectors are wired in.
-    crate::fake::sources()
+    // `BUSY_FAKE=1`: synthetic data filling every field, for UI work on machines without a GPU/battery/sensors.
+    if std::env::var_os("BUSY_FAKE").is_some() {
+        return crate::fake::sources();
+    }
+    let mut sources = busy_metrics::sources();
+    // Order matters: the sensors crate's GPU source must run before its Sensors source.
+    sources.extend(busy_sensors::sources());
+    sources
 }
 
 struct State {
