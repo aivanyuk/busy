@@ -40,5 +40,6 @@ Definition of done for any change: fmt clean, clippy clean with `-D warnings`, t
 | Code style, unsafe, errors, lints | [docs/code-quality.md](docs/code-quality.md) |
 | Test strategy and manual UI checks | [docs/testing.md](docs/testing.md) |
 | Commit/branch conventions | [docs/commits.md](docs/commits.md) |
+| UI design source + migration plan | [docs/plans/design-migration.md](docs/plans/design-migration.md), `design/` |
 
 When you learn something non-obvious about an area (Win32 quirk, measured cost, layout gotcha), add it to that area's doc in the same change.
