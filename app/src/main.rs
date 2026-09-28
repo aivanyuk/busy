@@ -4,16 +4,12 @@
 
 mod app;
 mod fake;
-// Building blocks partly used only by the flyout, which lands in a later commit.
-#[allow(dead_code)]
+mod flyout;
 mod fmt;
-#[allow(dead_code)]
 mod history;
-#[allow(dead_code)]
 mod render;
 mod sampler;
 mod taskbar;
-#[allow(dead_code)]
 mod theme;
 
 use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError};
@@ -26,5 +22,7 @@ fn main() {
     if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
         return;
     }
-    let _ = app::run();
+    // `--open-flyout`: open the flyout after the first sample (debugging/screenshots).
+    let open_flyout = std::env::args().any(|a| a == "--open-flyout");
+    let _ = app::run(open_flyout);
 }
