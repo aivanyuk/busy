@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "busy"
+version = "0.1.0"
+dependencies = [
+ "busy-core",
+]
+
+[[package]]
 name = "busy-core"
 version = "0.1.0"
 dependencies = [
