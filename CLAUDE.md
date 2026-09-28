@@ -39,7 +39,7 @@ Definition of done for any change: fmt clean, clippy clean with `-D warnings`, t
 | Settings window, autostart | [docs/areas/settings.md](docs/areas/settings.md) |
 | Code style, unsafe, errors, lints | [docs/code-quality.md](docs/code-quality.md) |
 | Test strategy and manual UI checks | [docs/testing.md](docs/testing.md) |
-| Commit/branch conventions | [docs/commits.md](docs/commits.md) |
+| Commit/branch conventions, automated PR review | [docs/commits.md](docs/commits.md), `.github/review-rules.md` |
 | UI design source + migration plan | [docs/plans/design-migration.md](docs/plans/design-migration.md), `design/` |
 
 When you learn something non-obvious about an area (Win32 quirk, measured cost, layout gotcha), add it to that area's doc in the same change.
