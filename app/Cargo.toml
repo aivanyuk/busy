@@ -9,6 +9,7 @@ build = "build.rs"
 busy-core.workspace = true
 busy-metrics.workspace = true
 busy-sensors.workspace = true
+busy-settings.workspace = true
 windows = { workspace = true, features = [
     "Win32_Foundation",
     "Win32_Graphics_Direct2D",
