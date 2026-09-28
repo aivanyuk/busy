@@ -1,5 +1,6 @@
-//! GPU metrics (DXGI + PDH + D3DKMT + NVML).
+//! GPU metrics (DXGI + PDH + D3DKMT + NVML/ADL).
 
+mod adl;
 mod gpu;
 mod nvml;
 

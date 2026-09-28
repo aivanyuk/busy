@@ -1,5 +1,5 @@
 //! GPU adapters (DXGI), utilization/memory/per-process (PDH "GPU Engine"/"GPU Adapter Memory"),
-//! generic temperature/fan (D3DKMT ADAPTERPERFDATA, what Task Manager shows) and NVML extras.
+//! generic temperature/fan (D3DKMT ADAPTERPERFDATA, what Task Manager shows) and NVML/ADL extras.
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -15,7 +15,7 @@ use windows::Win32::System::Threading::{
 };
 use windows::core::{PWSTR, w};
 
-use crate::nvml::Nvml;
+use crate::{adl::Adl, nvml::Nvml};
 
 const REENUM: Duration = Duration::from_secs(60);
 const PDH_FMT_NOCAP100: u32 = 0x8000;
@@ -84,6 +84,7 @@ impl Drop for Kmt {
 enum Vendor {
     None,
     Nvml(*mut std::ffi::c_void),
+    Adl(i32),
 }
 
 struct Adapter {
@@ -273,13 +274,22 @@ pub struct GpuSource {
     enum_at: Option<Instant>,
     pdh: Option<Pdh>,
     nvml: Option<Nvml>,
+    adl: Option<Adl>,
     names: HashMap<u32, String>,
     buf: Vec<u64>,
 }
 
 impl GpuSource {
     pub(crate) fn new() -> Self {
-        Self { adapters: Vec::new(), enum_at: None, pdh: None, nvml: None, names: HashMap::new(), buf: Vec::new() }
+        Self {
+            adapters: Vec::new(),
+            enum_at: None,
+            pdh: None,
+            nvml: None,
+            adl: None,
+            names: HashMap::new(),
+            buf: Vec::new(),
+        }
     }
 
     fn refresh(&mut self) {
@@ -291,6 +301,9 @@ impl GpuSource {
         let has = |v| self.adapters.iter().any(|a| a.vendor_id == v);
         if self.nvml.is_none() && has(0x10DE) {
             self.nvml = Nvml::load();
+        }
+        if self.adl.is_none() && has(0x1002) {
+            self.adl = Adl::load();
         }
         // Bind vendor devices: PCI bus/device first, else ids + occurrence order.
         let mut used = HashSet::new();
@@ -304,6 +317,11 @@ impl GpuSource {
                     used.insert(i);
                     a.vendor = Vendor::Nvml(n.devices[i].handle);
                 }
+            }
+            if let (Some(adl), Some(pci)) = (&self.adl, a.pci)
+                && let Some(x) = adl.adapters.iter().find(|x| (x.1, x.2) == pci)
+            {
+                a.vendor = Vendor::Adl(x.0);
             }
         }
     }
@@ -380,8 +398,9 @@ impl Source for GpuSource {
                 g.engines = types;
 
                 let kmt = a.kmt_stats();
-                let vs = match (&a.vendor, &self.nvml) {
-                    (Vendor::Nvml(d), Some(n)) => n.stats(*d),
+                let vs = match (&a.vendor, &self.nvml, &self.adl) {
+                    (Vendor::Nvml(d), Some(n), _) => n.stats(*d),
+                    (Vendor::Adl(i), _, Some(adl)) => adl.stats(*i),
                     _ => Stats::default(),
                 };
                 vs.or(kmt).apply(&mut g);
