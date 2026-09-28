@@ -18,6 +18,8 @@ struct State {
     cfg: Config,
     latest: Option<Snapshot>,
     stop: bool,
+    /// Bumped on config change so the waiting loop re-evaluates its deadline.
+    generation: u64,
 }
 
 struct Shared {
@@ -33,12 +35,21 @@ pub struct Sampler {
 impl Sampler {
     /// Posts `msg` to `notify` whenever a new snapshot is ready.
     pub fn start(cfg: Config, notify: HWND, msg: u32) -> Self {
-        let shared =
-            Arc::new(Shared { state: Mutex::new(State { cfg, latest: None, stop: false }), cv: Condvar::new() });
+        let shared = Arc::new(Shared {
+            state: Mutex::new(State { cfg, latest: None, stop: false, generation: 0 }),
+            cv: Condvar::new(),
+        });
         let hwnd = notify.0 as isize;
         let sh = shared.clone();
         let thread = std::thread::Builder::new().name("busy-sampler".into()).spawn(move || run(sh, hwnd, msg)).ok();
         Self { shared, thread }
+    }
+
+    pub fn set_config(&self, cfg: &Config) {
+        let mut st = lock(&self.shared.state);
+        st.cfg = cfg.clone();
+        st.generation += 1;
+        self.shared.cv.notify_all();
     }
 
     pub fn take(&self) -> Option<Snapshot> {
@@ -87,7 +98,12 @@ fn run(shared: Arc<Shared>, hwnd: isize, msg: u32) {
             if now >= deadline {
                 break;
             }
+            let generation = st.generation;
             st = shared.cv.wait_timeout(st, deadline - now).unwrap_or_else(PoisonError::into_inner).0;
+            // A config change may enable modules that should appear promptly.
+            if st.generation != generation && started.elapsed() >= Duration::from_millis(250) {
+                break;
+            }
         }
     }
     drop(sources);

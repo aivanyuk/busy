@@ -1,4 +1,4 @@
-//! Application state and message routing (UI thread only).
+//! Application state, config handling and message routing (UI thread only).
 //!
 //! The widget's input queue is attached to explorer's taskbar thread, so nothing here may block:
 //! sampling runs on the sampler thread and config file IO on short-lived worker threads.
@@ -8,7 +8,7 @@ use crate::render::Gfx;
 use crate::sampler::Sampler;
 use crate::taskbar::Taskbar;
 use crate::theme::Theme;
-use busy_core::{Config, SensorKind, SensorReading, Snapshot};
+use busy_core::{Anchor, Config, Module, SensorKind, SensorReading, Snapshot};
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use windows::Win32::Foundation::*;
@@ -20,6 +20,10 @@ pub const WM_APP_SNAPSHOT: u32 = WM_APP + 1;
 pub const WM_APP_RENDER: u32 = WM_APP + 2;
 
 const TIMER_WATCH: usize = 1;
+const ID_EXIT: u32 = 2;
+const ID_ANCHOR_TRAY: u32 = 3;
+const ID_ANCHOR_LEFT: u32 = 4;
+const ID_TOGGLE: u32 = 100;
 
 static MAIN: AtomicIsize = AtomicIsize::new(0);
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
@@ -236,6 +240,108 @@ impl App {
             tb.hover = hover;
             let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
             tb.render(&ctx);
+        }
+    }
+
+    /// Applies a new config live; `save` persists it on a worker thread.
+    fn apply_config(&mut self, mut cfg: Config, save: bool) {
+        cfg.normalize();
+        if cfg == self.cfg {
+            return;
+        }
+        let old = std::mem::replace(&mut self.cfg, cfg);
+        self.sampler.set_config(&self.cfg);
+        let cap = capacity(self.cfg.history_secs, self.cfg.interval_ms);
+        if cap != capacity(old.history_secs, old.interval_ms) {
+            self.hist.set_capacity(cap);
+        }
+        if old.theme != self.cfg.theme {
+            self.refresh_theme();
+        } else {
+            self.render_all();
+        }
+        if save {
+            let cfg = self.cfg.clone();
+            std::thread::spawn(move || cfg.save());
+        }
+    }
+
+    fn on_command(&mut self, id: u32) {
+        let mut cfg = self.cfg.clone();
+        match id {
+            ID_EXIT => return post_close(),
+            ID_ANCHOR_TRAY => cfg.anchor = Anchor::NearTray,
+            ID_ANCHOR_LEFT => cfg.anchor = Anchor::Left,
+            id if (ID_TOGGLE..ID_TOGGLE + Module::ALL.len() as u32).contains(&id) => {
+                let m = Module::ALL[(id - ID_TOGGLE) as usize];
+                if let Some(mc) = cfg.modules.iter_mut().find(|c| c.module == m) {
+                    mc.taskbar = !mc.taskbar;
+                }
+            }
+            _ => return,
+        }
+        self.apply_config(cfg, true);
+    }
+}
+
+fn post_close() {
+    unsafe {
+        let _ = PostMessageW(Some(main_hwnd()), WM_CLOSE, WPARAM(0), LPARAM(0));
+    }
+}
+
+/// Shows the widget's context menu. Runs outside the app borrow: TrackPopupMenu spins a modal loop.
+pub fn context_menu() {
+    let Some(cfg) = with(|a| a.cfg.clone()) else { return };
+    let main = main_hwnd();
+    unsafe {
+        let (Ok(menu), Ok(sub_mods), Ok(sub_pos)) = (CreatePopupMenu(), CreatePopupMenu(), CreatePopupMenu()) else {
+            return;
+        };
+        let checked = |b: bool| if b { MF_CHECKED } else { MF_UNCHECKED };
+        for mc in &cfg.modules {
+            let idx = Module::ALL.iter().position(|m| *m == mc.module).unwrap_or(0) as u32;
+            let label: Vec<u16> = mc.module.label().encode_utf16().chain([0]).collect();
+            let _ = AppendMenuW(
+                sub_mods,
+                MF_STRING | checked(mc.taskbar),
+                (ID_TOGGLE + idx) as usize,
+                PCWSTR(label.as_ptr()),
+            );
+        }
+        let _ = AppendMenuW(
+            sub_pos,
+            MF_STRING | checked(cfg.anchor == Anchor::NearTray),
+            ID_ANCHOR_TRAY as usize,
+            w!("Next to notification area"),
+        );
+        let _ = AppendMenuW(
+            sub_pos,
+            MF_STRING | checked(cfg.anchor == Anchor::Left),
+            ID_ANCHOR_LEFT as usize,
+            w!("Left edge"),
+        );
+        let _ = AppendMenuW(menu, MF_POPUP, sub_mods.0 as usize, w!("Show on taskbar"));
+        let _ = AppendMenuW(menu, MF_POPUP, sub_pos.0 as usize, w!("Position"));
+        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
+        let _ = AppendMenuW(menu, MF_STRING, ID_EXIT as usize, w!("Exit"));
+        let mut pt = POINT::default();
+        let _ = GetCursorPos(&mut pt);
+        // Required so the menu closes when clicking elsewhere.
+        let _ = SetForegroundWindow(main);
+        let cmd = TrackPopupMenu(
+            menu,
+            TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_BOTTOMALIGN | TPM_RIGHTALIGN,
+            pt.x,
+            pt.y,
+            None,
+            main,
+            None,
+        );
+        let _ = PostMessageW(Some(main), WM_NULL, WPARAM(0), LPARAM(0));
+        let _ = DestroyMenu(menu);
+        if cmd.0 > 0 {
+            with(|a| a.on_command(cmd.0 as u32));
         }
     }
 }
