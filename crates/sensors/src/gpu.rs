@@ -1,7 +1,7 @@
 //! GPU adapters (DXGI), utilization/memory/per-process (PDH "GPU Engine"/"GPU Adapter Memory"),
-//! generic temperature/fan (D3DKMT ADAPTERPERFDATA, what Task Manager shows).
+//! generic temperature/fan (D3DKMT ADAPTERPERFDATA, what Task Manager shows) and NVML extras.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use busy_core::{GpuInfo, Module, ProcEntry, Snapshot, Source, TOP_N};
@@ -14,6 +14,8 @@ use windows::Win32::System::Threading::{
     OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 use windows::core::{PWSTR, w};
+
+use crate::nvml::Nvml;
 
 const REENUM: Duration = Duration::from_secs(60);
 const PDH_FMT_NOCAP100: u32 = 0x8000;
@@ -31,6 +33,18 @@ pub struct Stats {
 }
 
 impl Stats {
+    fn or(self, o: Stats) -> Stats {
+        Stats {
+            temp_c: self.temp_c.or(o.temp_c),
+            hotspot_c: self.hotspot_c.or(o.hotspot_c),
+            fan_rpm: self.fan_rpm.or(o.fan_rpm),
+            fan_pct: self.fan_pct.or(o.fan_pct),
+            power_w: self.power_w.or(o.power_w),
+            core_mhz: self.core_mhz.or(o.core_mhz),
+            mem_mhz: self.mem_mhz.or(o.mem_mhz),
+        }
+    }
+
     fn apply(&self, g: &mut GpuInfo) {
         g.temp_c = self.temp_c;
         g.hotspot_c = self.hotspot_c;
@@ -67,12 +81,22 @@ impl Drop for Kmt {
     }
 }
 
+enum Vendor {
+    None,
+    Nvml(*mut std::ffi::c_void),
+}
+
 struct Adapter {
     name: String,
     luid: u64,
     vram_total: u64,
+    vendor_id: u32,
+    ids: u32,
+    subsys: u32,
+    pci: Option<(u32, u32)>,
     kmt: Option<Kmt>,
     kmt_caps: D3DKMT_ADAPTER_PERFDATACAPS,
+    vendor: Vendor,
 }
 
 impl Adapter {
@@ -107,7 +131,12 @@ fn enumerate() -> Vec<Adapter> {
             continue;
         }
         let kmt = Kmt::open(d.AdapterLuid);
+        let mut addr = D3DKMT_ADAPTERADDRESS::default();
         let mut kmt_caps = D3DKMT_ADAPTER_PERFDATACAPS::default();
+        let pci = kmt
+            .as_ref()
+            .filter(|k| k.query(KMTQAITYPE_ADAPTERADDRESS, &mut addr))
+            .map(|_| (addr.BusNumber, addr.DeviceNumber));
         if let Some(k) = &kmt {
             k.query(KMTQAITYPE_ADAPTERPERFDATA_CAPS, &mut kmt_caps);
         }
@@ -116,8 +145,13 @@ fn enumerate() -> Vec<Adapter> {
             name: String::from_utf16_lossy(&d.Description[..len]).trim().to_owned(),
             luid,
             vram_total: d.DedicatedVideoMemory as u64,
+            vendor_id: d.VendorId,
+            ids: d.DeviceId << 16 | d.VendorId,
+            subsys: d.SubSysId,
+            pci,
             kmt,
             kmt_caps,
+            vendor: Vendor::None,
         });
     }
     out
@@ -238,13 +272,14 @@ pub struct GpuSource {
     adapters: Vec<Adapter>,
     enum_at: Option<Instant>,
     pdh: Option<Pdh>,
+    nvml: Option<Nvml>,
     names: HashMap<u32, String>,
     buf: Vec<u64>,
 }
 
 impl GpuSource {
     pub(crate) fn new() -> Self {
-        Self { adapters: Vec::new(), enum_at: None, pdh: None, names: HashMap::new(), buf: Vec::new() }
+        Self { adapters: Vec::new(), enum_at: None, pdh: None, nvml: None, names: HashMap::new(), buf: Vec::new() }
     }
 
     fn refresh(&mut self) {
@@ -252,6 +287,24 @@ impl GpuSource {
         self.adapters = enumerate();
         if self.pdh.is_none() {
             self.pdh = Pdh::open();
+        }
+        let has = |v| self.adapters.iter().any(|a| a.vendor_id == v);
+        if self.nvml.is_none() && has(0x10DE) {
+            self.nvml = Nvml::load();
+        }
+        // Bind vendor devices: PCI bus/device first, else ids + occurrence order.
+        let mut used = HashSet::new();
+        for a in &mut self.adapters {
+            if let Some(n) = &self.nvml {
+                let pick = n.devices.iter().position(|d| a.pci == Some((d.bus, d.dev))).or_else(|| {
+                    (0..n.devices.len())
+                        .find(|i| !used.contains(i) && n.devices[*i].ids == a.ids && n.devices[*i].subsys == a.subsys)
+                });
+                if let Some(i) = pick {
+                    used.insert(i);
+                    a.vendor = Vendor::Nvml(n.devices[i].handle);
+                }
+            }
         }
     }
 }
@@ -326,7 +379,12 @@ impl Source for GpuSource {
                 types.sort_by(|x, y| x.0.cmp(&y.0));
                 g.engines = types;
 
-                a.kmt_stats().apply(&mut g);
+                let kmt = a.kmt_stats();
+                let vs = match (&a.vendor, &self.nvml) {
+                    (Vendor::Nvml(d), Some(n)) => n.stats(*d),
+                    _ => Stats::default(),
+                };
+                vs.or(kmt).apply(&mut g);
                 g
             })
             .collect();
