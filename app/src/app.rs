@@ -3,6 +3,7 @@
 //! The widget's input queue is attached to explorer's taskbar thread, so nothing here may block:
 //! sampling runs on the sampler thread and config file IO on short-lived worker threads.
 
+use crate::flyout::Flyout;
 use crate::history::{History, capacity};
 use crate::render::Gfx;
 use crate::sampler::Sampler;
@@ -13,11 +14,13 @@ use std::cell::RefCell;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use windows::Win32::Foundation::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::System::SystemInformation::GetTickCount64;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{PCWSTR, Result, w};
 
 pub const WM_APP_SNAPSHOT: u32 = WM_APP + 1;
 pub const WM_APP_RENDER: u32 = WM_APP + 2;
+pub const WM_APP_FLYOUT_DEACTIVATED: u32 = WM_APP + 4;
 
 const TIMER_WATCH: usize = 1;
 const ID_EXIT: u32 = 2;
@@ -26,6 +29,7 @@ const ID_ANCHOR_LEFT: u32 = 4;
 const ID_TOGGLE: u32 = 100;
 
 static MAIN: AtomicIsize = AtomicIsize::new(0);
+static FLYOUT: AtomicIsize = AtomicIsize::new(0);
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
 
 thread_local! {
@@ -49,6 +53,8 @@ pub struct App {
     theme: Theme,
     gfx: Gfx,
     taskbar: Option<Taskbar>,
+    flyout: Option<Flyout>,
+    open_flyout: bool,
 }
 
 /// Runs `f` on the app state unless it is already borrowed (re-entrant message); then returns None.
@@ -103,7 +109,7 @@ pub fn pinned_sensor<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a SensorR
     temps().filter(is_cpu).max_by(hottest).or_else(|| temps().max_by(hottest))
 }
 
-pub fn run() -> Result<()> {
+pub fn run(open_flyout: bool) -> Result<()> {
     let cfg = Config::load();
     let gfx = Gfx::new()?;
     register_class(w!("busy.main"), Some(main_proc));
@@ -133,14 +139,20 @@ pub fn run() -> Result<()> {
         SetTimer(Some(main), TIMER_WATCH, 1000, None);
     }
     let theme = Theme::resolve(cfg.theme);
+    let flyout = Flyout::create(&gfx, main, &theme);
+    if let Some(f) = &flyout {
+        FLYOUT.store(f.hwnd.0 as isize, Ordering::Relaxed);
+    }
     let app = App {
         sampler: Sampler::start(cfg.clone(), main, WM_APP_SNAPSHOT),
         hist: History::new(capacity(cfg.history_secs, cfg.interval_ms)),
         snap: Snapshot::default(),
         theme,
         taskbar: Taskbar::create(&gfx),
+        flyout,
         gfx,
         cfg,
+        open_flyout,
     };
     APP.with(|a| *a.borrow_mut() = Some(app));
 
@@ -164,6 +176,17 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             }
             WM_APP_RENDER => {
                 with(App::render_all);
+            }
+            WM_APP_FLYOUT_DEACTIVATED => {
+                with(|a| {
+                    if let Some(f) = &mut a.flyout
+                        && GetForegroundWindow() != f.hwnd
+                        // Debug builds: `BUSY_PIN_FLYOUT=1` keeps it open for screenshots.
+                        && !(cfg!(debug_assertions) && std::env::var_os("BUSY_PIN_FLYOUT").is_some())
+                    {
+                        f.hide(true);
+                    }
+                });
             }
             WM_TIMER => {
                 with(App::watch);
@@ -205,12 +228,18 @@ impl App {
         self.hist.push(&snap, sensor);
         self.snap = snap;
         self.render_all();
+        if std::mem::take(&mut self.open_flyout) {
+            self.toggle_flyout();
+        }
     }
 
     fn render_all(&mut self) {
         let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
         if let Some(tb) = &mut self.taskbar {
             tb.render(&ctx);
+        }
+        if let Some(f) = &mut self.flyout {
+            f.render(&ctx);
         }
     }
 
@@ -232,6 +261,9 @@ impl App {
 
     fn refresh_theme(&mut self) {
         self.theme = Theme::resolve(self.cfg.theme);
+        if let Some(f) = &mut self.flyout {
+            f.apply_theme(&self.theme);
+        }
         self.render_all();
     }
 
@@ -240,6 +272,32 @@ impl App {
             tb.hover = hover;
             let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
             tb.render(&ctx);
+        }
+    }
+
+    pub fn toggle_flyout(&mut self) {
+        let (Some(f), Some(tb)) = (&mut self.flyout, &self.taskbar) else { return };
+        if f.visible {
+            f.hide(false);
+        } else if unsafe { GetTickCount64() }.saturating_sub(f.deactivated_at) < 250 {
+            // The press that deactivated (and hid) the flyout was on the widget itself: stay closed.
+        } else {
+            let dpi = unsafe { windows::Win32::UI::HiDpi::GetDpiForWindow(tb.tray) };
+            let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
+            f.show(&ctx, tb.screen_rect(), dpi);
+        }
+    }
+
+    pub fn hide_flyout(&mut self) {
+        if let Some(f) = &mut self.flyout {
+            f.hide(false);
+        }
+    }
+
+    pub fn flyout_event(&mut self, ev: impl FnOnce(&mut Flyout, &Ctx)) {
+        let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
+        if let Some(f) = &mut self.flyout {
+            ev(f, &ctx);
         }
     }
 
@@ -292,7 +350,12 @@ fn post_close() {
 
 /// Shows the widget's context menu. Runs outside the app borrow: TrackPopupMenu spins a modal loop.
 pub fn context_menu() {
-    let Some(cfg) = with(|a| a.cfg.clone()) else { return };
+    let Some(cfg) = with(|a| {
+        a.hide_flyout();
+        a.cfg.clone()
+    }) else {
+        return;
+    };
     let main = main_hwnd();
     unsafe {
         let (Ok(menu), Ok(sub_mods), Ok(sub_pos)) = (CreatePopupMenu(), CreatePopupMenu(), CreatePopupMenu()) else {

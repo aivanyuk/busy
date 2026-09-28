@@ -1,6 +1,6 @@
 //! The widget embedded in the taskbar: a layered WS_CHILD of `Shell_TrayWnd` rendered with per-pixel alpha.
 
-use crate::app::{self, Ctx};
+use crate::app::{self, App, Ctx};
 use crate::fmt;
 use crate::history::Series;
 use crate::render::{Align, Canvas, Gfx, Rect, nice_max};
@@ -162,6 +162,14 @@ impl Taskbar {
         unsafe {
             IsWindow(Some(self.hwnd)).as_bool() && IsWindow(Some(self.tray)).as_bool() && find_tray() == Some(self.tray)
         }
+    }
+
+    pub fn screen_rect(&self) -> RECT {
+        let mut r = RECT::default();
+        unsafe {
+            let _ = GetWindowRect(self.hwnd, &mut r);
+        }
+        r
     }
 
     /// Re-lays out, repositions (only when changed) and redraws the widget.
@@ -540,6 +548,10 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
             }
             WM_MOUSELEAVE => {
                 app::with(|a| a.set_hover(false));
+                LRESULT(0)
+            }
+            WM_LBUTTONUP => {
+                app::with(App::toggle_flyout);
                 LRESULT(0)
             }
             WM_RBUTTONUP => {
