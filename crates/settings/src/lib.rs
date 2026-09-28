@@ -4,6 +4,7 @@
 //! [`is_dialog_message`] before `TranslateMessage`/`DispatchMessageW` so keyboard navigation works.
 
 pub mod autostart;
+mod dark;
 mod window;
 
 use busy_core::Config;
