@@ -1,5 +1,6 @@
 //! System metric collectors (CPU, memory, disk, network, battery, processes) built on Win32 APIs.
 
+mod battery;
 mod cpu;
 mod disk;
 mod memory;
@@ -16,5 +17,6 @@ pub fn sources() -> Vec<Box<dyn Source>> {
         Box::new(memory::Memory),
         Box::new(disk::Disk::new()),
         Box::new(network::Network::default()),
+        Box::new(battery::Battery::default()),
     ]
 }
