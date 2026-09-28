@@ -542,6 +542,10 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
                 app::with(|a| a.set_hover(false));
                 LRESULT(0)
             }
+            WM_RBUTTONUP => {
+                app::context_menu();
+                LRESULT(0)
+            }
             WM_DPICHANGED_AFTERPARENT | WM_DISPLAYCHANGE => {
                 app::post(app::WM_APP_RENDER);
                 LRESULT(0)
