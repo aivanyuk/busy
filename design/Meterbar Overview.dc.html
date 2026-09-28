@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+html,body{margin:0;background:#e7e6e3}
+*{box-sizing:border-box}
+a{color:#0067C0;text-decoration:none}
+a:hover{color:#004E93;text-decoration:underline}
+</style>
+</helmet>
+<div style="min-height:100%;background:#e7e6e3;padding:64px;display:flex;flex-direction:column;gap:88px;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,sans-serif;color:#1a1a1a;width:max-content">
+
+  <section style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+      <span style="font-size:13px;font-weight:600;letter-spacing:.08em;color:#5d5d5d">MODULE FLYOUTS · 3 LAYOUTS</span>
+      <span style="font-size:32px;font-weight:600">What opens when you click a reading</span>
+      <span style="font-size:16px;color:#4d4d4d;text-wrap:pretty">Same data, three densities. <a href="#1a">1a</a> mirrors Task Manager's depth, <a href="#1b">1b</a> is closest to the Stats popup — narrow rows, no cards — and <a href="#1c">1c</a> leans into Windows 11 tiles with a gauge ring. All artboards are live.</span>
+    </div>
+    <div style="display:flex;gap:40px;flex-wrap:wrap">
+      <div id="1a" style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="padding:2px 8px;border-radius:4px;background:#1a1a1a;color:#fff;font-size:13px;font-weight:600">1a</span><span style="font-size:15px;font-weight:600">Detailed</span><span style="font-size:14px;color:#5d5d5d">360 px · chart, cores, stats grid, processes</span></div>
+        <div style="position:relative;width:760px;height:760px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="cpu" flyout-layout="detailed" theme="dark" hint-size="760px,760px"></dc-import></div>
+      </div>
+      <div id="1b" style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="padding:2px 8px;border-radius:4px;background:#1a1a1a;color:#fff;font-size:13px;font-weight:600">1b</span><span style="font-size:15px;font-weight:600">Compact</span><span style="font-size:14px;color:#5d5d5d">300 px · key/value rows, Stats-like density</span></div>
+        <div style="position:relative;width:760px;height:760px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="cpu" flyout-layout="compact" theme="dark" hint-size="760px,760px"></dc-import></div>
+      </div>
+      <div id="1c" style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="padding:2px 8px;border-radius:4px;background:#1a1a1a;color:#fff;font-size:13px;font-weight:600">1c</span><span style="font-size:15px;font-weight:600">Tiles</span><span style="font-size:14px;color:#5d5d5d">380 px · gauge ring, stat tiles, process bars</span></div>
+        <div style="position:relative;width:760px;height:760px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="cpu" flyout-layout="tiles" theme="dark" hint-size="760px,760px"></dc-import></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:40px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-size:14px;color:#5d5d5d">1a · Network, light</span>
+        <div style="position:relative;width:760px;height:700px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="net" flyout-layout="detailed" theme="light" hint-size="760px,700px"></dc-import></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-size:14px;color:#5d5d5d">1b · Memory, light</span>
+        <div style="position:relative;width:760px;height:700px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="mem" flyout-layout="compact" theme="light" hint-size="760px,700px"></dc-import></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-size:14px;color:#5d5d5d">1c · Sensors, light</span>
+        <div style="position:relative;width:760px;height:700px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="sens" flyout-layout="tiles" theme="light" hint-size="760px,700px"></dc-import></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+      <span style="font-size:13px;font-weight:600;letter-spacing:.08em;color:#5d5d5d">TASKBAR WIDGETS</span>
+      <span style="font-size:32px;font-weight:600">Text, graph and bar styles</span>
+      <span style="font-size:16px;color:#4d4d4d;text-wrap:pretty">Every reading picks its own style. Network and disk add a two-line up/down readout. Shown here with all seven readings enabled.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;color:#5d5d5d">Default mix — CPU graph · memory bar · disk and network up/down</span><div style="position:relative;width:1400px;height:100px;border-radius:10px;overflow:hidden"><dc-import name="Meterbar" initial-view="none" theme="dark" hint-size="1400px,100px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;color:#5d5d5d">All text</span><div style="position:relative;width:1400px;height:100px;border-radius:10px;overflow:hidden"><dc-import name="Meterbar" initial-view="none" widget-preset="text" theme="dark" hint-size="1400px,100px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;color:#5d5d5d">All graphs</span><div style="position:relative;width:1400px;height:100px;border-radius:10px;overflow:hidden"><dc-import name="Meterbar" initial-view="none" widget-preset="graph" theme="dark" hint-size="1400px,100px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;color:#5d5d5d">All bars — CPU shows per-core pairs</span><div style="position:relative;width:1400px;height:100px;border-radius:10px;overflow:hidden"><dc-import name="Meterbar" initial-view="none" widget-preset="bar" theme="dark" hint-size="1400px,100px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;color:#5d5d5d">Light theme, widgets on the left edge</span><div style="position:relative;width:1400px;height:100px;border-radius:10px;overflow:hidden"><dc-import name="Meterbar" initial-view="none" widget-preset="graph" theme="light" position="left" hint-size="1400px,100px"></dc-import></div></div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+      <span style="font-size:13px;font-weight:600;letter-spacing:.08em;color:#5d5d5d">SETTINGS</span>
+      <span style="font-size:32px;font-weight:600">One page per reading</span>
+      <span style="font-size:16px;color:#4d4d4d;text-wrap:pretty">General holds startup, placement, default refresh and theme. Each module page has a live preview, style, color and its own update interval.</span>
+    </div>
+    <div style="display:flex;gap:40px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:12px"><span style="font-size:14px;color:#5d5d5d">General · dark</span><div style="position:relative;width:1180px;height:820px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="settings" theme="dark" hint-size="1180px,820px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:12px"><span style="font-size:14px;color:#5d5d5d">CPU · light</span><div style="position:relative;width:1180px;height:820px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="settings-cpu" theme="light" hint-size="1180px,820px"></dc-import></div></div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+      <span style="font-size:13px;font-weight:600;letter-spacing:.08em;color:#5d5d5d">FIRST RUN</span>
+      <span style="font-size:32px;font-weight:600">Pick readings, pick a side, done</span>
+      <span style="font-size:16px;color:#4d4d4d;text-wrap:pretty">Toggling a card updates the taskbar behind the window immediately, so the choice is visible before committing.</span>
+    </div>
+    <div style="display:flex;gap:40px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:12px"><span style="font-size:14px;color:#5d5d5d">Dark</span><div style="position:relative;width:1000px;height:760px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="onboarding" theme="dark" hint-size="1000px,760px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:12px"><span style="font-size:14px;color:#5d5d5d">Light</span><div style="position:relative;width:1000px;height:760px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="onboarding" theme="light" hint-size="1000px,760px"></dc-import></div></div>
+    </div>
+  </section>
+</div>
+</x-dc>
+</body>
+</html>

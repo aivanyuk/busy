@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+html,body{margin:0;height:100%}
+*{box-sizing:border-box}
+[data-mb] a{color:var(--link,#60CDFF);text-decoration:none}
+[data-mb] a:hover{color:var(--link,#60CDFF);text-decoration:underline}
+[data-mb]{--desk:radial-gradient(120% 100% at 25% 15%,#2b3b52 0%,#172131 50%,#0d131b 100%);--tb:rgba(28,28,28,.84);--tb-line:rgba(255,255,255,.08);--fly:rgba(44,44,44,.86);--fly-line:rgba(255,255,255,.09);--shadow:0 32px 64px rgba(0,0,0,.45),0 2px 21px rgba(0,0,0,.3);--fg:#ffffff;--fg2:#c8c8c8;--fg3:#a6a6a6;--hover:rgba(255,255,255,.06);--active:rgba(255,255,255,.09);--track:rgba(255,255,255,.12);--well:rgba(0,0,0,.2);--line:rgba(255,255,255,.07);--footer:rgba(0,0,0,.18);--win:#202020;--win-line:rgba(255,255,255,.1);--card:#2b2b2b;--card-line:#1d1d1d;--ctl:rgba(255,255,255,.06);--ctl-line:rgba(255,255,255,.07);--ctl-bottom:rgba(255,255,255,.16);--ctl-strong:rgba(255,255,255,.6);--pop:#2c2c2c;--accent:#4CC2FF;--on-accent:#000000;--link:#60CDFF;--tile:rgba(255,255,255,.16);--knob:rgba(255,255,255,.8);--grid:rgba(255,255,255,.06)}
+[data-mb][data-theme=light]{--desk:radial-gradient(120% 100% at 25% 15%,#eef3f9 0%,#d6e1ee 50%,#b9c9dc 100%);--tb:rgba(238,240,244,.86);--tb-line:rgba(0,0,0,.08);--fly:rgba(250,250,250,.88);--fly-line:rgba(0,0,0,.08);--shadow:0 32px 64px rgba(0,0,0,.18),0 2px 21px rgba(0,0,0,.12);--fg:#1a1a1a;--fg2:#4d4d4d;--fg3:#616161;--hover:rgba(0,0,0,.04);--active:rgba(0,0,0,.07);--track:rgba(0,0,0,.1);--well:rgba(0,0,0,.035);--line:rgba(0,0,0,.08);--footer:rgba(0,0,0,.035);--win:#f3f3f3;--win-line:rgba(0,0,0,.1);--card:#fbfbfb;--card-line:#e5e5e5;--ctl:#ffffff;--ctl-line:rgba(0,0,0,.08);--ctl-bottom:rgba(0,0,0,.2);--ctl-strong:rgba(0,0,0,.55);--pop:#f9f9f9;--accent:#005FB8;--on-accent:#ffffff;--link:#005FB8;--tile:rgba(0,0,0,.14);--knob:rgba(0,0,0,.6);--grid:rgba(0,0,0,.06)}
+</style>
+</helmet>
+<div data-mb="1" data-theme="{{ themeName }}" onClick="{{ closeAll }}" style="position:absolute;inset:0;overflow:hidden;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;color:var(--fg);background:var(--desk);user-select:none;-webkit-font-smoothing:antialiased">
+
+  <sc-if value="{{ settings }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ stopSel }}" data-screen-label="Settings" style="position:absolute;left:50%;top:calc(50% - 24px);transform:translate(-50%,-50%);width:min(1000px,calc(100% - 32px));height:min(700px,calc(100% - 96px));display:flex;flex-direction:column;background:var(--win);border:1px solid var(--win-line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden">
+      <div style="height:40px;flex:none;display:flex;align-items:center;gap:12px;padding-left:16px">
+        <div style="display:flex;align-items:flex-end;gap:2px;height:14px"><span style="width:3px;height:6px;border-radius:1px;background:var(--link)"></span><span style="width:3px;height:14px;border-radius:1px;background:var(--link)"></span><span style="width:3px;height:9px;border-radius:1px;background:var(--link)"></span></div>
+        <span style="font-size:12px">Meterbar Settings</span>
+        <div style="margin-left:auto;display:flex;height:40px">
+          <div onClick="{{ closeSettings }}" style="width:46px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:10px;height:1px;background:var(--fg)"></div></div>
+          <div style="width:46px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:10px;height:10px;border:1px solid var(--fg);border-radius:2px"></div></div>
+          <div onClick="{{ closeSettings }}" style="width:46px;display:grid;place-items:center;font-size:13px" style-hover="background:#C42B1C;color:#fff">✕</div>
+        </div>
+      </div>
+      <div style="flex:1;min-height:0;display:flex">
+        <div style="width:272px;flex:none;padding:4px 12px 16px 16px;display:flex;flex-direction:column;gap:3px;overflow:auto">
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 4px 16px">
+            <div style="width:48px;height:48px;border-radius:8px;background:var(--card);border:1px solid var(--card-line);display:flex;align-items:flex-end;justify-content:center;gap:3px;padding-bottom:13px"><span style="width:5px;height:10px;border-radius:1px;background:var(--link)"></span><span style="width:5px;height:22px;border-radius:1px;background:var(--link)"></span><span style="width:5px;height:15px;border-radius:1px;background:var(--link)"></span></div>
+            <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:600">Meterbar</span><span style="font-size:12px;color:var(--fg2)">{{ enabledText }}</span></div>
+          </div>
+          <div style="height:32px;margin-bottom:8px;padding:0 12px;border-radius:4px;background:var(--ctl);border:1px solid var(--ctl-line);border-bottom-color:var(--ctl-strong);display:flex;align-items:center;justify-content:space-between;color:var(--fg3)"><span>Find a setting</span><span style="width:11px;height:11px;border:1.5px solid var(--fg3);border-radius:50%"></span></div>
+          <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="8">
+            <div onClick="{{ n.onClick }}" style="position:relative;height:36px;flex:none;padding:0 12px 0 16px;border-radius:4px;display:flex;align-items:center;gap:14px;background:{{ n.bg }}" style-hover="background:var(--hover)">
+              <span style="position:absolute;left:0;top:9px;width:3px;height:18px;border-radius:2px;background:{{ n.pill }}"></span>
+              <span style="width:10px;height:10px;border-radius:3px;flex:none;background:{{ n.color }}"></span>
+              <span style="flex:1">{{ n.label }}</span>
+              <span style="font-size:12px;color:var(--fg3)">{{ n.status }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex:1;min-width:0;overflow:auto;padding:12px 32px 32px 20px">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:28px;font-weight:600;line-height:36px">{{ pageTitle }}</div>
+            <div style="font-size:13px;color:var(--fg2);margin-bottom:16px">{{ pageSub }}</div>
+            <sc-if value="{{ isModule }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:14px 16px 16px;border-radius:4px;background:var(--card);border:1px solid var(--card-line);display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--fg2)"><span>Preview</span><span>{{ pwNote }}</span></div>
+                <div style="height:48px;border-radius:4px;background:var(--tb);border:1px solid var(--tb-line);display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 8px">
+                  <div style="opacity:{{ pwOpacity }}"><dc-import name="MeterWidget" w="{{ pw }}" hint-size="60px,40px"></dc-import></div>
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;font-size:12px;line-height:16px;padding:0 8px"><span>{{ time }}</span><span>{{ date }}</span></div>
+                </div>
+              </div>
+            </sc-if>
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+              <sc-if value="{{ r.isHeader }}" hint-placeholder-val="{{ false }}"><div style="font-size:14px;font-weight:600;margin:14px 0 4px">{{ r.title }}</div></sc-if>
+              <sc-if value="{{ r.isCard }}" hint-placeholder-val="{{ true }}">
+                <div style="position:relative;min-height:68px;padding:12px 16px 12px 20px;border-radius:4px;background:var(--card);border:1px solid var(--card-line);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                  <div style="flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:2px">
+                    <span>{{ r.title }}</span>
+                    <span style="font-size:12px;color:var(--fg2);text-wrap:pretty">{{ r.desc }}</span>
+                  </div>
+                  <sc-if value="{{ r.isToggle }}" hint-placeholder-val="{{ false }}">
+                    <div onClick="{{ r.onToggle }}" style="display:flex;align-items:center;gap:12px;cursor:default">
+                      <span style="min-width:24px;text-align:right">{{ r.onText }}</span>
+                      <div style="position:relative;width:40px;height:20px;border-radius:10px;border:1px solid {{ r.tLine }};background:{{ r.tBg }}"><div style="position:absolute;top:3px;left:{{ r.kLeft }};width:12px;height:12px;border-radius:6px;background:{{ r.kBg }};transition:left .15s"></div></div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isSelect }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:relative">
+                      <div onClick="{{ r.onOpen }}" style="min-width:190px;height:32px;padding:0 12px;border-radius:4px;background:var(--ctl);border:1px solid var(--ctl-line);border-bottom-color:var(--ctl-bottom);display:flex;align-items:center;justify-content:space-between;gap:16px" style-hover="background:var(--active)">
+                        <span>{{ r.valueLabel }}</span>
+                        <span style="width:6px;height:6px;border-right:1.5px solid var(--fg2);border-bottom:1.5px solid var(--fg2);transform:translateY(-2px) rotate(45deg)"></span>
+                      </div>
+                      <sc-if value="{{ r.selOpen }}" hint-placeholder-val="{{ false }}">
+                        <div style="position:absolute;top:36px;right:0;min-width:100%;z-index:10;padding:4px;border-radius:8px;background:var(--pop);border:1px solid var(--win-line);box-shadow:0 8px 16px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:2px">
+                          <sc-for list="{{ r.options }}" as="o" hint-placeholder-count="3">
+                            <div onClick="{{ o.onPick }}" style="position:relative;height:32px;padding:0 16px;border-radius:4px;display:flex;align-items:center;white-space:nowrap;background:{{ o.bg }}" style-hover="background:var(--hover)"><span style="position:absolute;left:0;top:9px;width:3px;height:14px;border-radius:2px;background:{{ o.pill }}"></span>{{ o.label }}</div>
+                          </sc-for>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isSeg }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;padding:2px;gap:2px;border-radius:6px;background:var(--ctl);border:1px solid var(--ctl-line)">
+                      <sc-for list="{{ r.segs }}" as="s" hint-placeholder-count="3">
+                        <div onClick="{{ s.onPick }}" style="height:28px;padding:0 14px;border-radius:4px;display:flex;align-items:center;font-size:13px;background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isSwatch }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;gap:4px">
+                      <sc-for list="{{ r.swatches }}" as="s" hint-placeholder-count="6">
+                        <div onClick="{{ s.onPick }}" style="width:30px;height:30px;border-radius:50%;border:2px solid {{ s.ring }};display:grid;place-items:center"><div style="width:20px;height:20px;border-radius:50%;background:{{ s.color }}"></div></div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isButton }}" hint-placeholder-val="{{ false }}">
+                    <div onClick="{{ r.onBtn }}" style="height:32px;padding:0 16px;border-radius:4px;background:var(--ctl);border:1px solid var(--ctl-line);border-bottom-color:var(--ctl-bottom);display:flex;align-items:center" style-hover="background:var(--active)">{{ r.btnLabel }}</div>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </sc-for>
+            <sc-if value="{{ isGeneral }}" hint-placeholder-val="{{ true }}">
+              <div style="font-size:14px;font-weight:600;margin:14px 0 4px">Taskbar order</div>
+              <div style="border-radius:4px;background:var(--card);border:1px solid var(--card-line);display:flex;flex-direction:column">
+                <div style="padding:12px 16px 10px 20px;font-size:12px;color:var(--fg2)">Widgets appear left to right in this order.</div>
+                <sc-for list="{{ orderItems }}" as="o" hint-placeholder-count="7">
+                  <div style="height:48px;padding:0 12px 0 20px;display:flex;align-items:center;gap:14px;border-top:1px solid var(--line)">
+                    <span style="width:10px;height:10px;border-radius:3px;background:{{ o.color }}"></span>
+                    <span style="flex:1">{{ o.name }}</span>
+                    <span style="font-size:12px;color:var(--fg3);min-width:48px">{{ o.status }}</span>
+                    <div style="display:flex;gap:4px">
+                      <div onClick="{{ o.onUp }}" style="width:32px;height:32px;border-radius:4px;display:grid;place-items:center;opacity:{{ o.upOp }}" style-hover="background:var(--hover)">↑</div>
+                      <div onClick="{{ o.onDown }}" style="width:32px;height:32px;border-radius:4px;display:grid;place-items:center;opacity:{{ o.downOp }}" style-hover="background:var(--hover)">↓</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ onboarding }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ stop }}" data-screen-label="Onboarding" style="position:absolute;left:50%;top:calc(50% - 24px);transform:translate(-50%,-50%);width:min(680px,calc(100% - 32px));max-height:calc(100% - 80px);display:flex;flex-direction:column;background:var(--win);border:1px solid var(--win-line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden">
+      <div style="height:40px;flex:none;display:flex;align-items:center;gap:12px;padding-left:16px">
+        <div style="display:flex;align-items:flex-end;gap:2px;height:14px"><span style="width:3px;height:6px;border-radius:1px;background:var(--link)"></span><span style="width:3px;height:14px;border-radius:1px;background:var(--link)"></span><span style="width:3px;height:9px;border-radius:1px;background:var(--link)"></span></div>
+        <span style="font-size:12px">Meterbar</span>
+        <div onClick="{{ finishOnboarding }}" style="margin-left:auto;width:46px;height:40px;display:grid;place-items:center;font-size:13px" style-hover="background:#C42B1C;color:#fff">✕</div>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;padding:12px 32px 28px;display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:28px;font-weight:600;line-height:36px;text-wrap:pretty">Your PC's vitals, right on the taskbar</span>
+          <span style="color:var(--fg2);text-wrap:pretty">Pick what to show. Click any reading for details — you can change all of this later in Settings.</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-weight:600">Show on taskbar</span>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px">
+            <sc-for list="{{ obItems }}" as="o" hint-placeholder-count="7">
+              <div onClick="{{ o.onClick }}" style="height:52px;padding:0 14px;border-radius:6px;background:var(--card);border:1px solid {{ o.cardLine }};display:flex;align-items:center;gap:12px" style-hover="background:var(--active)">
+                <div style="width:20px;height:20px;flex:none;border-radius:4px;display:grid;place-items:center;font-size:13px;font-weight:700;background:{{ o.boxBg }};border:1px solid {{ o.boxLine }};color:var(--on-accent)">{{ o.check }}</div>
+                <span style="flex:1">{{ o.name }}</span>
+                <span style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ o.color }}">{{ o.sample }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-weight:600">Position</span>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px">
+            <sc-for list="{{ obPos }}" as="p" hint-placeholder-count="2">
+              <div onClick="{{ p.onClick }}" style="padding:14px;border-radius:6px;background:var(--card);border:1px solid var(--card-line);display:flex;align-items:flex-start;gap:12px" style-hover="background:var(--active)">
+                <div style="width:20px;height:20px;flex:none;border-radius:50%;border:{{ p.ring }};background:{{ p.fill }}"></div>
+                <div style="display:flex;flex-direction:column;gap:2px"><span>{{ p.label }}</span><span style="font-size:12px;color:var(--fg2)">{{ p.desc }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <div style="flex:none;padding:20px 24px;background:var(--footer);border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div onClick="{{ obStart.onClick }}" style="display:flex;align-items:center;gap:10px;margin-right:auto">
+          <div style="width:20px;height:20px;border-radius:4px;display:grid;place-items:center;font-size:13px;font-weight:700;background:{{ obStart.boxBg }};border:1px solid {{ obStart.boxLine }};color:var(--on-accent)">{{ obStart.check }}</div>
+          <span>Start with Windows</span>
+        </div>
+        <div onClick="{{ finishOnboarding }}" style="height:32px;padding:0 20px;border-radius:4px;background:var(--ctl);border:1px solid var(--ctl-line);border-bottom-color:var(--ctl-bottom);display:flex;align-items:center" style-hover="background:var(--active)">Skip</div>
+        <div onClick="{{ finishOnboarding }}" style="height:32px;padding:0 20px;border-radius:4px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center" style-hover="opacity:.9">Start monitoring</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isDetailed }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ stop }}" data-screen-label="Flyout detailed" style="position:absolute;bottom:60px;left:{{ flyLeft }};right:{{ flyRight }};width:360px;max-height:calc(100% - 72px);overflow:auto;display:flex;flex-direction:column;background:var(--fly);backdrop-filter:blur(48px) saturate(1.5);border:1px solid var(--fly-line);border-radius:8px;box-shadow:var(--shadow)">
+      <div style="padding:16px 16px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-weight:600">{{ fly.title }}</span><span style="font-size:12px;color:var(--fg2)">{{ fly.sub }}</span></div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;flex:none"><span style="font-size:24px;font-weight:600;line-height:30px;font-variant-numeric:tabular-nums">{{ fly.big }}</span><span style="font-size:12px;color:var(--fg3)">{{ fly.bigLabel }}</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="position:relative;height:86px;border-radius:4px;background:var(--well);border:1px solid var(--line);overflow:hidden">
+            <div style="position:absolute;left:0;right:0;top:25%;border-top:1px dashed var(--grid)"></div>
+            <div style="position:absolute;left:0;right:0;top:50%;border-top:1px dashed var(--grid)"></div>
+            <div style="position:absolute;left:0;right:0;top:75%;border-top:1px dashed var(--grid)"></div>
+            <svg width="324" height="84" style="position:absolute;left:0;top:0;display:block">
+              <polygon points="{{ fly.area }}" style="fill:{{ fly.color }};fill-opacity:.22"></polygon>
+              <polyline points="{{ fly.line }}" style="fill:none;stroke:{{ fly.color }};stroke-width:1.5;stroke-linejoin:round"></polyline>
+              <polyline points="{{ fly.line2 }}" style="fill:none;stroke:{{ fly.color2 }};stroke-width:1.5;stroke-linejoin:round"></polyline>
+            </svg>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--fg3)"><span>{{ fly.span }}</span><span>{{ fly.maxLabel }}</span></div>
+        </div>
+        <sc-if value="{{ fly.hasSeg }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px"><sc-for list="{{ fly.seg }}" as="g" hint-placeholder-count="4"><div style="flex:{{ g.grow }};background:{{ g.color }}"></div></sc-for></div>
+        </sc-if>
+        <sc-if value="{{ fly.hasLegend }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-wrap:wrap;gap:6px 16px">
+            <sc-for list="{{ fly.legend }}" as="l" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="width:8px;height:8px;border-radius:2px;background:{{ l.color }}"></span><span style="color:var(--fg2)">{{ l.label }}</span><span style="font-weight:600;font-variant-numeric:tabular-nums">{{ l.value }}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ fly.hasCores }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11px;color:var(--fg3)">Logical processors</span>
+            <div style="display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:3px;height:36px"><sc-for list="{{ fly.cores }}" as="k" hint-placeholder-count="16"><div style="display:flex;align-items:flex-end;border-radius:2px;background:var(--track);overflow:hidden"><div style="width:100%;height:{{ k.h }};background:{{ k.color }}"></div></div></sc-for></div>
+          </div>
+        </sc-if>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:10px 16px">
+        <sc-for list="{{ fly.stats }}" as="s" hint-placeholder-count="6">
+          <div style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:11px;color:var(--fg3)">{{ s.k }}</span><span style="font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.v }}</span></div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ fly.hasBars }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:12px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px">
+          <span style="font-size:12px;font-weight:600">{{ fly.barsTitle }}</span>
+          <sc-for list="{{ fly.bars }}" as="b" hint-placeholder-count="2">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;justify-content:space-between;gap:8px;font-size:12px"><span>{{ b.label }}</span><span style="color:var(--fg2);font-variant-numeric:tabular-nums">{{ b.text }}</span></div>
+              <div style="height:4px;border-radius:2px;background:var(--track);overflow:hidden"><div style="height:100%;width:{{ b.w }};background:{{ b.color }};border-radius:2px"></div></div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ fly.hasProcs }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:12px 16px 10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:12px;font-weight:600;margin-bottom:4px">{{ fly.procsTitle }}</span>
+          <sc-for list="{{ fly.procs }}" as="p" hint-placeholder-count="5">
+            <div style="height:26px;display:flex;align-items:center;gap:10px;font-size:12px"><span style="width:16px;height:16px;flex:none;border-radius:4px;background:var(--tile)"></span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span><span style="font-variant-numeric:tabular-nums;color:var(--fg2)">{{ p.v }}</span></div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px 10px 8px;background:var(--footer);border-top:1px solid var(--line)">
+        <div onClick="{{ fly.onTaskMgr }}" style="height:32px;padding:0 10px;border-radius:4px;display:flex;align-items:center;font-size:13px;color:var(--link)" style-hover="background:var(--hover)">Open Task Manager</div>
+        <div onClick="{{ fly.onSettings }}" style="height:32px;padding:0 14px;border-radius:4px;display:flex;align-items:center;font-size:13px;background:var(--ctl);border:1px solid var(--ctl-line);border-bottom-color:var(--ctl-bottom)" style-hover="background:var(--active)">{{ fly.settingsLabel }}</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ stop }}" data-screen-label="Flyout compact" style="position:absolute;bottom:60px;left:{{ flyLeft }};right:{{ flyRight }};width:300px;max-height:calc(100% - 72px);overflow:auto;display:flex;flex-direction:column;font-size:12px;background:var(--fly);backdrop-filter:blur(48px) saturate(1.5);border:1px solid var(--fly-line);border-radius:8px;box-shadow:var(--shadow)">
+      <div style="padding:12px 12px 10px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:13px;font-weight:600">{{ fly.title }}</span><span style="flex:1;min-width:0;font-size:11px;color:var(--fg3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ fly.sub }}</span><span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums">{{ fly.big }}</span></div>
+        <div style="position:relative;height:58px;border-radius:4px;background:var(--well);border:1px solid var(--line);overflow:hidden">
+          <div style="position:absolute;left:0;right:0;top:50%;border-top:1px dashed var(--grid)"></div>
+          <svg width="272" height="56" style="position:absolute;left:0;top:0;display:block">
+            <polygon points="{{ fly.area }}" style="fill:{{ fly.color }};fill-opacity:.22"></polygon>
+            <polyline points="{{ fly.line }}" style="fill:none;stroke:{{ fly.color }};stroke-width:1.25;stroke-linejoin:round"></polyline>
+            <polyline points="{{ fly.line2 }}" style="fill:none;stroke:{{ fly.color2 }};stroke-width:1.25;stroke-linejoin:round"></polyline>
+          </svg>
+        </div>
+        <sc-if value="{{ fly.hasCores }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:2px;height:18px"><sc-for list="{{ fly.cores }}" as="k" hint-placeholder-count="16"><div style="display:flex;align-items:flex-end;border-radius:1px;background:var(--track);overflow:hidden"><div style="width:100%;height:{{ k.h }};background:{{ k.color }}"></div></div></sc-for></div>
+        </sc-if>
+        <sc-if value="{{ fly.hasSeg }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;gap:2px"><sc-for list="{{ fly.seg }}" as="g" hint-placeholder-count="4"><div style="flex:{{ g.grow }};background:{{ g.color }}"></div></sc-for></div>
+        </sc-if>
+      </div>
+      <sc-if value="{{ fly.hasLegend }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:4px 12px;border-top:1px solid var(--line)">
+          <sc-for list="{{ fly.legend }}" as="l" hint-placeholder-count="3">
+            <div style="height:22px;display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:2px;background:{{ l.color }}"></span><span style="flex:1;color:var(--fg2)">{{ l.label }}</span><span style="font-weight:600;font-variant-numeric:tabular-nums">{{ l.value }}</span></div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <div style="padding:4px 12px;border-top:1px solid var(--line)">
+        <sc-for list="{{ fly.stats }}" as="s" hint-placeholder-count="6">
+          <div style="height:22px;display:flex;align-items:center;gap:8px"><span style="flex:1;color:var(--fg2)">{{ s.k }}</span><span style="font-variant-numeric:tabular-nums;white-space:nowrap">{{ s.v }}</span></div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ fly.hasBars }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:4px 12px;border-top:1px solid var(--line)">
+          <sc-for list="{{ fly.bars }}" as="b" hint-placeholder-count="2">
+            <div style="height:24px;display:flex;align-items:center;gap:8px"><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.label }}</span><div style="width:64px;height:4px;border-radius:2px;background:var(--track);overflow:hidden"><div style="height:100%;width:{{ b.w }};background:{{ b.color }}"></div></div><span style="min-width:48px;text-align:right;color:var(--fg2);font-variant-numeric:tabular-nums">{{ b.short }}</span></div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ fly.hasProcs }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:6px 12px 4px;border-top:1px solid var(--line)">
+          <div style="font-size:11px;color:var(--fg3);height:18px">{{ fly.procsTitle }}</div>
+          <sc-for list="{{ fly.procs }}" as="p" hint-placeholder-count="5">
+            <div style="height:22px;display:flex;align-items:center;gap:8px"><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span><span style="font-variant-numeric:tabular-nums;color:var(--fg2)">{{ p.v }}</span></div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <div style="display:flex;justify-content:space-between;padding:4px;background:var(--footer);border-top:1px solid var(--line)">
+        <div onClick="{{ fly.onTaskMgr }}" style="height:28px;padding:0 8px;border-radius:4px;display:flex;align-items:center;color:var(--link)" style-hover="background:var(--hover)">Task Manager</div>
+        <div onClick="{{ fly.onSettings }}" style="height:28px;padding:0 8px;border-radius:4px;display:flex;align-items:center;color:var(--link)" style-hover="background:var(--hover)">Settings</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isTiles }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ stop }}" data-screen-label="Flyout tiles" style="position:absolute;bottom:60px;left:{{ flyLeft }};right:{{ flyRight }};width:380px;max-height:calc(100% - 72px);overflow:auto;display:flex;flex-direction:column;background:var(--fly);backdrop-filter:blur(48px) saturate(1.5);border:1px solid var(--fly-line);border-radius:8px;box-shadow:var(--shadow)">
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="position:relative;width:56px;height:56px;flex:none">
+            <svg width="56" height="56" style="display:block;transform:rotate(-90deg)">
+              <circle cx="28" cy="28" r="22" style="fill:none;stroke:var(--track);stroke-width:6"></circle>
+              <circle cx="28" cy="28" r="22" style="fill:none;stroke:{{ fly.color }};stroke-width:6;stroke-linecap:round;stroke-dasharray:{{ fly.ring }}"></circle>
+            </svg>
+            <div style="position:absolute;inset:0;display:grid;place-items:center;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums">{{ fly.pctText }}</div>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+            <span style="font-weight:600">{{ fly.title }}</span>
+            <span style="font-size:12px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ fly.sub }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;flex:none"><span style="font-size:20px;font-weight:600;font-variant-numeric:tabular-nums">{{ fly.big }}</span><span style="font-size:11px;color:var(--fg3)">{{ fly.bigLabel }}</span></div>
+        </div>
+        <div style="position:relative;height:74px;border-radius:6px;background:var(--well);border:1px solid var(--line);overflow:hidden">
+          <svg width="344" height="72" style="position:absolute;left:0;top:0;display:block">
+            <polygon points="{{ fly.area }}" style="fill:{{ fly.color }};fill-opacity:.22"></polygon>
+            <polyline points="{{ fly.line }}" style="fill:none;stroke:{{ fly.color }};stroke-width:1.5;stroke-linejoin:round"></polyline>
+            <polyline points="{{ fly.line2 }}" style="fill:none;stroke:{{ fly.color2 }};stroke-width:1.5;stroke-linejoin:round"></polyline>
+          </svg>
+          <div style="position:absolute;left:8px;top:6px;display:flex;gap:10px;font-size:11px">
+            <sc-for list="{{ fly.legend }}" as="l" hint-placeholder-count="2"><span style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:2px;background:{{ l.color }}"></span><span style="color:var(--fg2)">{{ l.label }}</span><span style="font-weight:600;font-variant-numeric:tabular-nums">{{ l.value }}</span></span></sc-for>
+          </div>
+        </div>
+        <sc-if value="{{ fly.hasCores }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:3px;height:28px"><sc-for list="{{ fly.cores }}" as="k" hint-placeholder-count="16"><div style="display:flex;align-items:flex-end;border-radius:2px;background:var(--track);overflow:hidden"><div style="width:100%;height:{{ k.h }};background:{{ k.color }}"></div></div></sc-for></div>
+        </sc-if>
+        <sc-if value="{{ fly.hasSeg }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px"><sc-for list="{{ fly.seg }}" as="g" hint-placeholder-count="4"><div style="flex:{{ g.grow }};background:{{ g.color }}"></div></sc-for></div>
+        </sc-if>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">
+          <sc-for list="{{ fly.stats }}" as="s" hint-placeholder-count="6">
+            <div style="padding:8px 10px;border-radius:6px;background:var(--well);border:1px solid var(--line);display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:11px;color:var(--fg3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.k }}</span><span style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.v }}</span></div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ fly.hasBars }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ fly.bars }}" as="b" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;gap:8px;font-size:12px"><span>{{ b.label }}</span><span style="color:var(--fg2);font-variant-numeric:tabular-nums">{{ b.text }}</span></div><div style="height:6px;border-radius:3px;background:var(--track);overflow:hidden"><div style="height:100%;width:{{ b.w }};background:{{ b.color }};border-radius:3px"></div></div></div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ fly.hasProcs }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <span style="font-size:12px;font-weight:600;margin-bottom:3px">{{ fly.procsTitle }}</span>
+            <sc-for list="{{ fly.procs }}" as="p" hint-placeholder-count="5">
+              <div style="position:relative;height:28px;padding:0 10px;border-radius:4px;display:flex;align-items:center;gap:10px;font-size:12px;overflow:hidden">
+                <div style="position:absolute;left:0;top:0;bottom:0;width:{{ p.w }};background:{{ fly.color }};opacity:.16;border-radius:4px"></div>
+                <span style="position:relative;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span>
+                <span style="position:relative;font-variant-numeric:tabular-nums;color:var(--fg2)">{{ p.v }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px 10px 8px;background:var(--footer);border-top:1px solid var(--line)">
+        <div onClick="{{ fly.onTaskMgr }}" style="height:32px;padding:0 10px;border-radius:4px;display:flex;align-items:center;font-size:13px;color:var(--link)" style-hover="background:var(--hover)">Open Task Manager</div>
+        <div onClick="{{ fly.onSettings }}" style="height:32px;padding:0 14px;border-radius:4px;display:flex;align-items:center;font-size:13px;background:var(--ctl);border:1px solid var(--ctl-line);border-bottom-color:var(--ctl-bottom)" style-hover="background:var(--active)">{{ fly.settingsLabel }}</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <div data-screen-label="Taskbar" style="position:absolute;left:0;right:0;bottom:0;height:48px;display:grid;grid-template-columns:minmax(max-content,1fr) auto minmax(max-content,1fr);align-items:center;column-gap:8px;padding:0 4px 0 8px;background:var(--tb);backdrop-filter:blur(30px) saturate(1.25);border-top:1px solid var(--tb-line)">
+    <div style="display:flex;align-items:center;gap:2px">
+      <sc-if value="{{ widgetsLeft }}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{ widgets }}" as="w" hint-placeholder-count="0"><dc-import name="MeterWidget" w="{{ w }}" hint-size="56px,40px"></dc-import></sc-for>
+      </sc-if>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px">
+      <div style="width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="display:grid;grid-template-columns:9px 9px;gap:1.5px"><span style="height:9px;background:var(--link);border-radius:1px"></span><span style="height:9px;background:var(--link);border-radius:1px"></span><span style="height:9px;background:var(--link);border-radius:1px"></span><span style="height:9px;background:var(--link);border-radius:1px"></span></div></div>
+      <div style="width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:14px;height:14px;border:1.5px solid var(--fg);border-radius:50%"></div></div>
+      <div style="position:relative;width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:24px;height:24px;border-radius:5px;background:var(--tile)"></div><span style="position:absolute;bottom:2px;left:17px;width:6px;height:3px;border-radius:2px;background:var(--fg3)"></span></div>
+      <div style="position:relative;width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:24px;height:24px;border-radius:5px;background:var(--tile)"></div><span style="position:absolute;bottom:2px;left:17px;width:6px;height:3px;border-radius:2px;background:var(--fg3)"></span></div>
+      <div style="width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:24px;height:24px;border-radius:5px;background:var(--tile)"></div></div>
+      <div style="width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:24px;height:24px;border-radius:5px;background:var(--tile)"></div></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:2px">
+      <sc-if value="{{ widgetsRight }}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{ widgets }}" as="w" hint-placeholder-count="4"><dc-import name="MeterWidget" w="{{ w }}" hint-size="56px,40px"></dc-import></sc-for>
+        <div style="width:1px;height:20px;margin:0 4px;background:var(--line)"></div>
+      </sc-if>
+      <div style="width:28px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:6px;height:6px;border-left:1.5px solid var(--fg);border-top:1.5px solid var(--fg);transform:translateY(2px) rotate(45deg)"></div></div>
+      <div style="height:40px;padding:0 10px;border-radius:4px;display:flex;align-items:center;gap:12px" style-hover="background:var(--hover)">
+        <div style="display:flex;align-items:flex-end;gap:1.5px;height:13px"><span style="width:3px;height:4px;background:var(--fg)"></span><span style="width:3px;height:7px;background:var(--fg)"></span><span style="width:3px;height:10px;background:var(--fg)"></span><span style="width:3px;height:13px;background:var(--fg)"></span></div>
+        <div style="display:flex;align-items:center"><span style="width:4px;height:6px;background:var(--fg)"></span><span style="width:0;height:0;border-right:6px solid var(--fg);border-top:5px solid transparent;border-bottom:5px solid transparent;margin-left:-1px"></span></div>
+        <div style="display:flex;align-items:center;gap:1px"><div style="width:22px;height:11px;padding:1.5px;border:1.5px solid var(--fg);border-radius:3px"><div style="height:100%;width:{{ batW }};background:var(--fg);border-radius:1px"></div></div><span style="width:2px;height:5px;background:var(--fg);border-radius:0 1px 1px 0"></span></div>
+      </div>
+      <div style="height:40px;padding:0 8px;border-radius:4px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;font-size:12px;line-height:16px" style-hover="background:var(--hover)"><span>{{ time }}</span><span>{{ date }}</span></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;initialView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;cpu&quot;,&quot;gpu&quot;,&quot;mem&quot;,&quot;disk&quot;,&quot;net&quot;,&quot;bat&quot;,&quot;sens&quot;,&quot;settings&quot;,&quot;settings-cpu&quot;,&quot;settings-net&quot;,&quot;onboarding&quot;],&quot;default&quot;:&quot;cpu&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;,&quot;system&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;position&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;tray&quot;,&quot;left&quot;],&quot;default&quot;:&quot;tray&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;load&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;idle&quot;,&quot;normal&quot;,&quot;heavy&quot;],&quot;default&quot;:&quot;normal&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Simulation&quot;},&quot;widgetPreset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;default&quot;,&quot;text&quot;,&quot;graph&quot;,&quot;bar&quot;],&quot;default&quot;:&quot;default&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Simulation&quot;}}">
+class Component extends DCLogic {
+  N = 60;
+  PAL = { dark: ['#60CDFF', '#C3A1FF', '#6FD49A', '#E8C46A', '#FF9B7A', '#FF8AC6'], light: ['#0067C0', '#7A4FC4', '#0E7A45', '#8A5E00', '#C24A26', '#B8327A'] };
+  LOAD = { dark: ['#6FD49A', '#F2C661', '#FF7B72'], light: ['#0E7A45', '#8A5E00', '#C42B1C'] };
+  MODS = {
+    cpu: { name: 'CPU', short: 'CPU', sub: 'AMD Ryzen 7 7840U · 8 cores, 16 threads', color: 0, styles: ['graph', 'text', 'bar'] },
+    gpu: { name: 'GPU', short: 'GPU', sub: 'AMD Radeon 780M · integrated', color: 1, styles: ['graph', 'text', 'bar'] },
+    mem: { name: 'Memory', short: 'RAM', sub: '32 GB LPDDR5X · 6400 MT/s', color: 2, styles: ['bar', 'text', 'graph'] },
+    disk: { name: 'Disk', short: 'SSD', sub: 'Samsung PM9A1 · 1 TB NVMe', color: 3, styles: ['io', 'text', 'bar'] },
+    net: { name: 'Network', short: 'NET', sub: '', color: 0, styles: ['io', 'graph'] },
+    bat: { name: 'Battery', short: 'BAT', sub: 'Internal battery · 75 Wh design', color: 2, styles: ['text', 'bar'] },
+    sens: { name: 'Sensors', short: 'TEMP', sub: 'Temperatures, fans and power', color: 4, styles: ['text', 'graph'] },
+  };
+  KEYS = { cpu: ['cpu', 'sys'], gpu: ['gpu'], mem: ['mem'], disk: ['dr', 'dw'], net: ['nd', 'nu'], sens: ['temp'], bat: ['bat'] };
+  noop = () => {};
+  stop = e => e.stopPropagation();
+  state = this.initial();
+
+  clamp(v, lo = 0, hi = 100) { return Math.max(lo, Math.min(hi, v)); }
+
+  initial() {
+    const N = this.N, R = Math.random;
+    const s = (b, a, lo = 0, hi = 100) => Array.from({ length: N }, () => this.clamp(b + (R() - .5) * a, lo, hi));
+    const mk = (style, on, extra) => ({ on, style, label: true, color: -1, byLoad: false, iv: 0, ...extra });
+    return {
+      h: { cpu: s(20, 18, 1), sys: s(6, 5), gpu: s(7, 8), mem: s(61, 1.5), dr: s(2, 4, 0, 1e4), dw: s(1, 2, 0, 1e4), nd: s(60, 100, 0, 1e7), nu: s(12, 18, 0, 1e7), temp: s(50, 5), bat: Array(N).fill(78) },
+      cores: Array.from({ length: 16 }, () => this.clamp(20 + (R() - .5) * 40)),
+      j: Array.from({ length: 8 }, () => R()),
+      bat: 78, sessD: 1840, sessU: 212, secs: 8047, clock: new Date(),
+      open: null, settings: false, page: 'general', select: null, onboarding: false,
+      mods: { cpu: mk('graph', true, { bar: 'cores' }), gpu: mk('text', false), mem: mk('bar', true), disk: mk('io', true, { drive: 'C' }), net: mk('io', true, { units: 'bytes', iface: 'auto' }), bat: mk('text', false, { remaining: true }), sens: mk('text', false, { unit: 'C', sensor: 'cpu' }) },
+      gen: { startup: true, position: this.props?.position ?? 'tray', interval: 1, theme: this.props?.theme ?? 'dark' },
+      order: ['cpu', 'gpu', 'mem', 'disk', 'net', 'bat', 'sens'],
+    };
+  }
+
+  componentDidMount() {
+    this.timer = setInterval(() => this.tick(), 1000);
+    this.applyView(this.props.initialView ?? 'cpu');
+    this.applyPreset(this.props.widgetPreset);
+    this.onKey = e => { if (e.key === 'Escape') this.setState({ open: null, select: null }); };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { clearInterval(this.timer); window.removeEventListener('keydown', this.onKey); }
+  componentDidUpdate(pp) {
+    if (pp.initialView !== this.props.initialView) this.applyView(this.props.initialView);
+    if (pp.widgetPreset !== this.props.widgetPreset) this.applyPreset(this.props.widgetPreset);
+    if (pp.theme !== this.props.theme && this.props.theme) this.setGen({ theme: this.props.theme });
+    if (pp.position !== this.props.position && this.props.position) this.setGen({ position: this.props.position });
+  }
+
+  applyView(v) {
+    const b = { open: null, settings: false, onboarding: false, select: null };
+    if (v === 'settings') { b.settings = true; b.page = 'general'; }
+    else if (v && v.startsWith('settings-')) { b.settings = true; b.page = v.slice(9); }
+    else if (v === 'onboarding') b.onboarding = true;
+    else if (this.MODS[v]) b.open = v;
+    this.setState(b);
+  }
+  applyPreset(p) {
+    const P = {
+      text: { cpu: 'text', gpu: 'text', mem: 'text', disk: 'text', net: 'io', bat: 'text', sens: 'text' },
+      graph: { cpu: 'graph', gpu: 'graph', mem: 'graph', disk: 'io', net: 'graph', bat: 'text', sens: 'graph' },
+      bar: { cpu: 'bar', gpu: 'bar', mem: 'bar', disk: 'bar', net: 'io', bat: 'bar', sens: 'text' },
+    }[p];
+    if (!P) return;
+    this.setState(s => { const mods = {}; Object.keys(s.mods).forEach(m => { mods[m] = { ...s.mods[m], on: true, style: P[m] }; }); return { mods }; });
+  }
+
+  tick() {
+    this.setState(st => {
+      const L = { idle: .35, normal: 1, heavy: 2.6 }[this.props.load ?? 'normal'] ?? 1;
+      const h = st.h, R = Math.random, last = a => a[a.length - 1];
+      const walk = (p, t, vol, lo = 0, hi = 100) => this.clamp(p + (t - p) * .3 + (R() - .5) * vol, lo, hi);
+      const cpu = walk(last(h.cpu), 16 * L + (R() < .12 ? 35 : 0), 12, 1);
+      const v = {
+        cpu, sys: cpu * (.28 + R() * .1),
+        gpu: walk(last(h.gpu), 5 * L + (R() < .08 ? 25 : 0), 8),
+        mem: walk(last(h.mem), 56 + 6 * L, 1.2, 10, 98),
+        dr: R() < .18 ? (20 + R() * 160) * L : R() * 3,
+        dw: R() < .12 ? (10 + R() * 90) * L : R() * 1.5,
+        nd: R() < .22 ? (600 + R() * 9000) * L : 8 + R() * 90,
+        nu: R() < .12 ? (200 + R() * 1600) * L : 3 + R() * 40,
+        temp: walk(last(h.temp), 40 + cpu * .45, 3, 30, 100),
+        bat: Math.max(5, st.bat - .004 * L),
+      };
+      const secs = st.secs + 1, nh = { ...h };
+      let cores = st.cores;
+      Object.keys(this.KEYS).forEach(m => {
+        const iv = st.mods[m].iv || st.gen.interval;
+        if (secs % iv) return;
+        this.KEYS[m].forEach(k => { nh[k] = [...h[k].slice(1), v[k]]; });
+        if (m === 'cpu') cores = st.cores.map(x => walk(x, cpu + (R() - .5) * 40, 20));
+      });
+      return { h: nh, cores, j: st.j.map(() => R()), bat: v.bat, sessD: st.sessD + v.nd / 1024, sessU: st.sessU + v.nu / 1024, secs, clock: new Date() };
+    });
+  }
+
+  theme() {
+    const t = this.state.gen.theme;
+    if (t !== 'system') return t;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }
+  baseColor(m) { const c = this.state.mods[m]; return this.PAL[this.theme()][c.color >= 0 ? c.color : this.MODS[m].color]; }
+  col(m, pct) { return this.state.mods[m].byLoad ? this.LOAD[this.theme()][pct < 60 ? 0 : pct < 85 ? 1 : 2] : this.baseColor(m); }
+  upColor() { return this.PAL[this.theme()][4]; }
+  pts(a, w, h, max) { const n = a.length; return a.map((v, i) => `${(i / (n - 1) * w).toFixed(1)},${(h - 1 - Math.min(v, max) / max * (h - 2)).toFixed(1)}`).join(' '); }
+  area(a, w, h, max) { return `0,${h} ${this.pts(a, w, h, max)} ${w},${h}`; }
+  rate(kb) {
+    const bits = this.state.mods.net.units === 'bits', v = bits ? kb * 8 : kb;
+    return v < 1000 ? `${Math.round(v)} ${bits ? 'Kb/s' : 'KB/s'}` : `${(v / 1024).toFixed(v < 10240 ? 1 : 0)} ${bits ? 'Mb/s' : 'MB/s'}`;
+  }
+  mbps(mb) { return mb < 1 ? `${Math.round(mb * 1024)} KB/s` : `${mb.toFixed(mb < 10 ? 1 : 0)} MB/s`; }
+  tempStr(c) { return this.state.mods.sens.unit === 'F' ? `${Math.round(c * 9 / 5 + 32)}°F` : `${Math.round(c)}°C`; }
+  uptime() { const s = this.state.secs, p = n => String(n).padStart(2, '0'); return `${Math.floor(s / 86400)}:${p(Math.floor(s / 3600) % 24)}:${p(Math.floor(s / 60) % 60)}:${p(s % 60)}`; }
+  remaining(short) { const min = Math.round(this.state.bat / 100 * 70.5 / 11.4 * 60), hh = Math.floor(min / 60), mm = min % 60; return short ? `${hh}:${String(mm).padStart(2, '0')}` : `${hh} h ${mm} min remaining`; }
+  drives() { return [{ name: 'Windows (C:)', pct: 58, text: '396 GB free of 952 GB', short: '58%' }, { name: 'Backup (E:)', pct: 81, text: '177 GB free of 931 GB', short: '81%' }]; }
+  sub(m) { return m === 'net' ? (this.state.mods.net.iface === 'eth' ? 'Ethernet · Realtek 2.5GbE' : 'Wi‑Fi · Home-5G') : this.MODS[m].sub; }
+  styleName(m, s) { return { text: 'Text', graph: 'Graph', bar: 'Bar', io: m === 'disk' ? 'Read / write' : 'Up / down' }[s]; }
+  ivName(v) { return v === 1 ? '1 second' : `${v} seconds`; }
+  setMod(m, p) { this.setState(s => ({ mods: { ...s.mods, [m]: { ...s.mods[m], ...p } } })); }
+  setGen(p) { this.setState(s => ({ gen: { ...s.gen, ...p } })); }
+
+  widget(m, live = true) {
+    const st = this.state, c = st.mods[m], h = st.h, M = this.MODS[m], L = a => a[a.length - 1], W = 40, H = 20;
+    const s = M.styles.includes(c.style) ? c.style : M.styles[0];
+    let pct = 0, arr = null, arr2 = null, max = 100, value = '', label = M.short, k1 = '', v1 = '', k2 = '', v2 = '';
+    if (m === 'cpu' || m === 'gpu' || m === 'mem') { pct = L(h[m]); arr = h[m]; value = `${Math.round(pct)}%`; }
+    else if (m === 'disk') { const d = this.drives()[c.drive === 'E' ? 1 : 0]; pct = d.pct; value = `${pct}%`; label = `${c.drive}:`; k1 = 'R'; v1 = this.mbps(L(h.dr)); k2 = 'W'; v2 = this.mbps(L(h.dw)); }
+    else if (m === 'net') { arr = h.nd; arr2 = h.nu; max = Math.max(100, ...h.nd, ...h.nu) * 1.1; k1 = '↑'; v1 = this.rate(L(h.nu)); k2 = '↓'; v2 = this.rate(L(h.nd)); }
+    else if (m === 'bat') { pct = st.bat; value = `${Math.round(pct)}%`; if (c.remaining) label = this.remaining(true); }
+    else if (m === 'sens') { const k = { cpu: 1, gpu: .88, ssd: .8 }[c.sensor]; arr = h.temp.map(x => x * k); pct = L(arr); value = this.tempStr(pct); }
+    const color = this.col(m, pct), up = this.upColor();
+    const bars = m === 'cpu' && c.bar === 'cores'
+      ? Array.from({ length: 8 }, (_, i) => { const x = (st.cores[2 * i] + st.cores[2 * i + 1]) / 2; return { w: '3px', h: `${x}%`, color: this.col(m, x) }; })
+      : [{ w: '6px', h: `${pct}%`, color }];
+    return {
+      id: m, label, showLabel: c.label, isText: s === 'text', isGraph: s === 'graph', isBar: s === 'bar', isIo: s === 'io',
+      value, valueColor: c.byLoad ? color : 'var(--fg)', color, color2: up,
+      area: arr ? this.area(arr, W, H, max) : '', line: arr ? this.pts(arr, W, H, max) : '', line2: arr2 ? this.pts(arr2, W, H, max) : '',
+      bars, k1, v1, k2, v2, c1: m === 'net' ? up : color, c2: m === 'net' ? color : up,
+      bg: live && st.open === m ? 'var(--active)' : 'transparent',
+      tip: `${M.name}${value ? ': ' + value : ''}`,
+      onClick: live ? e => { e.stopPropagation(); this.setState(x => ({ open: x.open === m ? null : m })); } : this.noop,
+    };
+  }
+
+  procList(m) {
+    const st = this.state, h = st.h, j = st.j, L = a => a[a.length - 1];
+    if (m === 'bat') return [['Microsoft Edge', 'High', 100], ['Microsoft Teams', 'Moderate', 62], ['Visual Studio Code', 'Moderate', 55], ['Spotify', 'Low', 24], ['Windows Explorer', 'Very low', 9]].map(([name, v, w]) => ({ name, v, w: `${w}%` }));
+    const T = {
+      cpu: [['Microsoft Edge', .3], ['Visual Studio Code', .22], ['Microsoft Teams', .14], ['Desktop Window Manager', .08], ['Antimalware Service', .06]],
+      gpu: [['Desktop Window Manager', .4], ['Microsoft Edge', .3], ['Microsoft Teams', .18], ['Visual Studio Code', .06]],
+      mem: [['Microsoft Edge', 2840], ['Visual Studio Code', 1612], ['Microsoft Teams', 988], ['Windows Explorer', 312], ['Spotify', 286]],
+      disk: [['Antimalware Service', .34], ['OneDrive', .26], ['System', .2], ['Microsoft Edge', .12], ['Visual Studio Code', .08]],
+      net: [['Microsoft Edge', .46], ['OneDrive', .24], ['Microsoft Teams', .18], ['Spotify', .08], ['System', .04]],
+    }[m];
+    if (!T) return [];
+    const base = { cpu: L(h.cpu), gpu: L(h.gpu), mem: 1, disk: L(h.dr) + L(h.dw), net: L(h.nd) + L(h.nu) }[m];
+    const fmt = { cpu: v => `${v.toFixed(1)}%`, gpu: v => `${v.toFixed(1)}%`, mem: v => v >= 1000 ? `${(v / 1024).toFixed(2)} GB` : `${Math.round(v)} MB`, disk: v => this.mbps(v), net: v => this.rate(v) }[m];
+    const list = T.map(([name, w], i) => ({ name, n: base * w * (m === 'mem' ? .98 + j[i] * .04 : .6 + j[i] * .8) })).sort((a, b) => b.n - a.n);
+    const top = list[0].n || 1;
+    return list.map(p => ({ name: p.name, v: fmt(p.n), w: `${p.n / top * 100}%` }));
+  }
+
+  fly(m, layout) {
+    const st = this.state, h = st.h, c = st.mods[m], M = this.MODS[m], L = a => a[a.length - 1], T = this.theme();
+    const color = this.baseColor(m), up = this.upColor(), dim = T === 'dark' ? '#6b6b6b' : '#b8b8b8';
+    const [W, H] = { detailed: [324, 84], compact: [272, 56], tiles: [344, 72] }[layout];
+    const ch = (a, max, a2) => ({ area: this.area(a, W, H, max), line: this.pts(a, W, H, max), line2: a2 ? this.pts(a2, W, H, max) : '' });
+    let f;
+    if (m === 'cpu') {
+      const cpu = L(h.cpu), sys = Math.min(cpu, L(h.sys));
+      f = { big: `${Math.round(cpu)}%`, bigLabel: 'Utilization', pct: cpu, ...ch(h.cpu, 100, h.sys),
+        legend: [['System', `${Math.round(sys)}%`, up], ['User', `${Math.round(cpu - sys)}%`, color], ['Idle', `${Math.round(100 - cpu)}%`, dim]],
+        cores: st.cores.map(x => ({ h: `${x}%`, color: this.col('cpu', x) })),
+        stats: [['Speed', `${(2.9 + cpu / 100 * 2.2).toFixed(2)} GHz`], ['Temperature', this.tempStr(L(h.temp))], ['Processes', '284'], ['Threads', (3900 + Math.round(cpu * 3)).toLocaleString('en-US')], ['Handles', '128,440'], ['Up time', this.uptime()]] };
+    } else if (m === 'gpu') {
+      const g = L(h.gpu);
+      f = { big: `${Math.round(g)}%`, bigLabel: 'Utilization', pct: g, ...ch(h.gpu, 100),
+        legend: [['3D', `${Math.round(g * .8)}%`, color], ['Video decode', `${Math.round(g * .15)}%`, up], ['Copy', `${Math.round(g * .05)}%`, dim]],
+        stats: [['Dedicated memory', `${(0.8 + g / 100 * 2.4).toFixed(1)} / 4.0 GB`], ['Shared memory', '0.6 / 15.9 GB'], ['Temperature', this.tempStr(L(h.temp) * .88)], ['Power', `${(3 + g * .25).toFixed(1)} W`], ['Driver', '32.0.12011'], ['DirectX', '12 (FL 12_2)']] };
+    } else if (m === 'mem') {
+      const p = L(h.mem), used = p / 100 * 32, mod = .4, inUse = used - mod, sb = 9.8, free = Math.max(0, 32 - used - sb), sbc = T === 'dark' ? '#3E6A80' : '#9CC3E0';
+      f = { big: `${used.toFixed(1)} GB`, bigLabel: 'of 32 GB in use', pct: p, ...ch(h.mem, 100),
+        seg: [[inUse, color], [mod, up], [sb, sbc], [free, dim]].map(([g, cl]) => ({ grow: g, color: cl })),
+        legend: [['In use', `${inUse.toFixed(1)} GB`, color], ['Modified', `${mod.toFixed(1)} GB`, up], ['Standby', `${sb.toFixed(1)} GB`, sbc], ['Free', `${free.toFixed(1)} GB`, dim]],
+        stats: [['Committed', `${(used + 4.7).toFixed(1)} / 36.9 GB`], ['Compressed', '1.1 GB'], ['Paged pool', '612 MB'], ['Non-paged pool', '480 MB'], ['Speed', '6400 MT/s'], ['Hardware reserved', '242 MB']] };
+    } else if (m === 'disk') {
+      const r = L(h.dr), w = L(h.dw), act = Math.min(100, (r + w) / 2.2), mx = Math.max(5, ...h.dr, ...h.dw) * 1.1;
+      f = { big: `${Math.round(act)}%`, bigLabel: 'Active time', pct: act, ...ch(h.dr, mx, h.dw), maxLabel: `Peak ${this.mbps(mx / 1.1)}`,
+        legend: [['Read', this.mbps(r), color], ['Write', this.mbps(w), up]],
+        barsTitle: 'Volumes', bars: this.drives().map(d => ({ label: d.name, text: d.text, short: d.short, w: `${d.pct}%`, color: this.col('disk', d.pct) })),
+        stats: [['Avg. response', `${(0.2 + act / 60).toFixed(1)} ms`], ['Temperature', this.tempStr(41)], ['Health', 'Good · 98%'], ['Interface', 'PCIe 4.0 ×4'], ['Read today', '14.2 GB'], ['Written today', '6.8 GB']] };
+    } else if (m === 'net') {
+      const d = L(h.nd), u = L(h.nu), mx = Math.max(100, ...h.nd, ...h.nu) * 1.1, eth = c.iface === 'eth';
+      f = { big: this.rate(d), bigLabel: 'Download', pct: Math.min(100, d / mx * 110), pctText: '↓', ...ch(h.nd, mx, h.nu), maxLabel: `Peak ${this.rate(mx / 1.1)}`,
+        legend: [['Download', this.rate(d), color], ['Upload', this.rate(u), up]],
+        stats: [['Interface', eth ? 'Ethernet · 2.5 Gbps' : 'Wi‑Fi 6E · 5 GHz'], ['Signal', eth ? 'Wired' : '−52 dBm'], ['IPv4', '192.168.1.24'], ['Public IP', '203.0.113.47'], ['Received', `${(st.sessD / 1024).toFixed(2)} GB`], ['Sent', `${Math.round(st.sessU)} MB`]] };
+    } else if (m === 'bat') {
+      const b = st.bat;
+      f = { big: `${Math.round(b)}%`, bigLabel: this.remaining(false), pct: b, ...ch(h.bat, 100),
+        stats: [['State', 'On battery'], ['Power draw', `${(8 + L(h.cpu) * .12).toFixed(1)} W`], ['Health', '94%'], ['Cycle count', '218'], ['Design capacity', '75.0 Wh'], ['Full charge', '70.5 Wh']], procsTitle: 'Power usage' };
+    } else {
+      const t = L(h.temp), list = [['CPU package', t], ['GPU', t * .88], ['NVMe SSD', 41], ['Wi‑Fi adapter', 46], ['Battery', 33]];
+      f = { big: this.tempStr(t), bigLabel: 'CPU package', pct: t, pctText: this.tempStr(t), ...ch(h.temp, 100), maxLabel: `0–${this.tempStr(100)}`,
+        barsTitle: 'Temperatures', bars: list.map(([l, v]) => ({ label: l, text: this.tempStr(v), short: this.tempStr(v), w: `${v}%`, color: this.col('sens', v) })),
+        stats: [['CPU fan', `${Math.round(1800 + t * 22).toLocaleString('en-US')} RPM`], ['CPU power', `${(6 + L(h.cpu) * .3).toFixed(1)} W`], ['Throttling', t > 90 ? 'Thermal' : 'None'], ['System fan', 'Passive']], noProcs: true };
+    }
+    const o = Object.assign({ legend: [], cores: [], seg: [], bars: [], barsTitle: '', stats: [], procsTitle: 'Top processes', color2: up, maxLabel: '0–100%' }, f);
+    const iv = c.iv || st.gen.interval, C = 138.2;
+    o.title = M.name; o.sub = this.sub(m); o.color = color;
+    o.legend = o.legend.map(([label, value, cl]) => ({ label, value, color: cl }));
+    o.stats = o.stats.map(([k, v]) => ({ k, v }));
+    o.procs = f.noProcs ? [] : this.procList(m);
+    o.hasLegend = o.legend.length > 0; o.hasCores = o.cores.length > 0; o.hasSeg = o.seg.length > 0; o.hasBars = o.bars.length > 0; o.hasProcs = o.procs.length > 0;
+    o.span = iv === 1 ? 'Last 60 seconds' : `Last ${iv} minutes`;
+    o.ring = `${(this.clamp(o.pct) / 100 * C).toFixed(1)} ${C}`;
+    o.pctText = o.pctText ?? `${Math.round(o.pct)}%`;
+    o.settingsLabel = `${M.name} settings`;
+    o.onSettings = e => { e.stopPropagation(); this.setState({ settings: true, page: m, open: null, onboarding: false, select: null }); };
+    o.onTaskMgr = e => { e.stopPropagation(); this.setState({ open: null }); };
+    return o;
+  }
+
+  rb() { return { isHeader: false, isCard: true, isToggle: false, isSelect: false, isSeg: false, isSwatch: false, isButton: false, title: '', desc: '', onText: '', tBg: '', tLine: '', kLeft: '', kBg: '', onToggle: this.noop, valueLabel: '', options: [], selOpen: false, onOpen: this.noop, segs: [], swatches: [], btnLabel: '', onBtn: this.noop }; }
+  hdr(title) { return { ...this.rb(), isHeader: true, isCard: false, title }; }
+  tog(title, desc, on, fn) { return { ...this.rb(), isToggle: true, title, desc, onText: on ? 'On' : 'Off', tBg: on ? 'var(--accent)' : 'transparent', tLine: on ? 'var(--accent)' : 'var(--ctl-strong)', kLeft: on ? '23px' : '3px', kBg: on ? 'var(--on-accent)' : 'var(--knob)', onToggle: e => { e.stopPropagation(); fn(!on); } }; }
+  sel(id, title, desc, opts, cur, fn) {
+    const curO = opts.find(o => o[0] === cur) || opts[0];
+    return { ...this.rb(), isSelect: true, title, desc, valueLabel: curO[1], selOpen: this.state.select === id,
+      onOpen: e => { e.stopPropagation(); this.setState(s => ({ select: s.select === id ? null : id })); },
+      options: opts.map(([v, l]) => ({ label: l, bg: v === cur ? 'var(--hover)' : 'transparent', pill: v === cur ? 'var(--accent)' : 'transparent', onPick: e => { e.stopPropagation(); fn(v); this.setState({ select: null }); } })) };
+  }
+  seg(title, desc, opts, cur, fn) { return { ...this.rb(), isSeg: true, title, desc, segs: opts.map(([v, l]) => ({ label: l, bg: v === cur ? 'var(--accent)' : 'transparent', fg: v === cur ? 'var(--on-accent)' : 'var(--fg)', onPick: e => { e.stopPropagation(); fn(v); } })) }; }
+  sw(title, desc, cur, fn) { return { ...this.rb(), isSwatch: true, title, desc, swatches: this.PAL[this.theme()].map((cl, i) => ({ color: cl, ring: i === cur ? 'var(--fg)' : 'transparent', onPick: e => { e.stopPropagation(); fn(i); } })) }; }
+  btn(title, desc, label, fn) { return { ...this.rb(), isButton: true, title, desc, btnLabel: label, onBtn: e => { e.stopPropagation(); fn(); } }; }
+
+  rows() {
+    const st = this.state, p = st.page;
+    if (p === 'general') {
+      const g = st.gen, sg = x => this.setGen(x);
+      return [
+        this.hdr('Behavior'),
+        this.tog('Start with Windows', 'Launch Meterbar when you sign in', g.startup, v => sg({ startup: v })),
+        this.sel('pos', 'Widget position', 'Where readings sit on the taskbar', [['tray', 'Next to system tray'], ['left', 'Left edge of taskbar']], g.position, v => sg({ position: v })),
+        this.sel('iv', 'Default update interval', 'Each widget can override this on its own page', [[1, 'Every second'], [2, 'Every 2 seconds'], [5, 'Every 5 seconds']], g.interval, v => sg({ interval: v })),
+        this.hdr('Appearance'),
+        this.sel('theme', 'Theme', 'Flyouts and this window', [['system', 'Use system setting'], ['dark', 'Dark'], ['light', 'Light']], g.theme, v => sg({ theme: v })),
+        this.btn('Setup', 'Walk through choosing widgets again', 'Run setup', () => this.setState({ settings: false, onboarding: true })),
+      ];
+    }
+    const c = st.mods[p], M = this.MODS[p], sm = x => this.setMod(p, x);
+    const r = [
+      this.hdr('Taskbar'),
+      this.tog('Show on taskbar', `Display the ${M.name === 'CPU' || M.name === 'GPU' ? M.name : M.name.toLowerCase()} reading on the taskbar`, c.on, v => sm({ on: v })),
+      this.seg('Style', 'How the reading is drawn', M.styles.map(s => [s, this.styleName(p, s)]), c.style, v => sm({ style: v })),
+    ];
+    if (c.style !== 'io') r.push(this.tog('Show label', 'Small caption above the value', c.label, v => sm({ label: v })));
+    if (p === 'cpu') r.push(this.sel('cpubar', 'Bar shows', 'Used by the Bar style', [['cores', 'Each core'], ['total', 'Total']], c.bar, v => sm({ bar: v })));
+    if (p === 'disk') r.push(this.sel('drive', 'Drive', 'Used by the Text and Bar styles', [['C', 'Windows (C:)'], ['E', 'Backup (E:)']], c.drive, v => sm({ drive: v })));
+    if (p === 'net') {
+      r.push(this.sel('units', 'Units', 'Transfer rate units', [['bytes', 'Bytes (MB/s)'], ['bits', 'Bits (Mb/s)']], c.units, v => sm({ units: v })));
+      r.push(this.sel('iface', 'Interface', 'Which adapter to measure', [['auto', 'Automatic'], ['wifi', 'Wi‑Fi'], ['eth', 'Ethernet']], c.iface, v => sm({ iface: v })));
+    }
+    if (p === 'bat') r.push(this.tog('Show time remaining', 'Replaces the label with hours:minutes left', c.remaining, v => sm({ remaining: v })));
+    if (p === 'sens') {
+      r.push(this.sel('sensor', 'Taskbar sensor', 'Which temperature to show', [['cpu', 'CPU package'], ['gpu', 'GPU'], ['ssd', 'NVMe SSD']], c.sensor, v => sm({ sensor: v })));
+      r.push(this.seg('Unit', 'Applies everywhere in Meterbar', [['C', '°C'], ['F', '°F']], c.unit, v => sm({ unit: v })));
+    }
+    r.push(this.hdr('Color'));
+    r.push(this.sw('Widget color', 'Used for graphs, bars and the flyout chart', c.color >= 0 ? c.color : M.color, v => sm({ color: v })));
+    r.push(this.tog('Color by load', p === 'sens' ? 'Shift green → amber → red as temperature rises' : 'Shift green → amber → red as usage rises', c.byLoad, v => sm({ byLoad: v })));
+    r.push(this.hdr('Updates'));
+    r.push(this.sel('iv-' + p, 'Update interval', 'How often this reading refreshes', [[0, `Default (${this.ivName(st.gen.interval)})`], [1, 'Every second'], [2, 'Every 2 seconds'], [5, 'Every 5 seconds']], c.iv, v => sm({ iv: v })));
+    return r;
+  }
+
+  renderVals() {
+    const st = this.state, T = this.theme(), left = st.gen.position === 'left', layout = this.props.flyoutLayout ?? 'detailed';
+    const mod = this.MODS[st.page], isModule = !!mod;
+    const check = on => ({ boxBg: on ? 'var(--accent)' : 'transparent', boxLine: on ? 'var(--accent)' : 'var(--ctl-strong)', check: on ? '✓' : '' });
+    const fly = st.open ? this.fly(st.open, layout) : null;
+    const enabled = st.order.filter(m => st.mods[m].on);
+    return {
+      themeName: T,
+      stop: this.stop,
+      closeAll: () => { if (st.open || st.select) this.setState({ open: null, select: null }); },
+      stopSel: e => { e.stopPropagation(); if (this.state.select) this.setState({ select: null }); },
+      widgets: enabled.map(m => this.widget(m)),
+      widgetsLeft: left, widgetsRight: !left,
+      time: st.clock.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      date: st.clock.toLocaleDateString('en-US'),
+      batW: `${st.bat}%`,
+      fly, isDetailed: !!fly && layout === 'detailed', isCompact: !!fly && layout === 'compact', isTiles: !!fly && layout === 'tiles',
+      flyLeft: left ? '12px' : 'auto', flyRight: left ? 'auto' : '12px',
+      settings: st.settings,
+      closeSettings: e => { e.stopPropagation(); this.setState({ settings: false, select: null }); },
+      enabledText: `${enabled.length} readings on the taskbar`,
+      navItems: [{ id: 'general', label: 'General', color: 'var(--fg3)', status: '' }, ...st.order.map(m => ({ id: m, label: this.MODS[m].name, color: this.baseColor(m), status: st.mods[m].on ? 'On' : 'Off' }))]
+        .map(n => ({ ...n, bg: st.page === n.id ? 'var(--hover)' : 'transparent', pill: st.page === n.id ? 'var(--accent)' : 'transparent', onClick: e => { e.stopPropagation(); this.setState({ page: n.id, select: null }); } })),
+      pageTitle: isModule ? mod.name : 'General',
+      pageSub: isModule ? this.sub(st.page) : 'Startup, placement, refresh rate and theme',
+      isModule, isGeneral: !isModule,
+      pw: this.widget(isModule ? st.page : 'cpu', false),
+      pwNote: isModule && !st.mods[st.page].on ? 'Hidden — turn on “Show on taskbar”' : 'Live',
+      pwOpacity: isModule && !st.mods[st.page].on ? '.4' : '1',
+      rows: this.rows(),
+      orderItems: st.order.map((m, i) => ({
+        name: this.MODS[m].name, color: this.baseColor(m), status: st.mods[m].on ? 'Shown' : 'Hidden',
+        upOp: i === 0 ? '.3' : '1', downOp: i === st.order.length - 1 ? '.3' : '1',
+        onUp: e => { e.stopPropagation(); if (i > 0) this.setState(s => { const o = [...s.order]; [o[i - 1], o[i]] = [o[i], o[i - 1]]; return { order: o }; }); },
+        onDown: e => { e.stopPropagation(); if (i < st.order.length - 1) this.setState(s => { const o = [...s.order]; [o[i + 1], o[i]] = [o[i], o[i + 1]]; return { order: o }; }); },
+      })),
+      onboarding: st.onboarding,
+      finishOnboarding: e => { e.stopPropagation(); this.setState({ onboarding: false }); },
+      obItems: st.order.map(m => { const w = this.widget(m, false), on = st.mods[m].on; return { name: this.MODS[m].name, color: this.baseColor(m), sample: w.value || w.v2, cardLine: on ? 'var(--accent)' : 'var(--card-line)', ...check(on), onClick: e => { e.stopPropagation(); this.setMod(m, { on: !on }); } }; }),
+      obPos: [['tray', 'Next to the system tray', 'Right side, beside the clock'], ['left', 'Left edge of the taskbar', 'Where Widgets usually sits']].map(([v, label, desc]) => {
+        const on = st.gen.position === v;
+        return { label, desc, ring: on ? '5px solid var(--accent)' : '1px solid var(--ctl-strong)', fill: on ? 'var(--on-accent)' : 'transparent', onClick: e => { e.stopPropagation(); this.setGen({ position: v }); } };
+      }),
+      obStart: { ...check(st.gen.startup), onClick: e => { e.stopPropagation(); this.setGen({ startup: !st.gen.startup }); } },
+    };
+  }
+}
+</script>
+</body>
+</html>
