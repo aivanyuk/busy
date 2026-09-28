@@ -70,3 +70,16 @@ impl Every {
         self.0 = Some(Instant::now());
     }
 }
+
+/// Seconds elapsed since the previous call (None on first call).
+#[derive(Default)]
+pub struct Clock(Option<Instant>);
+
+impl Clock {
+    pub fn tick(&mut self) -> Option<f64> {
+        let now = Instant::now();
+        let dt = self.0.map(|t| (now - t).as_secs_f64()).filter(|&d| d > 0.0);
+        self.0 = Some(now);
+        dt
+    }
+}
