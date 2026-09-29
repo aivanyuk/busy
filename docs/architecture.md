@@ -113,7 +113,7 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 | Gap | Rule |
 |---|---|
 | Flyout-only modules are sampled with the flyout closed; nothing pauses on lock or display off. | Performance: sample only what is visible |
-| HWiNFO reopens and copies its mapping every tick; processes, GPU, disk and network rebuild their maps every tick. | Performance: reuse buffers |
+| HWiNFO reopens and copies its mapping every tick; processes, GPU and network rebuild their maps every tick. | Performance: reuse buffers |
 | The taskbar redraws every snapshot and every watch tick; the flyout repaints on every mouse move. | Performance: redraw only on change |
 | About 2 `SAFETY` comments for about 200 `unsafe` blocks. | Security: `SAFETY` comments |
 | LHM row count and string lengths, and the config file size, are unbounded. | Security: foreign data |
