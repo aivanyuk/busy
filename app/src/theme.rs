@@ -29,7 +29,7 @@ pub(crate) struct Theme {
     /// Taskbar surface. The widget draws over the real taskbar, so only the debug dump paints it.
     #[cfg_attr(not(debug_assertions), allow(dead_code))]
     pub(crate) tb: Color,
-    #[allow(dead_code)] // Phase 2: divider between the cells and the tray.
+    #[allow(dead_code)] // The taskbar's top border: Windows draws it (the divider before the tray is `line`).
     pub(crate) tb_line: Color,
     /// Flyout surface, painted over the acrylic backdrop (opaque when there is none).
     pub(crate) fly: Color,

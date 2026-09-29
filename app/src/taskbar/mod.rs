@@ -2,9 +2,11 @@
 
 mod cells;
 mod explorer;
+mod styles;
 mod surface;
 
-use cells::{Cell, Fonts};
+use cells::Cell;
+use styles::{CELL_H, Fonts};
 use surface::Surface;
 
 use crate::ctx::Ctx;
@@ -25,8 +27,10 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{PCWSTR, Result, w};
 
 const CLASS: PCWSTR = w!("busy.taskbar");
-const PAD: f32 = 6.0;
-const GAP: f32 = 12.0;
+/// Between cells (design: the widget row's `gap: 2px`).
+const GAP: f32 = 2.0;
+/// NearTray: a 1×20 `--line` divider with 4 px margins after the cells, before the notification area.
+const DIVIDER: f32 = GAP + 4.0 + 1.0 + 4.0;
 
 thread_local! {
     /// Each drawn cell's horizontal extent in client pixels, for hit-testing in the window procedure.
@@ -108,13 +112,7 @@ impl Taskbar {
             let made = (|| -> Result<_> {
                 let rt = gfx.d2d.CreateDCRenderTarget(&props)?;
                 rt.SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
-                let fonts = Fonts {
-                    label: gfx.format(10.0, false)?,
-                    value: gfx.format(13.5, true)?,
-                    pair: gfx.format(11.5, true)?,
-                    tiny: gfx.format(10.0, true)?,
-                };
-                Ok((rt, fonts))
+                Ok((rt, Fonts::new(gfx)?))
             })();
             let Ok((rt, fonts)) = made else {
                 let _ = DestroyWindow(hwnd);
@@ -200,7 +198,8 @@ impl Taskbar {
         let h_px = client.bottom - client.top;
         let mut cells = cells::cells(ctx);
         let mut widths: Vec<f32> = cells.iter().map(|c| c.width(ctx.gfx, &self.fonts)).collect();
-        let total = |ws: &[f32]| 2.0 * PAD + ws.iter().sum::<f32>() + GAP * ws.len().saturating_sub(1) as f32;
+        let divider = if ctx.cfg.anchor == Anchor::NearTray { DIVIDER } else { 0.0 };
+        let total = |ws: &[f32]| ws.iter().sum::<f32>() + GAP * ws.len().saturating_sub(1) as f32 + divider;
         // Never cover the task buttons: drop trailing (lowest-priority) cells that don't fit.
         while !widths.is_empty() && (total(&widths) * scale).ceil() as i32 > slot.1 {
             widths.pop();
@@ -208,11 +207,11 @@ impl Taskbar {
         }
         HITS.with_borrow_mut(|hits| {
             hits.clear();
-            let mut x = PAD;
+            let mut x = 0.0;
             for (c, cw) in cells.iter().zip(&widths) {
                 // Each cell owns half the gap on either side, so the pointer is always over some cell.
                 let (l, r) = (x - GAP / 2.0, x + cw + GAP / 2.0);
-                hits.push(((l * scale).round() as i32, (r * scale).round() as i32, c.module()));
+                hits.push(((l * scale).round() as i32, (r * scale).round() as i32, c.module));
                 x += cw + GAP;
             }
         });
@@ -261,19 +260,21 @@ impl Taskbar {
             self.rt.Clear(Some(&D2D1_COLOR_F { r: 0.0, g: 0.0, b: 0.0, a: 1.0 / 255.0 }));
         }
         if let Ok(cv) = Canvas::new(&self.rt, ctx.gfx) {
-            let mut x = PAD;
+            let t = ctx.theme;
+            let y = ((h - CELL_H) / 2.0).max(0.0);
+            let mut x = 0.0;
             for (c, cw) in cells.iter().zip(&widths) {
-                let m = Some(c.module());
-                let bg = if m == self.active {
-                    Some(ctx.theme.active)
-                } else {
-                    (m == self.hover).then_some(ctx.theme.hover)
-                };
+                let r = Rect::new(x, y, *cw, CELL_H);
+                let m = Some(c.module);
+                let bg = if m == self.active { Some(t.active) } else { (m == self.hover).then_some(t.hover) };
                 if let Some(bg) = bg {
-                    cv.round(Rect::new(x - GAP / 2.0 + 1.0, 4.0, cw + GAP - 2.0, h - 8.0), 4.0, bg);
+                    cv.round(r, 4.0, bg);
                 }
-                c.draw(&cv, &self.fonts, ctx, Rect::new(x, 0.0, *cw, h));
+                c.draw(&cv, ctx.gfx, &self.fonts, t, r);
                 x += cw + GAP;
+            }
+            if divider > 0.0 {
+                cv.fill(Rect::new(x + 4.0, (h - 20.0) / 2.0, 1.0, 20.0), t.line);
             }
         }
         unsafe {

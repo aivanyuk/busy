@@ -6,7 +6,7 @@ use busy_win::utf16;
 use windows::Win32::Graphics::Direct2D::Common::*;
 use windows::Win32::Graphics::Direct2D::*;
 use windows::Win32::Graphics::DirectWrite::*;
-use windows::core::{BOOL, HSTRING, Result, w};
+use windows::core::{BOOL, HSTRING, Interface, Result, w};
 
 pub struct Gfx {
     pub d2d: ID2D1Factory,
@@ -75,10 +75,14 @@ impl Gfx {
         }
     }
 
-    /// Single-line, vertically centered, ellipsis-trimmed format. `size` in DIPs.
+    /// Single-line, vertically centered, ellipsis-trimmed format. `size` in DIPs; `bold` is semibold (600).
     pub fn format(&self, size: f32, bold: bool) -> Result<IDWriteTextFormat> {
+        self.format_weight(size, if bold { DWRITE_FONT_WEIGHT_SEMI_BOLD } else { DWRITE_FONT_WEIGHT_NORMAL })
+    }
+
+    /// `format` with any weight (the design's `font-weight: 700` is `DWRITE_FONT_WEIGHT_BOLD`).
+    pub fn format_weight(&self, size: f32, weight: DWRITE_FONT_WEIGHT) -> Result<IDWriteTextFormat> {
         unsafe {
-            let weight = if bold { DWRITE_FONT_WEIGHT_SEMI_BOLD } else { DWRITE_FONT_WEIGHT_NORMAL };
             let f = self.dw.CreateTextFormat(
                 &self.family,
                 None,
@@ -111,9 +115,20 @@ impl Gfx {
         self.metrics(f, s, 10_000.0).0
     }
 
+    /// Width of `s` drawn with `tracking` DIPs after each character (CSS `letter-spacing`).
+    pub fn text_width_tracked(&self, f: &IDWriteTextFormat, s: &str, tracking: f32) -> f32 {
+        let Some(layout) = self.layout(f, s, 10_000.0, 10_000.0, tracking) else { return 0.0 };
+        let mut m = DWRITE_TEXT_METRICS::default();
+        // SAFETY: `m` is a valid out-pointer for the call.
+        if unsafe { layout.GetMetrics(&mut m) }.is_err() {
+            return 0.0;
+        }
+        m.widthIncludingTrailingWhitespace.ceil()
+    }
+
     /// (width, height) of `s` laid out within `max_w`.
     pub fn metrics(&self, f: &IDWriteTextFormat, s: &str, max_w: f32) -> (f32, f32) {
-        let Some(layout) = self.layout(f, s, max_w, 10_000.0) else { return (0.0, 0.0) };
+        let Some(layout) = self.layout(f, s, max_w, 10_000.0, 0.0) else { return (0.0, 0.0) };
         let mut m = DWRITE_TEXT_METRICS::default();
         // SAFETY: `m` is a valid out-pointer for the call.
         if unsafe { layout.GetMetrics(&mut m) }.is_err() {
@@ -122,15 +137,27 @@ impl Gfx {
         (m.widthIncludingTrailingWhitespace.ceil(), m.height.ceil())
     }
 
-    /// Text layout with tabular figures; measuring and drawing text with digits both go through it, so widths
-    /// match what is drawn.
-    fn layout(&self, f: &IDWriteTextFormat, s: &str, max_w: f32, max_h: f32) -> Option<IDWriteTextLayout> {
+    /// Text layout with tabular figures and `tracking` DIPs after each character; measuring and drawing text
+    /// with digits or tracking both go through it, so widths match what is drawn.
+    fn layout(
+        &self,
+        f: &IDWriteTextFormat,
+        s: &str,
+        max_w: f32,
+        max_h: f32,
+        tracking: f32,
+    ) -> Option<IDWriteTextLayout> {
         let text = utf16(s);
         let all = DWRITE_TEXT_RANGE { startPosition: 0, length: text.len() as u32 };
         // SAFETY: `text` outlives the call (DirectWrite copies it); `f` and the typography are live COM objects.
         unsafe {
             let layout = self.dw.CreateTextLayout(&text, f, max_w, max_h).ok()?;
             let _ = layout.SetTypography(&self.typography, all);
+            if tracking != 0.0
+                && let Ok(l1) = layout.cast::<IDWriteTextLayout1>()
+            {
+                let _ = l1.SetCharacterSpacing(0.0, tracking, 0.0, all);
+            }
             Some(layout)
         }
     }
@@ -173,6 +200,12 @@ impl<'a> Canvas<'a> {
     }
 
     pub fn text(&self, s: &str, f: &IDWriteTextFormat, r: Rect, c: Color, align: Align) {
+        self.text_tracked(s, f, r, c, align, 0.0);
+    }
+
+    /// `text` with `tracking` DIPs after each character (CSS `letter-spacing`), as `Gfx::text_width_tracked`
+    /// measures it.
+    pub fn text_tracked(&self, s: &str, f: &IDWriteTextFormat, r: Rect, c: Color, align: Align, tracking: f32) {
         let a = match align {
             Align::Left => DWRITE_TEXT_ALIGNMENT_LEADING,
             Align::Center => DWRITE_TEXT_ALIGNMENT_CENTER,
@@ -180,7 +213,7 @@ impl<'a> Canvas<'a> {
         };
         // Typography needs a text layout, and `tnum` only changes digits: text without any (the constant labels)
         // is drawn as before, so only values pay for a layout per draw.
-        if !s.bytes().any(|b| b.is_ascii_digit()) {
+        if tracking == 0.0 && !s.bytes().any(|b| b.is_ascii_digit()) {
             // SAFETY: the format, render target and brush are live COM objects; the string outlives the call.
             unsafe {
                 let _ = f.SetTextAlignment(a);
@@ -195,7 +228,7 @@ impl<'a> Canvas<'a> {
             }
             return;
         }
-        let Some(layout) = self.gfx.layout(f, s, r.w.max(0.0), r.h.max(0.0)) else { return };
+        let Some(layout) = self.gfx.layout(f, s, r.w.max(0.0), r.h.max(0.0), tracking) else { return };
         // SAFETY: the layout, render target and brush are live COM objects.
         unsafe {
             let _ = layout.SetTextAlignment(a);
@@ -299,5 +332,9 @@ mod tests {
         g.wrapping(12.0).unwrap();
         // Tabular figures: every digit has the same advance (proportional: "1111" is narrower).
         assert_eq!(g.text_width(&f, "1111"), g.text_width(&f, "8888"));
+        // Tracking adds its width after every character.
+        let (plain, tracked) = (g.text_width(&f, "CPU"), g.text_width_tracked(&f, "CPU", 2.0));
+        assert!((tracked - plain - 6.0).abs() <= 1.0, "{plain} {tracked}");
+        g.format_weight(11.0, windows::Win32::Graphics::DirectWrite::DWRITE_FONT_WEIGHT_BOLD).unwrap();
     }
 }
