@@ -1,4 +1,4 @@
-use crate::Module;
+use crate::{CONFIG_VERSION, Module};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::PathBuf;
 
@@ -91,6 +91,10 @@ fn text() -> CellStyle {
     CellStyle::Text
 }
 
+fn v1() -> u32 {
+    1
+}
+
 /// Drops entries that don't parse (a module or style from a newer build, a hand-edit) instead of failing the
 /// whole file; `normalize()` then re-adds any module that went missing.
 fn valid_modules<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<ModuleCfg>, D::Error> {
@@ -101,6 +105,11 @@ fn valid_modules<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<ModuleCfg>, D::E
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    /// Schema version the file was written with; a file without it is v1. `normalize()` migrates it.
+    #[serde(default = "v1")]
+    pub version: u32,
+    /// First-run setup was completed or skipped. False on a fresh install; v1 files migrate to true.
+    pub onboarded: bool,
     pub interval_ms: u32,
     /// Order = display order.
     #[serde(deserialize_with = "valid_modules")]
@@ -120,6 +129,8 @@ impl Default for Config {
     fn default() -> Self {
         let m = ModuleCfg::new;
         Self {
+            version: CONFIG_VERSION,
+            onboarded: false,
             interval_ms: 1000,
             modules: vec![
                 m(Module::Cpu, true, CellStyle::Graph),
@@ -196,6 +207,7 @@ impl Config {
     }
 
     pub fn normalize(&mut self) {
+        self.migrate();
         let mut seen = Vec::new();
         self.modules.retain(|m| {
             let dup = seen.contains(&m.module);
@@ -378,7 +390,7 @@ mod tests {
 
     #[test]
     fn json_roundtrip() {
-        let mut cfg = Config { offset_px: -42, theme: ThemeMode::Dark, ..Config::default() };
+        let mut cfg = Config { offset_px: -42, theme: ThemeMode::Dark, onboarded: true, ..Config::default() };
         cfg.modules[2] = ModuleCfg {
             show_label: false,
             color: Some(4),

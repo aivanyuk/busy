@@ -1,7 +1,9 @@
 //! Shared types between collectors (`busy-metrics`, `busy-sensors`) and UI (`busy`, `busy-settings`).
 
 mod config;
+mod migrate;
 pub use config::*;
+pub use migrate::CONFIG_VERSION;
 
 /// A data collector. Constructed and driven exclusively on the sampler thread,
 /// which has called `CoInitializeEx(COINIT_MULTITHREADED)` beforehand.
