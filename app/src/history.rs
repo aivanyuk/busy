@@ -1,5 +1,6 @@
 //! Rolling metric history kept on the UI thread.
 
+use crate::select;
 use busy_core::{Config, Module, Snapshot};
 use std::collections::VecDeque;
 
@@ -127,8 +128,9 @@ impl History {
     }
 
     /// Appends one sample per metric of each module `fresh` marks as just sampled, so a module sampled less
-    /// often than others isn't repeated. `sensor` is the value of `select::taskbar_sensor`.
-    pub fn push(&mut self, snap: &Snapshot, fresh: &Fresh, sensor: Option<f32>) {
+    /// often than others isn't repeated. Network follows the chosen interface and Sensors the chosen reading, as
+    /// the taskbar cells do.
+    pub fn push(&mut self, snap: &Snapshot, fresh: &Fresh, cfg: &Config) {
         let is = |m: Module| fresh[m.index()];
         if let Some(c) = snap.cpu.as_ref().filter(|_| is(Module::Cpu)) {
             self.cpu.push(c.total);
@@ -143,9 +145,9 @@ impl History {
                 s.push(g.util_pct);
             }
         }
-        if let Some(n) = snap.net.as_ref().filter(|_| is(Module::Network)) {
-            self.net_rx.push(n.rx_bps as f32);
-            self.net_tx.push(n.tx_bps as f32);
+        if let Some((rx, tx)) = select::net_rates(snap, cfg).filter(|_| is(Module::Network)) {
+            self.net_rx.push(rx as f32);
+            self.net_tx.push(tx as f32);
         }
         if !snap.disks.is_empty() && is(Module::Disk) {
             self.disk_r.push(snap.disks.iter().map(|d| d.read_bps).sum::<f64>() as f32);
@@ -154,8 +156,8 @@ impl History {
         if let Some(b) = snap.battery.as_ref().filter(|_| is(Module::Battery)) {
             self.battery.push(b.percent);
         }
-        if let Some(v) = sensor.filter(|_| is(Module::Sensors)) {
-            self.sensor.push(v);
+        if let Some(s) = select::taskbar_sensor(snap, cfg).filter(|_| is(Module::Sensors)) {
+            self.sensor.push(s.value);
         }
     }
 }
@@ -194,10 +196,10 @@ mod tests {
         };
         let mut fresh = [false; Module::ALL.len()];
         fresh[Module::Cpu.index()] = true;
-        h.push(&snap, &fresh, None);
+        h.push(&snap, &fresh, &cfg);
         assert_eq!((h.cpu.len(), h.mem.len()), (1, 0));
         fresh[Module::Memory.index()] = true;
-        h.push(&snap, &fresh, None);
+        h.push(&snap, &fresh, &cfg);
         assert_eq!((h.cpu.len(), h.mem.len(), h.mem.get(0)), (2, 1, 40.0));
         set_mem(&mut cfg, None);
         h.resize(&cfg);

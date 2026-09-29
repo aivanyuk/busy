@@ -7,7 +7,7 @@ use crate::render::nice_max;
 use crate::theme::Color;
 use crate::tone::{self, SECOND};
 use crate::{fmt, select};
-use busy_core::{CellStyle, Module, SensorKind};
+use busy_core::{CellStyle, CpuBar, Module, SensorKind};
 
 pub(super) struct Cell<'a> {
     pub(super) module: Module,
@@ -106,10 +106,18 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
                 _ => Body::Text { value: v, color: value },
             }
         };
+        let opts = &ctx.cfg.options;
         let body = match mc.module {
-            Module::Cpu => {
-                snap.cpu.as_ref().map(|c| pct_body(c.total, Some(&hist.cpu), (fill(c.total), value(c.total))))
-            }
+            Module::Cpu => snap.cpu.as_ref().map(|c| match mc.style {
+                // Design: the "Each core" bars take the load colors per bar; the value stays the total.
+                CellStyle::Bar if opts.cpu.bar == CpuBar::Cores && !c.per_core.is_empty() => Body::Bar {
+                    bars: select::core_bars(&c.per_core).into_iter().map(|p| (p / 100.0, fill(p))).collect(),
+                    bar_w: 3.0,
+                    value: fmt::pct(c.total),
+                    color: value(c.total),
+                },
+                _ => pct_body(c.total, Some(&hist.cpu), (fill(c.total), value(c.total))),
+            }),
             Module::Memory => snap.memory.as_ref().filter(|m| m.total > 0).map(|m| {
                 let p = m.used as f32 * 100.0 / m.total as f32;
                 pct_body(p, Some(&hist.mem), (fill(p), value(p)))
@@ -122,28 +130,30 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
                 let (f, v) = tone::battery(mc, b);
                 pct_body(b.percent, Some(&hist.battery), (t.color(f), t.color(v)))
             }),
-            Module::Network => snap.net.as_ref().map(|n| match mc.style {
+            Module::Network => select::net_rates(snap, ctx.cfg).map(|(rx, tx)| match mc.style {
                 // Design: the Graph style has no value; the two rates are the two lines.
                 CellStyle::Graph => Body::Graph {
                     value: String::new(),
                     lines: vec![(&hist.net_rx, color), (&hist.net_tx, second)],
                     max: nice_max(hist.net_rx.max().max(hist.net_tx.max())),
                 },
-                _ => Body::Io { rows: [("↑", second, fmt::rate(n.tx_bps)), ("↓", color, fmt::rate(n.rx_bps))] },
-            }),
-            Module::Disk => (!snap.disks.is_empty()).then(|| {
-                let r = snap.disks.iter().map(|d| d.read_bps).sum::<f64>();
-                let w = snap.disks.iter().map(|d| d.write_bps).sum::<f64>();
-                match mc.style {
-                    CellStyle::Io => Body::Io { rows: [("R", color, fmt::rate(r)), ("W", second, fmt::rate(w))] },
-                    CellStyle::Bar => {
-                        let max = nice_max(hist.disk_r.max().max(hist.disk_w.max()));
-                        let bars = vec![(r as f32 / max, color), (w as f32 / max, second)];
-                        Body::Bar { bars, bar_w: 3.0, value: fmt::rate(r + w), color: t.fg }
-                    }
-                    _ => Body::Text { value: fmt::rate(r + w), color: t.fg },
+                _ => {
+                    let rate = |bps| fmt::rate_in(bps, opts.network.units);
+                    Body::Io { rows: [("↑", second, rate(tx)), ("↓", color, rate(rx))] }
                 }
             }),
+            // Design: Io shows the read/write rates of all disks, Text and Bar how full the chosen drive is.
+            Module::Disk => match mc.style {
+                CellStyle::Io => (!snap.disks.is_empty()).then(|| {
+                    let r = snap.disks.iter().map(|d| d.read_bps).sum::<f64>();
+                    let w = snap.disks.iter().map(|d| d.write_bps).sum::<f64>();
+                    Body::Io { rows: [("R", color, fmt::rate(r)), ("W", second, fmt::rate(w))] }
+                }),
+                _ => select::disk_volume(snap, ctx.cfg).filter(|v| v.total > 0).map(|v| {
+                    let p = v.total.saturating_sub(v.free) as f32 * 100.0 / v.total as f32;
+                    pct_body(p, None, (fill(p), value(p)))
+                }),
+            },
             Module::Sensors => select::taskbar_sensor(snap, ctx.cfg).map(|s| {
                 let v = fmt::sensor(s.value, s.kind, ctx.cfg.temp_unit);
                 // Load coloring reads a temperature in °C as percent, like the design.
@@ -162,21 +172,29 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
             Module::Processes => None,
         };
         let Some(body) = body else { continue };
-        let label = mc.show_label.then(|| label(mc.module, ctx));
+        let label = mc.show_label.then(|| label(mc.module, mc.style, ctx));
         out.push(Cell { module: mc.module, label, body });
     }
     out
 }
 
-/// Design `MODS.short`; a sensor pick that isn't a temperature is named by its reading.
-fn label(m: Module, ctx: &Ctx) -> String {
+/// Design `MODS.short`, except: Disk Text/Bar name their drive ("C:"), Battery shows the time left (`h:mm`)
+/// on battery with `show_remaining`, and a sensor pick that isn't a temperature is named by its reading.
+fn label(m: Module, style: CellStyle, ctx: &Ctx) -> String {
+    let opts = &ctx.cfg.options;
     match m {
         Module::Cpu => "CPU".into(),
         Module::Memory => "RAM".into(),
         Module::Gpu => "GPU".into(),
         Module::Network => "NET".into(),
-        Module::Disk => "DISK".into(),
-        Module::Battery => "BAT".into(),
+        Module::Disk => match select::disk_volume(ctx.snap, ctx.cfg) {
+            Some(v) if style != CellStyle::Io => v.mount.clone(),
+            _ => "DISK".into(),
+        },
+        Module::Battery => match ctx.snap.battery.as_ref().and_then(|b| b.secs_remaining) {
+            Some(secs) if opts.battery.show_remaining => fmt::hours_minutes(secs),
+            _ => "BAT".into(),
+        },
         Module::Sensors => match select::taskbar_sensor(ctx.snap, ctx.cfg) {
             Some(s) if s.kind != SensorKind::Temperature => s.name.chars().take(6).collect::<String>().to_uppercase(),
             _ => "TEMP".into(),

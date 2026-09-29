@@ -1,6 +1,9 @@
 //! Choices of what to show, made from a snapshot and the config. Pure logic, no Win32.
 
-use busy_core::{Config, SensorKind, SensorPick, SensorReading, Snapshot};
+use busy_core::{Config, NetInterface, NetKind, SensorKind, SensorPick, SensorReading, Snapshot, VolumeInfo};
+
+/// Most bars the CPU "Cores" bar style draws (design: 8).
+const CORE_BARS: usize = 8;
 
 /// The reading picked for the taskbar Sensors cell (`options.sensors.sensor`). `Named` and `Cpu` fall back to
 /// the hottest temperature so the cell isn't empty; `Gpu` and `Storage` show nothing rather than another part.
@@ -34,10 +37,45 @@ pub(crate) fn taskbar_sensor<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a
     }
 }
 
+/// The volume the Disk Text and Bar cells show (`options.disk.drive`, else the system drive). A configured drive
+/// that is gone (unplugged) falls back to the system drive, whose letter the cell then shows.
+pub(crate) fn disk_volume<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a VolumeInfo> {
+    let chosen =
+        cfg.options.disk.drive.as_deref().and_then(|d| snap.volumes.iter().find(|v| v.mount.eq_ignore_ascii_case(d)));
+    chosen.or_else(|| snap.volumes.iter().find(|v| v.is_system)).or(snap.volumes.first())
+}
+
+/// (download, upload) bytes/s of the interfaces `options.network.interface` picks: the physical-interface
+/// totals for `Auto`, else the sum over the matching interfaces (0 when none matches, e.g. Wi-Fi off).
+pub(crate) fn net_rates(snap: &Snapshot, cfg: &Config) -> Option<(f64, f64)> {
+    let n = snap.net.as_ref()?;
+    let sum = |pick: &dyn Fn(&busy_core::NetIf) -> bool| {
+        n.interfaces.iter().filter(|i| pick(i)).fold((0.0, 0.0), |(rx, tx), i| (rx + i.rx_bps, tx + i.tx_bps))
+    };
+    Some(match &cfg.options.network.interface {
+        NetInterface::Auto => (n.rx_bps, n.tx_bps),
+        NetInterface::WiFi => sum(&|i| i.kind == NetKind::Wifi),
+        NetInterface::Ethernet => sum(&|i| i.kind == NetKind::Ethernet),
+        NetInterface::Named(name) => sum(&|i| &i.name == name),
+    })
+}
+
+/// The CPU "Cores" bars: at most `CORE_BARS`, each the mean of an equal run of logical processors (pairs on a
+/// 16-thread CPU, as in the design; one bar per processor with 8 or fewer).
+pub(crate) fn core_bars(per_core: &[f32]) -> Vec<f32> {
+    if per_core.is_empty() {
+        return Vec::new();
+    }
+    per_core.chunks(per_core.len().div_ceil(CORE_BARS)).map(|c| c.iter().sum::<f32>() / c.len() as f32).collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::taskbar_sensor;
-    use busy_core::{Config, GpuInfo, SensorKind, SensorPick, SensorReading, Snapshot};
+    use super::{core_bars, disk_volume, net_rates, taskbar_sensor};
+    use busy_core::{
+        Config, GpuInfo, NetIf, NetInfo, NetInterface, NetKind, SensorKind, SensorPick, SensorReading, Snapshot,
+        VolumeInfo,
+    };
 
     fn r(hardware: &str, name: &str, kind: SensorKind, value: f32) -> SensorReading {
         SensorReading { source: "test".into(), hardware: hardware.into(), name: name.into(), kind, value }
@@ -115,5 +153,60 @@ mod tests {
     fn nothing_to_show() {
         assert_eq!(pick(&snap(vec![r("NVIDIA RTX", "GPU Fan", SensorKind::Fan, 900.0)]), SensorPick::Cpu), None);
         assert_eq!(pick(&Snapshot::default(), SensorPick::Cpu), None);
+    }
+
+    #[test]
+    fn disk_volume_follows_the_drive_option() {
+        let vol = |mount: &str, is_system| VolumeInfo { mount: mount.into(), is_system, ..VolumeInfo::default() };
+        let s = Snapshot { volumes: vec![vol("D:", false), vol("C:", true), vol("E:", false)], ..Snapshot::default() };
+        let mut cfg = Config::default();
+        let pick = |cfg: &Config| disk_volume(&s, cfg).map(|v| v.mount.clone());
+        assert_eq!(pick(&cfg).as_deref(), Some("C:"));
+        cfg.options.disk.drive = Some("e:".into());
+        assert_eq!(pick(&cfg).as_deref(), Some("E:"));
+        cfg.options.disk.drive = Some("Z:".into());
+        assert_eq!(pick(&cfg).as_deref(), Some("C:"));
+        assert!(disk_volume(&Snapshot::default(), &cfg).is_none());
+    }
+
+    #[test]
+    fn net_rates_follow_the_interface_option() {
+        let nif =
+            |name: &str, kind, rx| NetIf { name: name.into(), kind, rx_bps: rx, tx_bps: rx / 10.0, ..NetIf::default() };
+        let s = Snapshot {
+            net: Some(NetInfo {
+                rx_bps: 300.0,
+                tx_bps: 30.0,
+                interfaces: vec![
+                    nif("Wi-Fi", NetKind::Wifi, 100.0),
+                    nif("Ethernet", NetKind::Ethernet, 200.0),
+                    nif("vEthernet", NetKind::Other, 50.0),
+                ],
+                ..NetInfo::default()
+            }),
+            ..Snapshot::default()
+        };
+        let mut cfg = Config::default();
+        let mut rates = |i| {
+            cfg.options.network.interface = i;
+            net_rates(&s, &cfg)
+        };
+        assert_eq!(rates(NetInterface::Auto), Some((300.0, 30.0)));
+        assert_eq!(rates(NetInterface::WiFi), Some((100.0, 10.0)));
+        assert_eq!(rates(NetInterface::Ethernet), Some((200.0, 20.0)));
+        assert_eq!(rates(NetInterface::Named("vEthernet".into())), Some((50.0, 5.0)));
+        assert_eq!(rates(NetInterface::Named("gone".into())), Some((0.0, 0.0)));
+        assert_eq!(net_rates(&Snapshot::default(), &Config::default()), None);
+    }
+
+    #[test]
+    fn core_bars_average_equal_runs() {
+        let cores: Vec<f32> = (0..16).map(|i| i as f32).collect();
+        assert_eq!(core_bars(&cores), vec![0.5, 2.5, 4.5, 6.5, 8.5, 10.5, 12.5, 14.5]);
+        assert_eq!(core_bars(&cores[..4]), vec![0.0, 1.0, 2.0, 3.0]);
+        // 20 threads: runs of 3, the last one shorter.
+        let twenty: Vec<f32> = (0..20).map(|_| 10.0).collect();
+        assert_eq!(core_bars(&twenty).len(), 7);
+        assert!(core_bars(&[]).is_empty());
     }
 }
