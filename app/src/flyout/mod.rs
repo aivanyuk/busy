@@ -9,7 +9,7 @@ use crate::ctx::Ctx;
 use crate::render::{Canvas, Gfx, Rect};
 use crate::theme::{Color, Theme};
 use crate::win::{self, Event, raise};
-use busy_core::Anchor;
+use busy_core::{Anchor, Module};
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Direct2D::Common::*;
 use windows::Win32::Graphics::Direct2D::*;
@@ -52,6 +52,8 @@ pub struct Flyout {
     visible: bool,
     /// Tick of the last hide caused by deactivation (see `toggle`).
     deactivated_at: u64,
+    /// The module shown (the cell it was opened from).
+    module: Option<Module>,
     backdrop: bool,
     dpi: u32,
     anchor: RECT,
@@ -105,6 +107,7 @@ impl Flyout {
             fonts,
             visible: false,
             deactivated_at: 0,
+            module: None,
             backdrop: false,
             dpi: 96,
             anchor: RECT::default(),
@@ -146,11 +149,19 @@ impl Flyout {
         self.dpi as f32 / 96.0
     }
 
-    /// Shows the flyout next to `anchor` (the widget's screen rect), or hides it if it is open.
-    pub fn toggle(&mut self, ctx: &Ctx, anchor: RECT, dpi: u32) {
-        if self.visible {
+    /// Shows `m`'s flyout on the side of `anchor` (the widget's screen rect); hides it if `m`'s is open, and
+    /// switches to `m` if another module's is. A click on the widget doesn't take activation from the flyout
+    /// (the widget answers `MA_NOACTIVATE`), so a click on another cell arrives while it is still open.
+    pub fn toggle(&mut self, ctx: &Ctx, m: Module, anchor: RECT, dpi: u32) {
+        if self.visible && self.module == Some(m) {
             self.hide(false);
+        } else if self.visible {
+            self.module = Some(m);
+            self.scroll = 0.0;
+            self.mouse = None;
+            self.render(ctx);
         } else if unsafe { GetTickCount64() }.saturating_sub(self.deactivated_at) >= 250 {
+            self.module = Some(m);
             self.show(ctx, anchor, dpi);
         }
         // Otherwise the press that deactivated (and hid) the flyout was on the widget itself: stay closed.
@@ -158,6 +169,11 @@ impl Flyout {
 
     pub fn is_visible(&self) -> bool {
         self.visible
+    }
+
+    /// The module whose flyout is open.
+    pub fn open_module(&self) -> Option<Module> {
+        self.module.filter(|_| self.visible)
     }
 
     pub fn is_foreground(&self) -> bool {
@@ -216,9 +232,10 @@ impl Flyout {
         let w = (WIDTH * s).round() as i32;
         let h = ((self.content_h * s).ceil() as i32).min(wa.bottom - wa.top - 2 * m).max(1);
         self.view_h = h as f32 / s;
+        // Design: 12 px in from the work area's edge on the widget's side, like the system flyouts.
         let x = match self.anchor_side {
-            Anchor::NearTray => self.anchor.right - w,
-            Anchor::Left => self.anchor.left,
+            Anchor::NearTray => wa.right - m - w,
+            Anchor::Left => wa.left + m,
         }
         .clamp(wa.left + m, (wa.right - m - w).max(wa.left + m));
         let below_center = self.anchor.top > (wa.top + wa.bottom) / 2;
@@ -329,16 +346,8 @@ impl Flyout {
             graphs: Vec::new(),
             tab: self.tab,
         };
-        let mut first = true;
-        for mc in ctx.cfg.modules.iter().filter(|m| m.flyout) {
-            if !first {
-                p.separator();
-            }
-            first = false;
+        if let Some(mc) = self.module.and_then(|m| ctx.cfg.module(m)) {
             p.section(mc);
-        }
-        if first {
-            p.sub("No modules enabled for the flyout.");
         }
         Layout { height: p.y + self.scroll + PAD - 4.0, hits: p.hits, graphs: p.graphs }
     }
