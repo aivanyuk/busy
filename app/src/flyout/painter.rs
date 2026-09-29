@@ -149,7 +149,7 @@ impl Painter<'_> {
         let Some((hit, k)) = hit.and_then(|h| Some((h, h.sample_at(mx)?))) else { return };
         let x = inner.right() - k as f32 * inner.w / (hit.cap.max(2) - 1) as f32;
         cv.vline(x, r.y + 2.0, r.bottom() - 2.0, t.fg2);
-        let secs = k as u64 * self.ctx.cfg.interval_ms as u64 / 1000;
+        let secs = k as u64 * series.first().map_or(0, |(s, _)| s.interval_ms()) as u64 / 1000;
         let mut label = series
             .iter()
             .filter(|(s, _)| k < s.len())

@@ -5,7 +5,7 @@
 
 use crate::ctx::Ctx;
 use crate::flyout::Flyout;
-use crate::history::{History, capacity};
+use crate::history::History;
 use crate::menu::{self, Command};
 use crate::render::Gfx;
 use crate::sampler::{Params, Sampler};
@@ -15,7 +15,7 @@ use crate::taskbar::Taskbar;
 use crate::theme::Theme;
 use crate::win::{self, Event, register_class};
 use crate::worker::Worker;
-use busy_core::{Config, Snapshot, ThemeMode};
+use busy_core::{Config, Module, Snapshot, ThemeMode};
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
@@ -141,7 +141,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
             *lock(&RESOLVED) = Some(Theme::resolve(mode));
             post(WM_APP_THEME);
         }),
-        hist: History::new(capacity(cfg.history_secs, cfg.interval_ms)),
+        hist: History::new(&cfg),
         snap: Snapshot::default(),
         theme,
         taskbar: Taskbar::create(&gfx),
@@ -309,7 +309,8 @@ impl App {
     fn on_snapshot(&mut self) {
         let Some(snap) = self.sampler.take() else { return };
         let sensor = taskbar_sensor(&snap, &self.cfg).map(|s| s.value);
-        self.hist.push(&snap, sensor);
+        // Every module is sampled on every tick for now.
+        self.hist.push(&snap, &[true; Module::ALL.len()], sensor);
         self.snap = snap;
         self.render_all();
         if std::mem::take(&mut self.open_flyout) {
@@ -416,10 +417,7 @@ impl App {
         }
         let old = std::mem::replace(&mut self.cfg, cfg);
         self.sync_sampler();
-        let cap = capacity(self.cfg.history_secs, self.cfg.interval_ms);
-        if cap != capacity(old.history_secs, old.interval_ms) {
-            self.hist.set_capacity(cap);
-        }
+        self.hist.resize(&self.cfg);
         if old.theme != self.cfg.theme {
             self.refresh_theme();
         }
