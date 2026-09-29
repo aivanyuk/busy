@@ -95,12 +95,27 @@ pub struct CpuInfo {
 #[derive(Clone, Debug, Default)]
 pub struct MemInfo {
     pub total: u64,
+    /// `total - available`; includes the modified list (see [`MemInfo::in_use`]).
     pub used: u64,
     pub available: u64,
     pub commit_used: u64,
     pub commit_limit: u64,
     pub cached: Option<u64>,
     pub compressed: Option<u64>,
+    /// Modified page list: dirty pages not yet written out (Task Manager "Modified").
+    pub modified: Option<u64>,
+    /// Standby list, all priorities (Task Manager "Standby"); part of `available`.
+    pub standby: Option<u64>,
+    /// Free + zeroed page lists (Task Manager "Free"); part of `available`.
+    pub free: Option<u64>,
+}
+
+impl MemInfo {
+    /// Task Manager "In use": `total` minus modified, standby and free, so the four segments sum to `total`.
+    pub fn in_use(&self) -> Option<u64> {
+        let lists = self.modified?.saturating_add(self.standby?).saturating_add(self.free?);
+        Some(self.total.saturating_sub(lists))
+    }
 }
 
 /// Physical disk throughput.
@@ -213,3 +228,16 @@ pub struct ProcEntry {
 }
 
 pub const TOP_N: usize = 5;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mem_in_use() {
+        let m = MemInfo { total: 100, modified: Some(5), standby: Some(30), free: Some(20), ..Default::default() };
+        assert_eq!(m.in_use(), Some(45));
+        assert_eq!(MemInfo { free: None, ..m.clone() }.in_use(), None);
+        assert_eq!(MemInfo { free: Some(u64::MAX), ..m }.in_use(), Some(0));
+    }
+}

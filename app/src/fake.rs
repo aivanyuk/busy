@@ -94,6 +94,7 @@ impl Source for Fake {
                     commit_limit: total + 8 * GB,
                     cached: Some((self.walk(1, 3.0, 9.0, 0.2) * GB as f32) as u64),
                     compressed: Some((self.walk(2, 0.1, 1.5, 0.05) * GB as f32) as u64),
+                    ..Default::default()
                 });
             }
             Module::Disk => {

@@ -27,6 +27,7 @@ pub trait Source {
 - `ProcEntry.io_bps` is **all** process I/O (read + write + other), not disk-only.
 - `GpuInfo.util_pct` is the max engine utilization (Task Manager semantics).
 - GPU fan % is reported as a `SensorKind::Load` reading named "GPU Fan" (no unit field yet).
+- `MemInfo.used` = total − available and so includes the modified list; Task Manager's "In use" is `MemInfo::in_use()` (total − modified − standby − free), so the composition bar's four segments sum to `total`.
 
 ## Config
 
@@ -49,4 +50,4 @@ Core is shared by four crates. Prefer additive changes (new `Option` fields). Re
 
 - `SensorReading.unit` or `SensorKind::FanPercent`.
 - `ProcEntry.disk_bps` distinct from all-I/O.
-- `CpuInfo.base_mhz`; `MemInfo.standby/modified` (Task Manager "Cached"); `GpuInfo.power_limit_w`.
+- `CpuInfo.base_mhz`; `GpuInfo.power_limit_w`.
