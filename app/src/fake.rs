@@ -186,6 +186,7 @@ impl Source for Fake {
                         power_w: Some(self.walk(10, 20.0, 320.0, 25.0)),
                         core_clock_mhz: Some(self.walk(11, 210.0, 2800.0, 200.0) as u32),
                         mem_clock_mhz: Some(11200),
+                        ..Default::default()
                     },
                     GpuInfo {
                         name: "Fake Radeon Graphics".into(),

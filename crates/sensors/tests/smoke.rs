@@ -30,6 +30,9 @@ fn sources_sample_without_panicking() {
         assert!((0.0..=100.0).contains(&g.util_pct), "{g:?}");
         assert!(g.engines.iter().all(|(_, v)| (0.0..=100.0).contains(v)));
         assert!(g.temp_c.is_none_or(|t| (-20.0..150.0).contains(&t)));
+        let dv = g.driver_version.as_deref().unwrap_or("0.0.0.0");
+        assert!(dv.split('.').count() == 4 && dv.split('.').all(|p| p.parse::<u16>().is_ok()), "{g:?}");
+        assert!(g.feature_level.is_none_or(|(major, minor)| (9..=15).contains(&major) && minor <= 15), "{g:?}");
     }
     assert!(snap.sensors.iter().all(|r| r.value.is_finite()));
 }

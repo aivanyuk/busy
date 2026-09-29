@@ -1,6 +1,7 @@
 //! GPU metrics (DXGI + PDH + D3DKMT + NVML/ADL) and hardware sensors (LibreHardwareMonitor / HWiNFO).
 
 mod adl;
+mod dx;
 mod gpu;
 mod hwinfo;
 mod lhm;
