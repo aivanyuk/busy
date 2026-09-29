@@ -23,6 +23,8 @@ Count an interface if: connected, not loopback, not a filter/LWF row, `HardwareI
 
 CPU 0.6–5 ms · Memory <0.3 ms · Disk ~0.3 ms · Network ~0.5 ms · Battery µs · Processes 4–13 ms (scales with thread count). `sources()` construction 0.4–0.8 s (first PDH query).
 
+Heap allocations per sample (release, `dump_metrics 60`, median): CPU 32 · Memory 0 · Disk 31 · Network 20 · Battery 0 · Processes 30. What remains is mostly the snapshot's own output (names, lists) and PDH instance strings.
+
 ## Gotchas
 
 - First sample: Processes/Network rates are 0; CPU/Disk collect once in the constructor so they have data.

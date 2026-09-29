@@ -2,7 +2,6 @@ use crate::pdh::{Counter, Query};
 use crate::util::Every;
 use busy_core::{DiskInfo, Module, Snapshot, Source, VolumeInfo};
 use busy_win::from_wide;
-use std::collections::HashMap;
 use windows::Win32::Storage::FileSystem::{
     GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDriveStringsW, GetVolumeInformationW,
 };
@@ -40,8 +39,9 @@ impl Pdh {
         if !self.q.collect() {
             return None;
         }
-        let map = |c: Counter| c.array(0).map(|v| v.into_iter().collect::<HashMap<_, _>>());
-        let (write, idle) = (map(self.write)?, map(self.idle)?);
+        // A handful of instances: a linear lookup beats building a map every tick.
+        let (write, idle) = (self.write.array(0)?, self.idle.array(0)?);
+        let get = |v: &[(String, f64)], name: &str| v.iter().find(|(n, _)| n == name).map(|&(_, x)| x);
         // Instances are "<disk#> <letters>" (e.g. "2 C: H:") plus "_Total".
         let mut disks: Vec<_> = self
             .read
@@ -50,8 +50,8 @@ impl Pdh {
             .filter(|(n, _)| n != "_Total")
             .map(|(name, r)| DiskInfo {
                 read_bps: r,
-                write_bps: write.get(&name).copied().unwrap_or(0.0),
-                active_pct: idle.get(&name).map_or(0.0, |i| (100.0 - i).clamp(0.0, 100.0) as f32),
+                write_bps: get(&write, &name).unwrap_or(0.0),
+                active_pct: get(&idle, &name).map_or(0.0, |i| (100.0 - i).clamp(0.0, 100.0) as f32),
                 name,
             })
             .collect();
