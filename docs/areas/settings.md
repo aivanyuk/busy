@@ -21,7 +21,7 @@ pub mod autostart { pub fn is_enabled() -> bool; pub fn set(enabled: bool) -> wi
 
 ## Layout
 
-Groups: Modules (ListView: Module | Taskbar | Flyout | Style, Move up/down, row editors below), Taskbar (Position, Offset with up-down), General (interval, history, theme, temp unit, pinned sensor, Start with Windows). OK / Cancel / Apply (Apply enabled only when dirty). Every label has an Alt mnemonic; Enter = OK, Esc = Cancel. DPI-aware via `SystemParametersInfoForDpi` + `WM_DPICHANGED`.
+Groups: Modules (ListView: Module | Taskbar | Flyout | Style, Move up/down, row editors below; the Style combo offers only the selected module's `allowed_styles()`), Taskbar (Position, Offset with up-down), General (interval, history, theme, temp unit, pinned sensor, Start with Windows). OK / Cancel / Apply (Apply enabled only when dirty). Every label has an Alt mnemonic; Enter = OK, Esc = Cancel. DPI-aware via `SystemParametersInfoForDpi` + `WM_DPICHANGED`.
 
 ## Dark mode
 

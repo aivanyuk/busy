@@ -130,13 +130,8 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
                     ..base(&label, Val::One(v.clone()), &["100°C", "212°F", "8888 rpm", "888.8 W"], v)
                 }
             }),
-            Module::Processes => snap.top.by_cpu.first().map(|p| {
-                let name: String = p.name.trim_end_matches(".exe").chars().take(12).collect();
-                Cell {
-                    bars: vec![(p.cpu_pct / 100.0, t.accent)],
-                    ..base(&name, Val::One(fmt::pct(p.cpu_pct)), &["100%", "WWWWWWWW"], fmt::pct(p.cpu_pct))
-                }
-            }),
+            // Flyout-only: `Config::normalize` never leaves it on the taskbar.
+            Module::Processes => None,
         };
         out.extend(cell);
     }
@@ -163,7 +158,7 @@ impl Cell<'_> {
 
     pub(super) fn width(&self, gfx: &Gfx, f: &Fonts) -> f32 {
         match self.style {
-            CellStyle::Text => self.text_width(gfx, f),
+            CellStyle::Text | CellStyle::Io => self.text_width(gfx, f),
             CellStyle::Graph => {
                 GRAPH_W.max(gfx.text_width(&f.label, &self.label) + gfx.text_width(&f.tiny, &self.short) + 6.0)
             }
@@ -194,7 +189,7 @@ impl Cell<'_> {
     pub(super) fn draw(&self, cv: &Canvas, f: &Fonts, ctx: &Ctx, r: Rect) {
         let t = ctx.theme;
         match self.style {
-            CellStyle::Text => self.draw_text(cv, f, ctx, r),
+            CellStyle::Text | CellStyle::Io => self.draw_text(cv, f, ctx, r),
             CellStyle::Graph => {
                 let y0 = (r.h - 32.0) / 2.0;
                 cv.text(&self.label, &f.label, Rect::new(r.x, y0, r.w, 13.0), t.secondary, Align::Left);

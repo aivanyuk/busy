@@ -25,6 +25,8 @@ pub enum CellStyle {
     Graph,
     /// Vertical bar(s).
     Bar,
+    /// Two stacked rates with colored keys: read/write, upload/download.
+    Io,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -88,7 +90,7 @@ impl Default for Config {
                 m(Module::Cpu, true, CellStyle::Graph),
                 m(Module::Memory, true, CellStyle::Text),
                 m(Module::Gpu, true, CellStyle::Text),
-                m(Module::Network, true, CellStyle::Text),
+                m(Module::Network, true, CellStyle::Io),
                 m(Module::Disk, false, CellStyle::Text),
                 m(Module::Sensors, false, CellStyle::Text),
                 m(Module::Battery, false, CellStyle::Text),
@@ -101,6 +103,23 @@ impl Default for Config {
             history_secs: 120,
             temp_unit: TempUnit::Celsius,
             pinned_sensor: String::new(),
+        }
+    }
+}
+
+impl Module {
+    /// Taskbar styles this module can be drawn in, preferred first (design `MODS.styles`).
+    /// Empty = flyout-only.
+    pub fn allowed_styles(self) -> &'static [CellStyle] {
+        use CellStyle::*;
+        match self {
+            Module::Cpu | Module::Gpu => &[Graph, Text, Bar],
+            Module::Memory => &[Bar, Text, Graph],
+            Module::Disk => &[Io, Text, Bar],
+            Module::Network => &[Io, Graph],
+            Module::Battery => &[Text, Bar],
+            Module::Sensors => &[Text, Graph],
+            Module::Processes => &[],
         }
     }
 }
@@ -143,6 +162,14 @@ impl Config {
                 self.modules.push(d);
             }
         }
+        for m in &mut self.modules {
+            let allowed = m.module.allowed_styles();
+            match allowed.first() {
+                None => m.taskbar = false,
+                Some(&first) if !allowed.contains(&m.style) => m.style = first,
+                _ => {}
+            }
+        }
         self.interval_ms = self.interval_ms.clamp(250, 10_000);
         self.history_secs = self.history_secs.clamp(10, 3600);
     }
@@ -179,6 +206,51 @@ mod tests {
         assert_eq!(cfg.modules[0].module, Module::Cpu);
         assert_eq!(cfg.interval_ms, 250);
         assert_eq!(cfg.history_secs, 3600);
+    }
+
+    #[test]
+    fn default_styles_are_allowed() {
+        for m in Config::default().modules {
+            let allowed = m.module.allowed_styles();
+            assert!(allowed.is_empty() || allowed.contains(&m.style), "{:?} {:?}", m.module, m.style);
+        }
+    }
+
+    #[test]
+    fn normalize_coerces_disallowed_style_to_first_allowed() {
+        let mut cfg = Config::default();
+        for m in &mut cfg.modules {
+            m.style = match m.module {
+                Module::Network => CellStyle::Text,
+                Module::Battery => CellStyle::Io,
+                Module::Disk => CellStyle::Graph,
+                Module::Cpu => CellStyle::Bar,
+                _ => m.style,
+            };
+        }
+        cfg.normalize();
+        let style = |m| cfg.module(m).map(|c| c.style);
+        assert_eq!(style(Module::Network), Some(CellStyle::Io));
+        assert_eq!(style(Module::Battery), Some(CellStyle::Text));
+        assert_eq!(style(Module::Disk), Some(CellStyle::Io));
+        assert_eq!(style(Module::Cpu), Some(CellStyle::Bar));
+    }
+
+    #[test]
+    fn normalize_keeps_processes_off_the_taskbar() {
+        let mut cfg = Config::default();
+        for m in &mut cfg.modules {
+            m.taskbar = true;
+        }
+        cfg.normalize();
+        assert_eq!(cfg.module(Module::Processes).map(|c| c.taskbar), Some(false));
+        assert_eq!(cfg.module(Module::Battery).map(|c| c.taskbar), Some(true));
+    }
+
+    #[test]
+    fn io_style_roundtrips() {
+        assert_eq!(serde_json::to_string(&CellStyle::Io).unwrap(), r#""Io""#);
+        assert_eq!(serde_json::from_str::<CellStyle>(r#""Io""#).unwrap(), CellStyle::Io);
     }
 
     #[test]

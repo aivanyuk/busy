@@ -1,9 +1,9 @@
 //! `WM_COMMAND`/`WM_NOTIFY` handling and the module list editors.
 
 use super::Ui;
-use super::config::STYLES;
+use super::config::{STYLES, style_name};
 use super::controls::*;
-use busy_core::{Module, ModuleCfg};
+use busy_core::{CellStyle, ModuleCfg};
 use windows::Win32::Foundation::*;
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, GetFocus, IsWindowEnabled, SetFocus};
@@ -27,7 +27,7 @@ impl Ui {
                 self.edit_row(|m| m.flyout = on);
             }
             (ID_STYLE, CBN_SELCHANGE) => {
-                if let Some((st, _)) = combo_value(self.ctl.style).and_then(|v| STYLES.get(v as usize)) {
+                if let Some(st) = combo_value(self.ctl.style).and_then(|v| STYLES.get(v as usize)) {
                     self.edit_row(|m| m.style = *st);
                 }
             }
@@ -88,9 +88,9 @@ impl Ui {
 
     pub(super) fn fill_row(&self, i: usize) {
         let Some(m) = self.modules.borrow().get(i).cloned() else { return };
-        let flyout_only = m.module == Module::Processes;
+        let flyout_only = m.module.allowed_styles().is_empty();
         let mark = |on: bool| if on { "\u{2713}" } else { "" };
-        let style = STYLES.iter().find(|(s, _)| *s == m.style).map_or("", |(_, n)| n);
+        let style = style_name(m.module, m.style);
         let cells = [
             m.module.label(),
             if flyout_only { "\u{2014}" } else { mark(m.taskbar) },
@@ -108,17 +108,20 @@ impl Ui {
         let sel = self.selected();
         let len = self.modules.borrow().len();
         let m = sel.and_then(|i| self.modules.borrow().get(i).cloned());
-        let flyout_only = m.as_ref().is_some_and(|m| m.module == Module::Processes);
+        let flyout_only = m.as_ref().is_some_and(|m| m.module.allowed_styles().is_empty());
         let editable = m.as_ref().filter(|_| !flyout_only);
         set_check(self.ctl.taskbar, editable.is_some_and(|m| m.taskbar));
         set_check(self.ctl.flyout, m.as_ref().is_some_and(|m| m.flyout));
         match editable {
             Some(m) => {
-                combo_set(
+                // Offer only the module's allowed styles (design `MODS.styles`).
+                let index = |s: CellStyle| STYLES.iter().position(|x| *x == s).unwrap_or(0) as isize;
+                send(self.ctl.style, CB_RESETCONTENT, 0, 0);
+                combo_fill(
                     self.ctl.style,
-                    STYLES.iter().position(|(s, _)| *s == m.style).unwrap_or(0) as isize,
-                    String::new,
+                    m.module.allowed_styles().iter().map(|&s| (style_name(m.module, s), index(s))),
                 );
+                combo_set(self.ctl.style, index(m.style), String::new);
             }
             None => {
                 send(self.ctl.style, CB_SETCURSEL, usize::MAX, 0);
