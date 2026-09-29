@@ -78,9 +78,9 @@ pub fn open(cfg: &Config, on_apply: Box<dyn Fn(Config)>) {
     let _ = create(cfg, on_apply);
 }
 
-struct Ui {
-    hwnd: HWND,
-    ctls: Vec<(HWND, Kind)>,
+/// Child control handles; creation order is tab order.
+struct Controls {
+    all: Vec<(HWND, Kind)>,
     groups: [HWND; 3],
     list: HWND,
     up: HWND,
@@ -109,6 +109,11 @@ struct Ui {
     ok: HWND,
     cancel: HWND,
     apply: HWND,
+}
+
+struct Ui {
+    hwnd: HWND,
+    ctl: Controls,
     modules: RefCell<Vec<ModuleCfg>>,
     applied: RefCell<Config>,
     on_apply: Box<dyn Fn(Config)>,
@@ -169,107 +174,11 @@ fn create(cfg: &Config, on_apply: Box<dyn Fn(Config)>) -> Result<()> {
             None,
         )?;
 
-        let mut ctls = Vec::new();
-        let mut mk = |class: PCWSTR, text: &str, style: u32, id: u16, kind: Kind| {
-            let ex = if matches!(kind, Kind::List | Kind::Edit) { WS_EX_CLIENTEDGE } else { WINDOW_EX_STYLE(0) };
-            let h = CreateWindowExW(
-                ex,
-                class,
-                &HSTRING::from(text),
-                WS_CHILD | WS_VISIBLE | WINDOW_STYLE(style),
-                0,
-                0,
-                0,
-                0,
-                Some(hwnd),
-                Some(HMENU(id as usize as _)),
-                Some(hinst),
-                None,
-            )
-            .unwrap_or_default();
-            ctls.push((h, kind));
-            h
-        };
-        let tab = (WS_TABSTOP | WS_GROUP).0;
-        let group = BS_GROUPBOX as u32;
-        let push = tab | BS_PUSHBUTTON as u32;
-        let check = tab | BS_AUTOCHECKBOX as u32;
-        let combo = tab | WS_VSCROLL.0 | CBS_DROPDOWNLIST as u32;
-        let edit = tab | ES_AUTOHSCROLL as u32;
-
-        // Creation order = tab order; labels precede their control so mnemonics work.
-        let grp_mod = mk(WC_BUTTONW, "&Modules", group, 0, Kind::Group);
-        let lv_style = LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER;
-        let list = mk(WC_LISTVIEWW, "Modules", tab | lv_style, ID_LIST, Kind::List);
-        let up = mk(WC_BUTTONW, "Move &up", push, ID_UP, Kind::Push);
-        let down = mk(WC_BUTTONW, "Move &down", push, ID_DOWN, Kind::Push);
-        let taskbar = mk(WC_BUTTONW, "Show on &taskbar", check, ID_TASKBAR, Kind::Check);
-        let flyout = mk(WC_BUTTONW, "Show in &flyout", check, ID_FLYOUT, Kind::Check);
-        let style_lbl = mk(WC_STATICW, "St&yle:", SS_CENTERIMAGE, 0, Kind::Static);
-        let style = mk(WC_COMBOBOXW, "", combo, ID_STYLE, Kind::Combo);
-
-        let grp_tb = mk(WC_BUTTONW, "Taskbar", group, 0, Kind::Group);
-        let anchor_lbl = mk(WC_STATICW, "&Position:", SS_CENTERIMAGE, 0, Kind::Static);
-        let anchor = mk(WC_COMBOBOXW, "", combo, ID_ANCHOR, Kind::Combo);
-        let offset_lbl = mk(WC_STATICW, "Off&set:", SS_CENTERIMAGE, 0, Kind::Static);
-        let offset = mk(WC_EDITW, "", edit, ID_OFFSET, Kind::Edit);
-        let spin_style = UDS_SETBUDDYINT | UDS_ARROWKEYS | UDS_NOTHOUSANDS;
-        let spin = mk(UPDOWN_CLASSW, "", spin_style, ID_SPIN, Kind::Spin);
-        let px_lbl = mk(WC_STATICW, "px", SS_CENTERIMAGE, 0, Kind::Static);
-
-        let grp_gen = mk(WC_BUTTONW, "General", group, 0, Kind::Group);
-        let interval_lbl = mk(WC_STATICW, "Update &interval:", SS_CENTERIMAGE, 0, Kind::Static);
-        let interval = mk(WC_COMBOBOXW, "", combo, ID_INTERVAL, Kind::Combo);
-        let history_lbl = mk(WC_STATICW, "&History length:", SS_CENTERIMAGE, 0, Kind::Static);
-        let history = mk(WC_COMBOBOXW, "", combo, ID_HISTORY, Kind::Combo);
-        let theme_lbl = mk(WC_STATICW, "Th&eme:", SS_CENTERIMAGE, 0, Kind::Static);
-        let theme = mk(WC_COMBOBOXW, "", combo, ID_THEME, Kind::Combo);
-        let unit_lbl = mk(WC_STATICW, "Temperature u&nit:", SS_CENTERIMAGE, 0, Kind::Static);
-        let unit = mk(WC_COMBOBOXW, "", combo, ID_UNIT, Kind::Combo);
-        let sensor_lbl = mk(WC_STATICW, "Pinned sens&or:", SS_CENTERIMAGE, 0, Kind::Static);
-        let sensor = mk(WC_EDITW, "", edit, ID_SENSOR, Kind::Edit);
-        let autostart = mk(WC_BUTTONW, "Start with &Windows", check, ID_AUTOSTART, Kind::Check);
-
-        let ok = mk(WC_BUTTONW, "OK", tab | BS_DEFPUSHBUTTON as u32, ID_OK, Kind::Push);
-        let cancel = mk(WC_BUTTONW, "Cancel", push, ID_CANCEL, Kind::Push);
-        let apply = mk(WC_BUTTONW, "&Apply", push, ID_APPLY, Kind::Push);
-
-        for g in [grp_mod, grp_tb, grp_gen] {
-            let _ = SetWindowSubclass(g, Some(group_proc), 1, 0);
-        }
-        let _ = SetWindowSubclass(list, Some(list_proc), 1, 0);
-
+        let ctl = Controls::create(hwnd, hinst);
+        let list = ctl.list;
         let ui = Rc::new(Ui {
             hwnd,
-            ctls,
-            groups: [grp_mod, grp_tb, grp_gen],
-            list,
-            up,
-            down,
-            taskbar,
-            flyout,
-            style_lbl,
-            style,
-            anchor_lbl,
-            anchor,
-            offset_lbl,
-            offset,
-            spin,
-            px_lbl,
-            interval_lbl,
-            interval,
-            history_lbl,
-            history,
-            theme_lbl,
-            theme,
-            unit_lbl,
-            unit,
-            sensor_lbl,
-            sensor,
-            autostart,
-            ok,
-            cancel,
-            apply,
+            ctl,
             modules: RefCell::new(cfg.modules.clone()),
             applied: RefCell::new(cfg.clone()),
             on_apply,
@@ -297,9 +206,117 @@ fn create(cfg: &Config, on_apply: Box<dyn Fn(Config)>) -> Result<()> {
     }
 }
 
+impl Controls {
+    fn create(parent: HWND, hinst: HINSTANCE) -> Self {
+        unsafe {
+            let mut ctls = Vec::new();
+            let mut mk = |class: PCWSTR, text: &str, style: u32, id: u16, kind: Kind| {
+                let ex = if matches!(kind, Kind::List | Kind::Edit) { WS_EX_CLIENTEDGE } else { WINDOW_EX_STYLE(0) };
+                let h = CreateWindowExW(
+                    ex,
+                    class,
+                    &HSTRING::from(text),
+                    WS_CHILD | WS_VISIBLE | WINDOW_STYLE(style),
+                    0,
+                    0,
+                    0,
+                    0,
+                    Some(parent),
+                    Some(HMENU(id as usize as _)),
+                    Some(hinst),
+                    None,
+                )
+                .unwrap_or_default();
+                ctls.push((h, kind));
+                h
+            };
+            let tab = (WS_TABSTOP | WS_GROUP).0;
+            let group = BS_GROUPBOX as u32;
+            let push = tab | BS_PUSHBUTTON as u32;
+            let check = tab | BS_AUTOCHECKBOX as u32;
+            let combo = tab | WS_VSCROLL.0 | CBS_DROPDOWNLIST as u32;
+            let edit = tab | ES_AUTOHSCROLL as u32;
+
+            // Creation order = tab order; labels precede their control so mnemonics work.
+            let grp_mod = mk(WC_BUTTONW, "&Modules", group, 0, Kind::Group);
+            let lv_style = LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER;
+            let list = mk(WC_LISTVIEWW, "Modules", tab | lv_style, ID_LIST, Kind::List);
+            let up = mk(WC_BUTTONW, "Move &up", push, ID_UP, Kind::Push);
+            let down = mk(WC_BUTTONW, "Move &down", push, ID_DOWN, Kind::Push);
+            let taskbar = mk(WC_BUTTONW, "Show on &taskbar", check, ID_TASKBAR, Kind::Check);
+            let flyout = mk(WC_BUTTONW, "Show in &flyout", check, ID_FLYOUT, Kind::Check);
+            let style_lbl = mk(WC_STATICW, "St&yle:", SS_CENTERIMAGE, 0, Kind::Static);
+            let style = mk(WC_COMBOBOXW, "", combo, ID_STYLE, Kind::Combo);
+
+            let grp_tb = mk(WC_BUTTONW, "Taskbar", group, 0, Kind::Group);
+            let anchor_lbl = mk(WC_STATICW, "&Position:", SS_CENTERIMAGE, 0, Kind::Static);
+            let anchor = mk(WC_COMBOBOXW, "", combo, ID_ANCHOR, Kind::Combo);
+            let offset_lbl = mk(WC_STATICW, "Off&set:", SS_CENTERIMAGE, 0, Kind::Static);
+            let offset = mk(WC_EDITW, "", edit, ID_OFFSET, Kind::Edit);
+            let spin_style = UDS_SETBUDDYINT | UDS_ARROWKEYS | UDS_NOTHOUSANDS;
+            let spin = mk(UPDOWN_CLASSW, "", spin_style, ID_SPIN, Kind::Spin);
+            let px_lbl = mk(WC_STATICW, "px", SS_CENTERIMAGE, 0, Kind::Static);
+
+            let grp_gen = mk(WC_BUTTONW, "General", group, 0, Kind::Group);
+            let interval_lbl = mk(WC_STATICW, "Update &interval:", SS_CENTERIMAGE, 0, Kind::Static);
+            let interval = mk(WC_COMBOBOXW, "", combo, ID_INTERVAL, Kind::Combo);
+            let history_lbl = mk(WC_STATICW, "&History length:", SS_CENTERIMAGE, 0, Kind::Static);
+            let history = mk(WC_COMBOBOXW, "", combo, ID_HISTORY, Kind::Combo);
+            let theme_lbl = mk(WC_STATICW, "Th&eme:", SS_CENTERIMAGE, 0, Kind::Static);
+            let theme = mk(WC_COMBOBOXW, "", combo, ID_THEME, Kind::Combo);
+            let unit_lbl = mk(WC_STATICW, "Temperature u&nit:", SS_CENTERIMAGE, 0, Kind::Static);
+            let unit = mk(WC_COMBOBOXW, "", combo, ID_UNIT, Kind::Combo);
+            let sensor_lbl = mk(WC_STATICW, "Pinned sens&or:", SS_CENTERIMAGE, 0, Kind::Static);
+            let sensor = mk(WC_EDITW, "", edit, ID_SENSOR, Kind::Edit);
+            let autostart = mk(WC_BUTTONW, "Start with &Windows", check, ID_AUTOSTART, Kind::Check);
+
+            let ok = mk(WC_BUTTONW, "OK", tab | BS_DEFPUSHBUTTON as u32, ID_OK, Kind::Push);
+            let cancel = mk(WC_BUTTONW, "Cancel", push, ID_CANCEL, Kind::Push);
+            let apply = mk(WC_BUTTONW, "&Apply", push, ID_APPLY, Kind::Push);
+
+            for g in [grp_mod, grp_tb, grp_gen] {
+                let _ = SetWindowSubclass(g, Some(group_proc), 1, 0);
+            }
+            let _ = SetWindowSubclass(list, Some(list_proc), 1, 0);
+
+            Self {
+                all: ctls,
+                groups: [grp_mod, grp_tb, grp_gen],
+                list,
+                up,
+                down,
+                taskbar,
+                flyout,
+                style_lbl,
+                style,
+                anchor_lbl,
+                anchor,
+                offset_lbl,
+                offset,
+                spin,
+                px_lbl,
+                interval_lbl,
+                interval,
+                history_lbl,
+                history,
+                theme_lbl,
+                theme,
+                unit_lbl,
+                unit,
+                sensor_lbl,
+                sensor,
+                autostart,
+                ok,
+                cancel,
+                apply,
+            }
+        }
+    }
+}
+
 impl Ui {
     fn init(&self, cfg: &Config) {
-        send(self.list, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, (LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER) as isize);
+        send(self.ctl.list, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, (LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER) as isize);
         for (i, name) in ["Module", "Taskbar", "Flyout", "Style"].into_iter().enumerate() {
             let text = HSTRING::from(name);
             let col = LVCOLUMNW {
@@ -308,7 +325,7 @@ impl Ui {
                 pszText: PWSTR(text.as_ptr() as _),
                 ..Default::default()
             };
-            send(self.list, LVM_INSERTCOLUMNW, i, &col as *const _ as isize);
+            send(self.ctl.list, LVM_INSERTCOLUMNW, i, &col as *const _ as isize);
         }
         for i in 0..cfg.modules.len() {
             let item = LVITEMW {
@@ -317,36 +334,36 @@ impl Ui {
                 pszText: PWSTR(w!("").as_ptr() as _),
                 ..Default::default()
             };
-            send(self.list, LVM_INSERTITEMW, 0, &item as *const _ as isize);
+            send(self.ctl.list, LVM_INSERTITEMW, 0, &item as *const _ as isize);
             self.fill_row(i);
         }
 
-        combo_fill(self.style, STYLES.iter().enumerate().map(|(i, (_, s))| (*s, i as isize)));
-        combo_fill(self.anchor, [("Near tray", 0), ("Left edge", 1)]);
-        combo_set(self.anchor, (cfg.anchor == Anchor::Left) as isize, String::new);
+        combo_fill(self.ctl.style, STYLES.iter().enumerate().map(|(i, (_, s))| (*s, i as isize)));
+        combo_fill(self.ctl.anchor, [("Near tray", 0), ("Left edge", 1)]);
+        combo_set(self.ctl.anchor, (cfg.anchor == Anchor::Left) as isize, String::new);
         combo_fill(
-            self.interval,
+            self.ctl.interval,
             [500, 1000, 2000, 5000].map(|v| (fmt_ms(v), v as isize)).iter().map(|(s, v)| (s.as_str(), *v)),
         );
-        combo_set(self.interval, cfg.interval_ms as isize, || fmt_ms(cfg.interval_ms));
+        combo_set(self.ctl.interval, cfg.interval_ms as isize, || fmt_ms(cfg.interval_ms));
         combo_fill(
-            self.history,
+            self.ctl.history,
             [60, 120, 300, 600].map(|v| (fmt_secs(v), v as isize)).iter().map(|(s, v)| (s.as_str(), *v)),
         );
-        combo_set(self.history, cfg.history_secs as isize, || fmt_secs(cfg.history_secs));
-        combo_fill(self.theme, [("System", 0), ("Light", 1), ("Dark", 2)]);
-        combo_set(self.theme, cfg.theme as isize, String::new);
-        combo_fill(self.unit, [("Celsius (\u{b0}C)", 0), ("Fahrenheit (\u{b0}F)", 1)]);
-        combo_set(self.unit, (cfg.temp_unit == TempUnit::Fahrenheit) as isize, String::new);
+        combo_set(self.ctl.history, cfg.history_secs as isize, || fmt_secs(cfg.history_secs));
+        combo_fill(self.ctl.theme, [("System", 0), ("Light", 1), ("Dark", 2)]);
+        combo_set(self.ctl.theme, cfg.theme as isize, String::new);
+        combo_fill(self.ctl.unit, [("Celsius (\u{b0}C)", 0), ("Fahrenheit (\u{b0}F)", 1)]);
+        combo_set(self.ctl.unit, (cfg.temp_unit == TempUnit::Fahrenheit) as isize, String::new);
 
-        send(self.spin, UDM_SETBUDDY, self.offset.0 as usize, 0);
-        send(self.spin, UDM_SETRANGE32, -OFFSET_RANGE as usize, OFFSET_RANGE as isize);
-        send(self.spin, UDM_SETPOS32, 0, cfg.offset_px.clamp(-OFFSET_RANGE, OFFSET_RANGE) as isize);
-        set_text(self.offset, &cfg.offset_px.to_string());
-        set_text(self.sensor, &cfg.pinned_sensor);
+        send(self.ctl.spin, UDM_SETBUDDY, self.ctl.offset.0 as usize, 0);
+        send(self.ctl.spin, UDM_SETRANGE32, -OFFSET_RANGE as usize, OFFSET_RANGE as isize);
+        send(self.ctl.spin, UDM_SETPOS32, 0, cfg.offset_px.clamp(-OFFSET_RANGE, OFFSET_RANGE) as isize);
+        set_text(self.ctl.offset, &cfg.offset_px.to_string());
+        set_text(self.ctl.sensor, &cfg.pinned_sensor);
         let cue = HSTRING::from("hardware/name \u{2014} empty = hottest CPU");
-        send(self.sensor, EM_SETCUEBANNER, 0, cue.as_ptr() as isize);
-        set_check(self.autostart, autostart::is_enabled());
+        send(self.ctl.sensor, EM_SETCUEBANNER, 0, cue.as_ptr() as isize);
+        set_check(self.ctl.autostart, autostart::is_enabled());
 
         self.select(0);
         self.sync_editors();
@@ -359,7 +376,7 @@ impl Ui {
             let pv = Some((&mut ncm as *mut NONCLIENTMETRICSW).cast());
             let _ = SystemParametersInfoForDpi(SPI_GETNONCLIENTMETRICS.0, ncm.cbSize, pv, 0, self.dpi.get());
             let font = CreateFontIndirectW(&ncm.lfMessageFont);
-            for &(h, _) in &self.ctls {
+            for &(h, _) in &self.ctl.all {
                 send(h, WM_SETFONT, font.0 as usize, 1);
             }
             let old = self.font.replace(font);
@@ -386,64 +403,69 @@ impl Ui {
         let lw = iw - bw - gap;
         let col = s(72);
         for (i, cx) in [lw - s(4) - 3 * col, col, col, col].into_iter().enumerate() {
-            send(self.list, LVM_SETCOLUMNWIDTH, i, cx as isize);
+            send(self.ctl.list, LVM_SETCOLUMNWIDTH, i, cx as isize);
         }
         let mut y = m;
         let ly = y + top;
         // Size the list to fit all rows exactly: lay out tall, then measure the last row.
-        mv(self.list, ix, ly, lw, s(1000));
+        mv(self.ctl.list, ix, ly, lw, s(1000));
         let mut last = RECT::default();
-        send(self.list, LVM_GETITEMRECT, self.modules.borrow().len().saturating_sub(1), &mut last as *mut _ as isize);
+        send(
+            self.ctl.list,
+            LVM_GETITEMRECT,
+            self.modules.borrow().len().saturating_sub(1),
+            &mut last as *mut _ as isize,
+        );
         let (mut wr, mut cr) = (RECT::default(), RECT::default());
         unsafe {
-            let _ = GetWindowRect(self.list, &mut wr);
-            let _ = GetClientRect(self.list, &mut cr);
+            let _ = GetWindowRect(self.ctl.list, &mut wr);
+            let _ = GetClientRect(self.ctl.list, &mut cr);
         }
         let lh = last.bottom + (wr.bottom - wr.top) - (cr.bottom - cr.top);
-        mv(self.list, ix, ly, lw, lh);
-        mv(self.up, ix + iw - bw, ly, bw, h + s(2));
-        mv(self.down, ix + iw - bw, ly + h + s(8), bw, h + s(2));
+        mv(self.ctl.list, ix, ly, lw, lh);
+        mv(self.ctl.up, ix + iw - bw, ly, bw, h + s(2));
+        mv(self.ctl.down, ix + iw - bw, ly + h + s(8), bw, h + s(2));
         let ey = ly + lh + gap;
-        mv(self.taskbar, ix, ey, s(120), h);
-        mv(self.flyout, ix + s(130), ey, s(115), h);
-        mv(self.style, ix + iw - bw, ey, bw, s(200));
-        mv(self.style_lbl, ix + iw - bw - s(48), ey, s(44), h);
+        mv(self.ctl.taskbar, ix, ey, s(120), h);
+        mv(self.ctl.flyout, ix + s(130), ey, s(115), h);
+        mv(self.ctl.style, ix + iw - bw, ey, bw, s(200));
+        mv(self.ctl.style_lbl, ix + iw - bw - s(48), ey, s(44), h);
         let gh = ey + h + pad - y;
-        mv(self.groups[0], gx, y, gw, gh);
+        mv(self.ctl.groups[0], gx, y, gw, gh);
         y += gh + s(10);
 
         // Two-column label/control grid shared by Taskbar and General.
         let (c1l, c1c, c2l, c2c, lwid, cwid) = (ix, ix + s(110), ix + s(242), ix + s(352), s(104), s(120));
         let ry = y + top;
-        mv(self.anchor_lbl, c1l, ry, lwid, h);
-        mv(self.anchor, c1c, ry, cwid, s(200));
-        mv(self.offset_lbl, c2l, ry, lwid, h);
+        mv(self.ctl.anchor_lbl, c1l, ry, lwid, h);
+        mv(self.ctl.anchor, c1c, ry, cwid, s(200));
+        mv(self.ctl.offset_lbl, c2l, ry, lwid, h);
         let (ew, sw) = (s(64), s(18));
-        mv(self.offset, c2c, ry, ew, h);
-        mv(self.spin, c2c + ew, ry, sw, h);
-        mv(self.px_lbl, c2c + ew + sw + s(6), ry, s(30), h);
+        mv(self.ctl.offset, c2c, ry, ew, h);
+        mv(self.ctl.spin, c2c + ew, ry, sw, h);
+        mv(self.ctl.px_lbl, c2c + ew + sw + s(6), ry, s(30), h);
         let gh = top + h + pad;
-        mv(self.groups[1], gx, y, gw, gh);
+        mv(self.ctl.groups[1], gx, y, gw, gh);
         y += gh + s(10);
 
         let row = |i: i32| y + top + i * (h + gap);
-        mv(self.interval_lbl, c1l, row(0), lwid, h);
-        mv(self.interval, c1c, row(0), cwid, s(200));
-        mv(self.history_lbl, c2l, row(0), lwid, h);
-        mv(self.history, c2c, row(0), cwid, s(200));
-        mv(self.theme_lbl, c1l, row(1), lwid, h);
-        mv(self.theme, c1c, row(1), cwid, s(200));
-        mv(self.unit_lbl, c2l, row(1), lwid, h);
-        mv(self.unit, c2c, row(1), cwid, s(200));
-        mv(self.sensor_lbl, c1l, row(2), lwid, h);
-        mv(self.sensor, c1c, row(2), ix + iw - c1c, h);
-        mv(self.autostart, c1l, row(3), s(200), h);
+        mv(self.ctl.interval_lbl, c1l, row(0), lwid, h);
+        mv(self.ctl.interval, c1c, row(0), cwid, s(200));
+        mv(self.ctl.history_lbl, c2l, row(0), lwid, h);
+        mv(self.ctl.history, c2c, row(0), cwid, s(200));
+        mv(self.ctl.theme_lbl, c1l, row(1), lwid, h);
+        mv(self.ctl.theme, c1c, row(1), cwid, s(200));
+        mv(self.ctl.unit_lbl, c2l, row(1), lwid, h);
+        mv(self.ctl.unit, c2c, row(1), cwid, s(200));
+        mv(self.ctl.sensor_lbl, c1l, row(2), lwid, h);
+        mv(self.ctl.sensor, c1c, row(2), ix + iw - c1c, h);
+        mv(self.ctl.autostart, c1l, row(3), s(200), h);
         let gh = row(3) + h + pad - y;
-        mv(self.groups[2], gx, y, gw, gh);
+        mv(self.ctl.groups[2], gx, y, gw, gh);
         y += gh + s(12);
 
         let (bw, bh) = (s(80), h + s(2));
-        for (i, b) in [self.ok, self.cancel, self.apply].into_iter().enumerate() {
+        for (i, b) in [self.ctl.ok, self.ctl.cancel, self.ctl.apply].into_iter().enumerate() {
             mv(b, width - m - (3 - i as i32) * bw - (2 - i as i32) * gap, y, bw, bh);
         }
         (width, y + bh + m)
@@ -459,7 +481,7 @@ impl Ui {
         let d = self.dark.get();
         dark::title_bar(self.hwnd, d);
         unsafe {
-            for &(h, k) in &self.ctls {
+            for &(h, k) in &self.ctl.all {
                 let name = match (k, d) {
                     (Kind::Push | Kind::Check | Kind::List | Kind::Spin, true) => w!("DarkMode_Explorer"),
                     (Kind::Combo | Kind::Edit, true) => w!("DarkMode_CFD"),
@@ -468,16 +490,16 @@ impl Ui {
                 };
                 let _ = SetWindowTheme(h, name, PCWSTR::null());
             }
-            let header = HWND(send(self.list, LVM_GETHEADER, 0, 0) as _);
+            let header = HWND(send(self.ctl.list, LVM_GETHEADER, 0, 0) as _);
             let _ = SetWindowTheme(header, if d { w!("DarkMode_ItemsView") } else { PCWSTR::null() }, PCWSTR::null());
             let (bk, fg) = if d {
                 (dark::FIELD, dark::TEXT)
             } else {
                 (COLORREF(GetSysColor(COLOR_WINDOW)), COLORREF(GetSysColor(COLOR_WINDOWTEXT)))
             };
-            send(self.list, LVM_SETBKCOLOR, 0, bk.0 as isize);
-            send(self.list, LVM_SETTEXTBKCOLOR, 0, bk.0 as isize);
-            send(self.list, LVM_SETTEXTCOLOR, 0, fg.0 as isize);
+            send(self.ctl.list, LVM_SETBKCOLOR, 0, bk.0 as isize);
+            send(self.ctl.list, LVM_SETTEXTBKCOLOR, 0, bk.0 as isize);
+            send(self.ctl.list, LVM_SETTEXTCOLOR, 0, fg.0 as isize);
             let _ = RedrawWindow(Some(self.hwnd), None, None, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME);
         }
     }
@@ -577,15 +599,15 @@ impl Ui {
             (ID_UP, BN_CLICKED) => self.move_row(-1),
             (ID_DOWN, BN_CLICKED) => self.move_row(1),
             (ID_TASKBAR, BN_CLICKED) => {
-                let on = checked(self.taskbar);
+                let on = checked(self.ctl.taskbar);
                 self.edit_row(|m| m.taskbar = on);
             }
             (ID_FLYOUT, BN_CLICKED) => {
-                let on = checked(self.flyout);
+                let on = checked(self.ctl.flyout);
                 self.edit_row(|m| m.flyout = on);
             }
             (ID_STYLE, CBN_SELCHANGE) => {
-                if let Some((st, _)) = combo_value(self.style).and_then(|v| STYLES.get(v as usize)) {
+                if let Some((st, _)) = combo_value(self.ctl.style).and_then(|v| STYLES.get(v as usize)) {
                     self.edit_row(|m| m.style = *st);
                 }
             }
@@ -600,14 +622,17 @@ impl Ui {
     fn notify(&self, l: LPARAM) -> Option<LRESULT> {
         let hdr = unsafe { &*(l.0 as *const NMHDR) };
         match hdr.code {
-            LVN_ITEMCHANGED if hdr.hwndFrom == self.list => {
+            LVN_ITEMCHANGED if hdr.hwndFrom == self.ctl.list => {
                 let nm = unsafe { &*(l.0 as *const NMLISTVIEW) };
                 if (nm.uNewState ^ nm.uOldState) & LVIS_SELECTED.0 != 0 {
                     self.sync_editors();
                 }
                 None
             }
-            NM_CUSTOMDRAW if self.dark.get() && [self.taskbar, self.flyout, self.autostart].contains(&hdr.hwndFrom) => {
+            NM_CUSTOMDRAW
+                if self.dark.get()
+                    && [self.ctl.taskbar, self.ctl.flyout, self.ctl.autostart].contains(&hdr.hwndFrom) =>
+            {
                 Some(self.draw_check(unsafe { &*(l.0 as *const NMCUSTOMDRAW) }))
             }
             _ => None,
@@ -674,27 +699,27 @@ impl Ui {
         unsafe {
             if !on && GetFocus() == h {
                 let next = match h {
-                    _ if h == self.apply => self.ok,
-                    _ if h == self.up => self.down,
-                    _ if h == self.down => self.up,
-                    _ => self.list,
+                    _ if h == self.ctl.apply => self.ctl.ok,
+                    _ if h == self.ctl.up => self.ctl.down,
+                    _ if h == self.ctl.down => self.ctl.up,
+                    _ => self.ctl.list,
                 };
-                let _ = SetFocus(Some(if IsWindowEnabled(next).as_bool() { next } else { self.list }));
+                let _ = SetFocus(Some(if IsWindowEnabled(next).as_bool() { next } else { self.ctl.list }));
             }
             let _ = EnableWindow(h, on);
         }
     }
 
     fn selected(&self) -> Option<usize> {
-        let i = send(self.list, LVM_GETNEXTITEM, usize::MAX, LVNI_SELECTED as isize);
+        let i = send(self.ctl.list, LVM_GETNEXTITEM, usize::MAX, LVNI_SELECTED as isize);
         (i >= 0).then_some(i as usize)
     }
 
     fn select(&self, i: usize) {
         let st = LIST_VIEW_ITEM_STATE_FLAGS(LVIS_SELECTED.0 | LVIS_FOCUSED.0);
         let item = LVITEMW { state: st, stateMask: st, ..Default::default() };
-        send(self.list, LVM_SETITEMSTATE, i, &item as *const _ as isize);
-        send(self.list, LVM_ENSUREVISIBLE, i, 0);
+        send(self.ctl.list, LVM_SETITEMSTATE, i, &item as *const _ as isize);
+        send(self.ctl.list, LVM_ENSUREVISIBLE, i, 0);
     }
 
     fn fill_row(&self, i: usize) {
@@ -711,7 +736,7 @@ impl Ui {
         for (sub, text) in cells.into_iter().enumerate() {
             let text = HSTRING::from(text);
             let item = LVITEMW { iSubItem: sub as i32, pszText: PWSTR(text.as_ptr() as _), ..Default::default() };
-            send(self.list, LVM_SETITEMTEXTW, i, &item as *const _ as isize);
+            send(self.ctl.list, LVM_SETITEMTEXTW, i, &item as *const _ as isize);
         }
     }
 
@@ -721,25 +746,25 @@ impl Ui {
         let m = sel.and_then(|i| self.modules.borrow().get(i).cloned());
         let flyout_only = m.as_ref().is_some_and(|m| m.module == Module::Processes);
         let editable = m.as_ref().filter(|_| !flyout_only);
-        set_check(self.taskbar, editable.is_some_and(|m| m.taskbar));
-        set_check(self.flyout, m.as_ref().is_some_and(|m| m.flyout));
+        set_check(self.ctl.taskbar, editable.is_some_and(|m| m.taskbar));
+        set_check(self.ctl.flyout, m.as_ref().is_some_and(|m| m.flyout));
         match editable {
             Some(m) => {
                 combo_set(
-                    self.style,
+                    self.ctl.style,
                     STYLES.iter().position(|(s, _)| *s == m.style).unwrap_or(0) as isize,
                     String::new,
                 );
             }
             None => {
-                send(self.style, CB_SETCURSEL, usize::MAX, 0);
+                send(self.ctl.style, CB_SETCURSEL, usize::MAX, 0);
             }
         }
-        self.enable(self.taskbar, editable.is_some());
-        self.enable(self.flyout, m.is_some());
-        self.enable(self.style, editable.is_some());
-        self.enable(self.up, sel.is_some_and(|i| i > 0));
-        self.enable(self.down, sel.is_some_and(|i| i + 1 < len));
+        self.enable(self.ctl.taskbar, editable.is_some());
+        self.enable(self.ctl.flyout, m.is_some());
+        self.enable(self.ctl.style, editable.is_some());
+        self.enable(self.ctl.up, sel.is_some_and(|i| i > 0));
+        self.enable(self.ctl.down, sel.is_some_and(|i| i + 1 < len));
     }
 
     fn edit_row(&self, f: impl FnOnce(&mut ModuleCfg)) {
@@ -768,26 +793,26 @@ impl Ui {
     fn collect(&self) -> Config {
         let mut c = self.applied.borrow().clone();
         c.modules = self.modules.borrow().clone();
-        c.anchor = if combo_value(self.anchor) == Some(1) { Anchor::Left } else { Anchor::NearTray };
-        if let Ok(v) = window_string(self.offset).trim().parse::<i32>() {
+        c.anchor = if combo_value(self.ctl.anchor) == Some(1) { Anchor::Left } else { Anchor::NearTray };
+        if let Ok(v) = window_string(self.ctl.offset).trim().parse::<i32>() {
             c.offset_px = v.clamp(-OFFSET_RANGE, OFFSET_RANGE);
         }
-        c.interval_ms = combo_value(self.interval).map_or(c.interval_ms, |v| v as u32);
-        c.history_secs = combo_value(self.history).map_or(c.history_secs, |v| v as u32);
-        c.theme = match combo_value(self.theme) {
+        c.interval_ms = combo_value(self.ctl.interval).map_or(c.interval_ms, |v| v as u32);
+        c.history_secs = combo_value(self.ctl.history).map_or(c.history_secs, |v| v as u32);
+        c.theme = match combo_value(self.ctl.theme) {
             Some(1) => ThemeMode::Light,
             Some(2) => ThemeMode::Dark,
             _ => ThemeMode::System,
         };
-        c.temp_unit = if combo_value(self.unit) == Some(1) { TempUnit::Fahrenheit } else { TempUnit::Celsius };
-        c.pinned_sensor = window_string(self.sensor).trim().to_string();
-        c.autostart = checked(self.autostart);
+        c.temp_unit = if combo_value(self.ctl.unit) == Some(1) { TempUnit::Fahrenheit } else { TempUnit::Celsius };
+        c.pinned_sensor = window_string(self.ctl.sensor).trim().to_string();
+        c.autostart = checked(self.ctl.autostart);
         c
     }
 
     fn changed(&self) {
         let dirty = self.collect() != *self.applied.borrow();
-        self.enable(self.apply, dirty);
+        self.enable(self.ctl.apply, dirty);
     }
 
     fn apply(&self) {
@@ -801,14 +826,14 @@ impl Ui {
             let msg = HSTRING::from(format!("Couldn't update the startup entry.\n\n{}", e.message()));
             unsafe { MessageBoxW(Some(self.hwnd), &msg, w!("busy"), MB_ICONERROR | MB_OK) };
             c.autostart = autostart::is_enabled();
-            set_check(self.autostart, c.autostart);
+            set_check(self.ctl.autostart, c.autostart);
         }
         self.syncing.set(true);
-        if window_string(self.offset).trim() != c.offset_px.to_string() {
-            set_text(self.offset, &c.offset_px.to_string());
+        if window_string(self.ctl.offset).trim() != c.offset_px.to_string() {
+            set_text(self.ctl.offset, &c.offset_px.to_string());
         }
-        if window_string(self.sensor) != c.pinned_sensor {
-            set_text(self.sensor, &c.pinned_sensor);
+        if window_string(self.ctl.sensor) != c.pinned_sensor {
+            set_text(self.ctl.sensor, &c.pinned_sensor);
         }
         self.syncing.set(false);
         *self.applied.borrow_mut() = c.clone();
