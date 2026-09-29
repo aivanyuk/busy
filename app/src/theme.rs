@@ -23,7 +23,7 @@ pub(crate) fn alpha(c: Color, a: f32) -> Color {
 
 /// One field per design token (`--tb` → `tb`, `--on-accent` → `on_accent`). Tokens only the settings window
 /// uses (`--win`, `--card`, `--ctl*`, `--pop`, `--knob`) are left to Phase 4.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Theme {
     pub(crate) dark: bool,
     /// Taskbar surface. The widget draws over the real taskbar, so only the debug dump paints it.

@@ -16,7 +16,8 @@ Verified on Windows 11 build 26200.9457 (25H2), 3840×2160 @ 200 %, centered tas
 
 - Hosting: `WS_CHILD` created directly with `Shell_TrayWnd` as parent (primary monitor only) — same end state as TrafficMonitor's `SetParent`. Win11 removed deskbands; this is undocumented and may need fixes after Windows updates.
 - Rendering: `WS_EX_LAYERED | WS_EX_NOPARENTNOTIFY` child, D2D `ID2D1DCRenderTarget` (premultiplied BGRA) into a 32-bpp DIB → `UpdateLayeredWindow`; DWM honours per-pixel alpha on the layered child. Background alpha 1/255 so the whole widget is clickable. Returns `MA_NOACTIVATE`.
-- Positioning (re-checked by a 1 s timer, moved only when the rect changes; the timer also re-embeds if the widget or taskbar died):
+- Redraw only on change: each render builds a `Frame` (DPI, pixel size, hover, active, theme, and per cell its width plus a `cells::Key` of what its style draws: text and its color, bar fill in 1/256 steps, and for graphs each series' push count) and skips drawing and `UpdateLayeredWindow` when it equals the frame on screen. DWM keeps the layered window's last bitmap, so nothing has to be redrawn for it. Text and Bar cells change only when a formatted value changes; a Graph cell redraws on every new sample because the sparkline scrolls.
+- Positioning (re-checked by a 1 s timer, moved only when the rect changes; the timer also re-embeds if the widget or taskbar died). The timer re-lays out only when the taskbar geometry (DPI, client rect, free slot) changed; otherwise it only restores z-order and visibility:
   - `NearTray`: left of `TrayNotifyWnd` — still present on 26200 and matching the XAML notification area.
   - `Left`: taskbar left edge + offset with centered icons; after the task list with left-aligned icons.
   - Task-button extent: `ReBarWindow32` is **not** kept in sync on 26200; the hidden `Start` window's rect is, and with centered icons it is mirrored around the taskbar centre to find the icon group's right end.
