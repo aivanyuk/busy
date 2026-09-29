@@ -3,14 +3,24 @@
 use super::controls::{checked, combo_fill, combo_set, combo_value, send, set_check, set_text, window_string};
 use super::worker::{Job, Reply};
 use super::{Ui, show};
-use busy_core::{Anchor, CellStyle, Config, TempUnit, ThemeMode};
+use busy_core::{Anchor, CellStyle, Config, Module, TempUnit, ThemeMode};
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{HSTRING, PWSTR, w};
 
 const OFFSET_RANGE: i32 = 2000;
-pub(super) const STYLES: [(CellStyle, &str); 3] =
-    [(CellStyle::Text, "Text"), (CellStyle::Graph, "Graph"), (CellStyle::Bar, "Bar")];
+/// Style combo item data is the index into this table.
+pub(super) const STYLES: [CellStyle; 4] = [CellStyle::Text, CellStyle::Graph, CellStyle::Bar, CellStyle::Io];
+
+pub(super) fn style_name(m: Module, s: CellStyle) -> &'static str {
+    match s {
+        CellStyle::Text => "Text",
+        CellStyle::Graph => "Graph",
+        CellStyle::Bar => "Bar",
+        CellStyle::Io if m == Module::Disk => "Read / write",
+        CellStyle::Io => "Up / down",
+    }
+}
 
 impl Ui {
     pub(super) fn init(&self, cfg: &Config) {
@@ -36,7 +46,6 @@ impl Ui {
             self.fill_row(i);
         }
 
-        combo_fill(self.ctl.style, STYLES.iter().enumerate().map(|(i, (_, s))| (*s, i as isize)));
         combo_fill(self.ctl.anchor, [("Near tray", 0), ("Left edge", 1)]);
         combo_set(self.ctl.anchor, (cfg.anchor == Anchor::Left) as isize, String::new);
         combo_fill(
