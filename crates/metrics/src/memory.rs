@@ -1,7 +1,9 @@
 use crate::util::perf_info;
 use busy_core::{MemInfo, Module, Snapshot, Source};
 use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SYSTEM_INFORMATION_CLASS};
-use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+use windows::Win32::System::SystemInformation::{
+    GetPhysicallyInstalledSystemMemory, GlobalMemoryStatusEx, MEMORYSTATUSEX,
+};
 
 /// SYSTEM_MEMORY_LIST_INFORMATION (phnt `ntexapi.h`), page counts. Not in the `windows` crate.
 #[repr(C)]
@@ -33,7 +35,19 @@ fn memory_lists() -> Option<MemoryLists> {
     (st.is_ok() && ret == size).then_some(m)
 }
 
-pub struct Memory;
+pub struct Memory {
+    /// Installed RAM per the SMBIOS memory tables; fixed for the session.
+    installed: Option<u64>,
+}
+
+impl Memory {
+    pub fn new() -> Self {
+        let mut kb = 0u64;
+        // SAFETY: `kb` is a valid out-pointer for the duration of the call.
+        let ok = unsafe { GetPhysicallyInstalledSystemMemory(&mut kb) }.is_ok();
+        Self { installed: ok.then(|| kb.saturating_mul(1024)) }
+    }
+}
 
 impl Source for Memory {
     fn module(&self) -> Module {
@@ -61,6 +75,10 @@ impl Source for Memory {
             modified: pages(|l| l.modified),
             standby: pages(|l| l.standby_by_priority.iter().fold(0, |a, &b| a.saturating_add(b))),
             free: pages(|l| l.free.saturating_add(l.zero)),
+            paged_pool: pi.map(|p| (p.KernelPaged as u64).saturating_mul(page)),
+            nonpaged_pool: pi.map(|p| (p.KernelNonpaged as u64).saturating_mul(page)),
+            // Without SMBIOS memory tables (some VMs) installed can be below total: report nothing, not 0.
+            hardware_reserved: self.installed.and_then(|i| i.checked_sub(ms.ullTotalPhys)),
         });
     }
 }

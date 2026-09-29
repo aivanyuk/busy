@@ -108,6 +108,11 @@ pub struct MemInfo {
     pub standby: Option<u64>,
     /// Free + zeroed page lists (Task Manager "Free"); part of `available`.
     pub free: Option<u64>,
+    /// Kernel paged / non-paged pool (Task Manager "Paged pool", "Non-paged pool").
+    pub paged_pool: Option<u64>,
+    pub nonpaged_pool: Option<u64>,
+    /// Installed RAM not visible to Windows (firmware, iGPU carve-out): installed − `total`.
+    pub hardware_reserved: Option<u64>,
 }
 
 impl MemInfo {
