@@ -36,12 +36,6 @@ pub fn rate(bps: f64) -> String {
     format!("{} {}/s", num(v), UNITS[i])
 }
 
-/// Compact rate for narrow places: `"1.2M"`, `"350K"`.
-pub fn rate_short(bps: f64) -> String {
-    let (v, i) = scale(bps.max(0.0) / 1024.0, 1);
-    format!("{}{}", if v < 0.05 { "0".into() } else { num(v) }, &UNITS[i][..1])
-}
-
 pub fn pct(v: f32) -> String {
     format!("{:.0}%", v.clamp(0.0, 100.0))
 }
@@ -118,8 +112,6 @@ mod tests {
         assert_eq!(rate(350.0 * 1024.0), "350 KB/s");
         assert_eq!(rate(1.25 * 1024.0 * 1024.0), "1.2 MB/s");
         assert_eq!(rate(12.0 * 1024.0), "12.0 KB/s");
-        assert_eq!(rate_short(1.5 * 1024.0 * 1024.0), "1.5M");
-        assert_eq!(rate_short(0.0), "0K");
     }
 
     #[test]
