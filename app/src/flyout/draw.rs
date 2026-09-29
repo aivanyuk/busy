@@ -3,9 +3,9 @@
 
 use super::Action;
 use super::detail::{Chart, Detail};
-use crate::render::{Align, Canvas, Gfx, Rect};
-use crate::theme::{Color, Theme};
 use busy_ui::fmt;
+use busy_ui::render::{Align, Canvas, Gfx, Rect};
+use busy_ui::theme::{Color, Theme};
 use windows::Win32::Graphics::DirectWrite::IDWriteTextFormat;
 use windows::core::Result;
 
@@ -400,7 +400,7 @@ impl Pen<'_> {
 #[cfg(test)]
 mod tests {
     use super::GraphHit;
-    use crate::render::Rect;
+    use busy_ui::render::Rect;
 
     #[test]
     fn sample_at_counts_back_from_the_newest_sample() {

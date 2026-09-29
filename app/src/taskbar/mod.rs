@@ -11,11 +11,11 @@ use styles::{CELL_H, Fonts};
 use surface::Surface;
 use tip::Tip;
 
-use crate::ctx::Ctx;
-use crate::render::{Canvas, Gfx, Rect};
-use crate::theme::Theme;
 use crate::win::{self, Event, raise};
 use busy_core::{Anchor, Config, Module};
+use busy_ui::ctx::Ctx;
+use busy_ui::render::{Canvas, Gfx, Rect};
+use busy_ui::theme::Theme;
 use std::cell::RefCell;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Direct2D::Common::*;

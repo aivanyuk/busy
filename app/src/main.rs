@@ -3,18 +3,14 @@
 #![allow(linker_messages)]
 
 mod app;
-mod ctx;
 #[cfg(debug_assertions)]
 mod fake;
 mod flyout;
 mod launch;
 mod menu;
-mod render;
 mod sampler;
 mod sync;
 mod taskbar;
-mod theme;
-mod tone;
 mod win;
 mod worker;
 

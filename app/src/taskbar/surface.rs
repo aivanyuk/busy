@@ -1,7 +1,7 @@
 //! The 32-bpp DIB the widget is drawn into before `UpdateLayeredWindow`.
 
 #[cfg(debug_assertions)]
-use crate::theme::Color;
+use busy_ui::theme::Color;
 use windows::Win32::Graphics::Gdi::*;
 
 /// 32-bpp top-down DIB selected into a memory DC.

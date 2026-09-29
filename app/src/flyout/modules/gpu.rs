@@ -1,7 +1,7 @@
 use super::super::detail::{Chart, Detail, Value, series_span};
-use crate::ctx::Ctx;
-use crate::tone::{self, SECOND};
 use busy_core::{Module, ModuleCfg};
+use busy_ui::ctx::Ctx;
+use busy_ui::tone::{self, SECOND};
 use busy_ui::{fmt, select};
 
 /// Design `fly('gpu')`: the GPU the taskbar cell shows (the busiest), its utilization over time, the busiest

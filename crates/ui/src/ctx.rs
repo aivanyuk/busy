@@ -1,9 +1,9 @@
 //! The read-only view our windows draw from.
 
+use crate::history::History;
 use crate::render::Gfx;
 use crate::theme::Theme;
 use busy_core::{Config, Snapshot};
-use busy_ui::history::History;
 
 pub struct Ctx<'a> {
     pub cfg: &'a Config,

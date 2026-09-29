@@ -6,11 +6,11 @@ mod modules;
 
 use draw::{Fonts, GraphHit};
 
-use crate::ctx::Ctx;
-use crate::render::{Canvas, Gfx, Rect};
-use crate::theme::{Color, Theme};
 use crate::win::{self, Event, raise};
 use busy_core::{Anchor, Module};
+use busy_ui::ctx::Ctx;
+use busy_ui::render::{Canvas, Gfx, Rect};
+use busy_ui::theme::{Color, Theme};
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Direct2D::Common::*;
 use windows::Win32::Graphics::Direct2D::*;

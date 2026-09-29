@@ -1,8 +1,8 @@
 //! Measuring and drawing a cell in its style, to the design's `MeterWidget` geometry (sizes in DIPs).
 
 use super::cells::{Body, Cell};
-use crate::render::{Align, Canvas, Gfx, Rect};
-use crate::theme::Theme;
+use busy_ui::render::{Align, Canvas, Gfx, Rect};
+use busy_ui::theme::Theme;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use windows::Win32::Graphics::DirectWrite::{DWRITE_FONT_WEIGHT_BOLD, IDWriteTextFormat};
