@@ -1,14 +1,8 @@
 use busy_core::ThemeMode;
-use windows::Win32::Foundation::{COLORREF, HWND};
+use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmSetWindowAttribute};
 use windows::Win32::System::Registry::HKEY_CURRENT_USER;
 use windows::core::BOOL;
-
-pub const BG: COLORREF = COLORREF(0x202020);
-pub const FIELD: COLORREF = COLORREF(0x2b2b2b);
-pub const TEXT: COLORREF = COLORREF(0xffffff);
-pub const DIM: COLORREF = COLORREF(0x7a7a7a);
-pub const LINE: COLORREF = COLORREF(0x454545);
 
 /// Windows app mode (`AppsUseLightTheme`). Reads the registry: call it off the UI thread.
 pub(crate) fn system_dark() -> bool {

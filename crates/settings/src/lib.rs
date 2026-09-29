@@ -10,7 +10,7 @@ mod window;
 
 use busy_core::{Config, Module};
 use windows::Win32::Foundation::HWND;
-use windows::Win32::UI::WindowsAndMessaging::{IsDialogMessageW, MSG};
+use windows::Win32::UI::WindowsAndMessaging::MSG;
 
 /// Opens the modeless settings window, or focuses it if already open.
 /// `on_apply` is invoked on the UI thread with the new config on Apply/OK (only if something changed);
@@ -27,7 +27,9 @@ pub fn is_open() -> bool {
     window::hwnd().is_some()
 }
 
-/// Returns true if `msg` was consumed by the settings window's dialog navigation (Tab, Enter, Esc, mnemonics).
-pub fn is_dialog_message(msg: &MSG) -> bool {
-    window::hwnd().is_some_and(|h| unsafe { IsDialogMessageW(h, msg) }.as_bool())
+/// Returns true if `msg` was consumed by the settings window's keyboard handling. The custom-drawn window
+/// handles its keys in its own window procedure, so nothing is consumed here; hosts keep calling it so the
+/// message loop needs no change if that moves.
+pub fn is_dialog_message(_msg: &MSG) -> bool {
+    false
 }

@@ -8,11 +8,11 @@
 | `busy-win` | `crates/win` | Win32 plumbing used by more than one crate: wide strings, registry reads, the System32-only `Dll` loader, the PDH wrapper (`pdh`). |
 | `busy-metrics` | `crates/metrics` | Collectors: CPU, memory, disk, network, battery, top processes. |
 | `busy-sensors` | `crates/sensors` | GPU (DXGI/PDH/D3DKMT/NVML/ADL) and temperature/fan sensors (LHM WMI, HWiNFO shared memory). |
-| `busy-settings` | `crates/settings` | Modeless native settings window, autostart registry. |
+| `busy-settings` | `crates/settings` | Settings window (custom-drawn with Direct2D), autostart registry. |
 | `busy-ui` | `crates/ui` | What the windows show and how they draw it, shared by the app and the settings window: formatting, choices of what to show, rolling history, the design's colors, D2D/DWrite helpers, the taskbar cell. |
 | `busy` | `app` | Binary: sampler thread, history, taskbar widget, flyout, theme. |
 
-Dependency direction: `busy` → {`busy-metrics`, `busy-sensors`, `busy-settings`, `busy-ui`} → {`busy-core`, `busy-win`}. Collector and UI crates never depend on each other; data they share goes through `busy-core`, Win32 helpers through `busy-win`.
+Dependency direction: `busy` → {`busy-metrics`, `busy-sensors`, `busy-settings`} → {`busy-core`, `busy-win`}; `busy-settings` and `busy` also use `busy-ui`, which uses only `busy-core` and `busy-win`. Collector crates and `busy-settings` never depend on each other; data they share goes through `busy-core`, Win32 helpers through `busy-win`, and what the app's windows and the settings window both draw through `busy-ui`.
 
 ## Layering
 
@@ -23,7 +23,7 @@ Each crate may depend only on the crates in its row, and exposes only what its r
 | `busy-core` | `serde`, `serde_json` | Data types, `Source`, `Module`, `Config`. No Win32, no threads; its only I/O is `Config::load`/`save`. |
 | `busy-win` | `windows` | Win32 plumbing shared by more than one crate: wide strings, registry reads, the System32 DLL loader, the PDH wrapper. No `busy-*` dependency and no policy (it never decides *what* to read). |
 | `busy-metrics`, `busy-sensors` | `busy-core`, `busy-win` | `sources()` only (plus examples and tests). |
-| `busy-settings` | `busy-core`, `busy-win` | `open`, `is_open`, `is_dialog_message`, `autostart`. |
+| `busy-settings` | `busy-core`, `busy-win`, `busy-ui` | `open`, `is_open`, `is_dialog_message`, `autostart`. |
 | `busy-ui` | `busy-core`, `busy-win` | `fmt`, `select`, `history`, `tone`, `theme`, `render`, `ctx`, `cell`. |
 | `busy` | all of the above | The binary. |
 
@@ -80,7 +80,7 @@ Every thread the app starts is listed here.
 | Theme reader | Yes (registry) | resolves `Theme` (light or dark, from `SystemUsesLightTheme`) on theme broadcasts and config changes, posts it back |
 | Launcher | Yes (shell) | starts Task Manager for the flyout's "Open Task Manager" (`launch::task_manager`: `ShellExecuteW` with the System32 path, in its own STA) |
 | Settings registry (one per open settings window) | Yes (registry) | reads autostart and `AppsUseLightTheme`, writes autostart, posts results to the window; ends with the window, never joined |
-| Debug dump (debug builds, per render) | Yes (file I/O) | one `taskbar.bmp` write |
+| Debug dump (debug builds, per render) | Yes (file I/O) | one `taskbar.bmp` or `settings.bmp` write |
 
 Rules:
 
