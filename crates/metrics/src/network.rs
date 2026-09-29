@@ -9,7 +9,8 @@
 //! (~tens of µs each).
 
 use crate::util::{Clock, Every};
-use busy_core::{Module, NetIf, NetInfo, NetKind, Snapshot, Source};
+use crate::wifi::Wlan;
+use busy_core::{Module, NetIf, NetInfo, NetKind, Snapshot, Source, WifiInfo};
 use busy_win::from_wide;
 use std::collections::{HashMap, HashSet};
 use std::net::Ipv4Addr;
@@ -17,6 +18,7 @@ use windows::Win32::Foundation::ERROR_SUCCESS;
 use windows::Win32::NetworkManagement::IpHelper::*;
 use windows::Win32::NetworkManagement::Ndis::{IfOperStatusUp, MediaConnectStateConnected, NET_LUID_LH};
 use windows::Win32::Networking::WinSock::AF_INET;
+use windows::core::GUID;
 
 // MIB_IF_ROW2.InterfaceAndOperStatusFlags bits.
 const HARDWARE: u8 = 1;
@@ -34,10 +36,52 @@ pub struct Network {
     prev: HashMap<u64, (u64, u64)>,
     rx_total: u64,
     tx_total: u64,
+    wlan: Wlan,
+    wifi_full: Every,
+    wifi_rssi: Every,
+    /// GUIDs of the connected Wi-Fi interfaces this sample; refilled each sample.
+    wifi_up: Vec<u128>,
+    /// (interface GUID, association; None: queried, not associated) for the connected Wi-Fi interfaces.
+    wifi: Vec<(u128, Option<WifiInfo>)>,
+}
+
+impl Network {
+    /// The full association query costs ~30 ms, so it runs when a Wi-Fi interface connects and then every
+    /// 60 s (SSID, quality and channel can lag a roam by that much); RSSI (~0.2 ms) every 5 s.
+    fn refresh_wifi(&mut self, rows: &[Row]) {
+        let up = rows.iter().filter(|r| r.connected && r.kind == NetKind::Wifi).map(|r| r.guid.to_u128());
+        self.wifi_up.clear();
+        self.wifi_up.extend(up);
+        self.wifi.retain(|(g, _)| self.wifi_up.contains(g));
+        if self.wifi_up.is_empty() {
+            return;
+        }
+        let new = self.wifi_up.iter().any(|g| !self.wifi.iter().any(|(k, _)| k == g));
+        if new || self.wifi_full.due(60) {
+            self.wifi_full.arm();
+            self.wifi_rssi.arm();
+            for &g in &self.wifi_up {
+                let info = self.wlan.info(&GUID::from_u128(g));
+                match self.wifi.iter_mut().find(|(k, _)| *k == g) {
+                    Some(e) => e.1 = info,
+                    None => self.wifi.push((g, info)),
+                }
+            }
+        } else if self.wifi_rssi.due(5) {
+            for (g, w) in &mut self.wifi {
+                if let Some(w) = w
+                    && let Some(rssi) = self.wlan.rssi(&GUID::from_u128(*g))
+                {
+                    w.rssi_dbm = Some(rssi);
+                }
+            }
+        }
+    }
 }
 
 struct Row {
     luid: u64,
+    guid: GUID,
     name: String,
     rx: u64,
     tx: u64,
@@ -88,6 +132,7 @@ impl Source for Network {
         }
         self.rx_total += drx;
         self.tx_total += dtx;
+        self.refresh_wifi(&rows);
         let rate = |b: u64| dt.map_or(0.0, |dt| b as f64 / dt);
         let mut interfaces: Vec<_> = rows
             .into_iter()
@@ -102,6 +147,7 @@ impl Source for Network {
                     link_speed_bps: r.speed,
                     connected: r.connected,
                     kind: r.kind,
+                    wifi: self.wifi.iter().find(|(g, _)| *g == r.guid.to_u128()).and_then(|(_, w)| w.clone()),
                     name: r.name,
                 })
             })
@@ -122,6 +168,7 @@ fn row(r: &MIB_IF_ROW2) -> Row {
     let flags = r.InterfaceAndOperStatusFlags._bitfield;
     Row {
         luid: unsafe { r.InterfaceLuid.Value },
+        guid: r.InterfaceGuid,
         name: from_wide(&r.Alias),
         rx: r.InOctets,
         tx: r.OutOctets,

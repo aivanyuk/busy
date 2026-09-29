@@ -172,6 +172,8 @@ pub struct NetIf {
     pub link_speed_bps: u64,
     pub connected: bool,
     pub kind: NetKind,
+    /// Set for a connected `NetKind::Wifi` interface. Read on connect and every 60 s; `rssi_dbm` every 5 s.
+    pub wifi: Option<WifiInfo>,
 }
 
 /// Medium of a network interface, for picking the flyout's interface.
@@ -182,6 +184,17 @@ pub enum NetKind {
     Wifi,
     #[default]
     Other,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct WifiInfo {
+    pub ssid: String,
+    /// Driver-reported link quality 0..=100 (netsh "Signal"); not derived from RSSI.
+    pub signal_pct: u8,
+    /// Received signal strength, dBm (negative, e.g. −52).
+    pub rssi_dbm: Option<i32>,
+    /// Center frequency of the associated channel, MHz (2.4 GHz: 2412–2484, 5 GHz: 5160–5885, 6 GHz: 5955–7115).
+    pub channel_mhz: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default)]
