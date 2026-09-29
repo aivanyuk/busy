@@ -10,12 +10,12 @@ use busy_core::{GpuInfo, Module, ProcEntry, SensorKind, SensorReading, Snapshot,
 use busy_win::pdh::{ArrayBuf, Counter, PDH_FMT_NOCAP100, Query};
 use windows::Wdk::Graphics::Direct3D::*;
 use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SYSTEM_INFORMATION_CLASS};
-use windows::Win32::Foundation::{CloseHandle, LUID};
+use windows::Win32::Foundation::LUID;
 use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE, IDXGIFactory1};
 use windows::Win32::System::Threading::{
     OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
-use windows::core::PWSTR;
+use windows::core::{Owned, PWSTR};
 
 use crate::{Shared, adl::Adl, nvml::Nvml, reading};
 
@@ -213,13 +213,12 @@ fn proc_name(pid: u32) -> String {
     }
     let mut buf = [0u16; 512];
     let mut n = buf.len() as u32;
-    let ok = unsafe {
-        OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).is_ok_and(|h| {
-            let r = QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut n);
-            _ = CloseHandle(h);
-            r.is_ok()
-        })
-    } || nt_image_name(pid, &mut buf, &mut n);
+    // SAFETY: on success we own the returned handle; `Owned` closes it.
+    let h = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.map(|h| unsafe { Owned::new(h) });
+    let ok = h.is_ok_and(|h| {
+        // SAFETY: `buf` holds `n` writable u16s, and `n` tells the API so.
+        unsafe { QueryFullProcessImageNameW(*h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut n) }.is_ok()
+    }) || nt_image_name(pid, &mut buf, &mut n);
     if !ok {
         return format!("pid {pid}");
     }

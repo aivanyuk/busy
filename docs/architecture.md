@@ -111,7 +111,6 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 
 | Gap | Rule |
 |---|---|
-| The PDH wrapper exists twice (`busy-metrics` `pdh.rs`, `busy-sensors` `gpu.rs`); `gpu.rs` and `hwinfo.rs` close handles by hand. | Layering: one implementation |
 | Flyout-only modules are sampled with the flyout closed; nothing pauses on lock or display off. | Performance: sample only what is visible |
 | HWiNFO reopens and copies its mapping every tick; processes, GPU, disk and network rebuild their maps every tick. | Performance: reuse buffers |
 | The taskbar redraws every snapshot and every watch tick; the flyout repaints on every mouse move. | Performance: redraw only on change |
