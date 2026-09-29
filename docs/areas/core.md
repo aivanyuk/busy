@@ -29,6 +29,7 @@ pub trait Source {
 - `Config::load()` never fails: missing/invalid file → defaults, then `normalize()` (dedup modules, append missing ones, clamp interval 250..10000 ms and history 10..3600 s).
 - `modules` order is display order; each has `taskbar`, `flyout`, `style` (Text/Graph/Bar). Processes is flyout-only.
 - Adding a field: give it a default in `impl Default for Config` — `#[serde(default)]` keeps old files loading. Add a test.
+- A new `ModuleCfg` field needs its own `#[serde(default…)]` (the struct has no `Default`: `module` is required). A `modules` entry that still fails to parse — an unknown `Module` or `CellStyle` from a newer build, a hand-edit — is dropped on load and `normalize()` re-adds that module with its default; before, one bad entry reset the whole file.
 - Adding a `Module` variant: update `Module::ALL`, `label()`, `Config::default()`, and every exhaustive `match` in app/settings.
 
 ## Changing core types
