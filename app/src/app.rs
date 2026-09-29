@@ -113,7 +113,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
     let flyout = Flyout::create(&gfx, main, &theme);
     let app = App {
         main,
-        sampler: Sampler::start(Params::new(&cfg), main, WM_APP_SNAPSHOT),
+        sampler: Sampler::start(Params::new(&cfg, false), main, WM_APP_SNAPSHOT),
         writer: Worker::start("busy-config", |cfg: Config| {
             let _ = cfg.save();
         }),
@@ -207,6 +207,7 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                     {
                         f.hide(true);
                     }
+                    a.sync_sampler();
                     a.sync_active();
                 });
             }
@@ -314,6 +315,7 @@ impl App {
         let (Some(f), Some(tb)) = (&mut self.flyout, &self.taskbar) else { return };
         let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
         f.toggle(&ctx, tb.screen_rect(), tb.dpi());
+        self.sync_sampler();
         self.sync_active();
     }
 
@@ -321,7 +323,14 @@ impl App {
         if let Some(f) = &mut self.flyout {
             f.hide(false);
         }
+        self.sync_sampler();
         self.sync_active();
+    }
+
+    /// Tells the sampler what is visible now, so it samples flyout-only modules only while the flyout is open.
+    fn sync_sampler(&self) {
+        let flyout_open = self.flyout.as_ref().is_some_and(Flyout::is_visible);
+        self.sampler.set_params(Params::new(&self.cfg, flyout_open));
     }
 
     /// The widget shows `--active` while its flyout is open (design: the open module's cell); redrawn only when
@@ -350,7 +359,7 @@ impl App {
             return;
         }
         let old = std::mem::replace(&mut self.cfg, cfg);
-        self.sampler.set_params(Params::new(&self.cfg));
+        self.sync_sampler();
         let cap = capacity(self.cfg.history_secs, self.cfg.interval_ms);
         if cap != capacity(old.history_secs, old.interval_ms) {
             self.hist.set_capacity(cap);

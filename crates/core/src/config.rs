@@ -249,9 +249,9 @@ impl Config {
         self.module(m).and_then(|c| c.interval_s).map_or(self.interval_ms, |s| s.saturating_mul(1000))
     }
 
-    /// Whether a module needs sampling at all.
-    pub fn is_active(&self, m: Module) -> bool {
-        self.module(m).is_some_and(|c| c.taskbar || c.flyout)
+    /// Whether a module needs sampling: it has a taskbar cell, or a flyout section while the flyout is open.
+    pub fn is_active(&self, m: Module, flyout_open: bool) -> bool {
+        self.module(m).is_some_and(|c| c.taskbar || (c.flyout && flyout_open))
     }
 }
 
@@ -412,15 +412,18 @@ mod tests {
     }
 
     #[test]
-    fn is_active_requires_taskbar_or_flyout() {
+    fn is_active_requires_taskbar_or_open_flyout() {
         let mut cfg = Config::default();
         for m in &mut cfg.modules {
-            if m.module == Module::Disk {
-                m.taskbar = false;
-                m.flyout = false;
+            match m.module {
+                Module::Disk => (m.taskbar, m.flyout) = (false, false),
+                Module::Battery => (m.taskbar, m.flyout) = (false, true),
+                _ => {}
             }
         }
-        assert!(!cfg.is_active(Module::Disk));
-        assert!(cfg.is_active(Module::Cpu));
+        assert!(!cfg.is_active(Module::Disk, true));
+        assert!(cfg.is_active(Module::Cpu, false));
+        assert!(!cfg.is_active(Module::Battery, false));
+        assert!(cfg.is_active(Module::Battery, true));
     }
 }
