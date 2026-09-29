@@ -41,7 +41,7 @@ impl Ui {
     }
 
     pub(super) fn update_dark(&self) {
-        let d = dark::wanted(self.applied.borrow().theme);
+        let d = dark::wanted(self.applied.borrow().theme, self.system_dark.get());
         if d != self.dark.get() {
             self.dark.set(d);
             self.apply_theme();

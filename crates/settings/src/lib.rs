@@ -1,4 +1,5 @@
-//! Settings window for busy. All functions must be called on the UI thread.
+//! Settings window for busy. The window functions must be called on the UI thread; the window does its
+//! registry work on a thread of its own. [`autostart`] blocks on the registry, so keep it off a UI thread.
 //!
 //! Host integration: call [`open`] from the UI thread, and in the message loop call
 //! [`is_dialog_message`] before `TranslateMessage`/`DispatchMessageW` so keyboard navigation works.
@@ -13,7 +14,7 @@ use windows::Win32::UI::WindowsAndMessaging::{IsDialogMessageW, MSG};
 
 /// Opens the modeless settings window, or focuses it if already open.
 /// `on_apply` is invoked on the UI thread with the new config on Apply/OK (only if something changed);
-/// the caller persists it. Autostart is applied to the registry by the window itself.
+/// the caller persists it. Autostart is applied to the registry by the window itself, off the UI thread.
 /// `_owner` is unused: the window is an unowned top-level window with its own taskbar button,
 /// since the host's window may be a child of explorer's taskbar.
 pub fn open(_owner: HWND, cfg: &Config, on_apply: Box<dyn Fn(Config)>) {

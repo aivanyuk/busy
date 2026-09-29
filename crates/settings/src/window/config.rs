@@ -1,8 +1,8 @@
 //! Filling the controls from a `Config`, collecting them back, and Apply.
 
-use super::Ui;
 use super::controls::{checked, combo_fill, combo_set, combo_value, send, set_check, set_text, window_string};
-use crate::autostart;
+use super::worker::{Job, Reply};
+use super::{Ui, show};
 use busy_core::{Anchor, CellStyle, Config, TempUnit, ThemeMode};
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
@@ -61,7 +61,9 @@ impl Ui {
         set_text(self.ctl.sensor, &cfg.pinned_sensor);
         let cue = HSTRING::from("hardware/name \u{2014} empty = hottest CPU");
         send(self.ctl.sensor, EM_SETCUEBANNER, 0, cue.as_ptr() as isize);
-        set_check(self.ctl.autostart, autostart::is_enabled());
+        // Shows the saved setting until the worker has read the registry.
+        set_check(self.ctl.autostart, cfg.autostart);
+        self.enable(self.ctl.autostart, false);
 
         self.select(0);
         self.sync_editors();
@@ -93,19 +95,41 @@ impl Ui {
         self.enable(self.ctl.apply, dirty);
     }
 
-    pub(super) fn apply(&self) {
-        let mut c = self.collect();
-        if c == *self.applied.borrow() {
+    /// Applies the edited config; with `close`, then closes the window. An autostart change is written by the
+    /// worker first, and the apply finishes in `on_reply`.
+    pub(super) fn apply(&self, close: bool) {
+        if let Some((_, closing)) = self.pending.borrow_mut().as_mut() {
+            *closing |= close;
             return;
         }
-        if c.autostart != autostart::is_enabled()
-            && let Err(e) = autostart::set(c.autostart)
+        let mut c = self.collect();
+        if let Some(reg) = self.reg_autostart.get()
+            && reg != c.autostart
         {
-            let msg = HSTRING::from(format!("Couldn't update the startup entry.\n\n{}", e.message()));
-            unsafe { MessageBoxW(Some(self.hwnd), &msg, w!("busy"), MB_ICONERROR | MB_OK) };
-            c.autostart = autostart::is_enabled();
-            set_check(self.ctl.autostart, c.autostart);
+            if self.worker.submit(Job::SetAutostart(c.autostart)) {
+                *self.pending.borrow_mut() = Some((c, close));
+                for h in [self.ctl.autostart, self.ctl.ok, self.ctl.apply] {
+                    self.enable(h, false);
+                }
+                return;
+            }
+            c.autostart = reg;
+            set_check(self.ctl.autostart, reg);
         }
+        self.finish(c, close);
+    }
+
+    /// Closes the window, or once the pending apply is done.
+    pub(super) fn close(&self) {
+        if let Some((_, close)) = self.pending.borrow_mut().as_mut() {
+            *close = true;
+            return;
+        }
+        let _ = unsafe { DestroyWindow(self.hwnd) };
+    }
+
+    fn finish(&self, c: Config, close: bool) {
+        let changed = c != *self.applied.borrow();
         self.syncing.set(true);
         if window_string(self.ctl.offset).trim() != c.offset_px.to_string() {
             set_text(self.ctl.offset, &c.offset_px.to_string());
@@ -117,7 +141,52 @@ impl Ui {
         *self.applied.borrow_mut() = c.clone();
         self.changed();
         self.update_dark();
-        (self.on_apply)(c);
+        if changed {
+            (self.on_apply)(c);
+        }
+        if close {
+            self.close();
+        }
+    }
+
+    pub(super) fn on_reply(&self, r: Reply) {
+        match r {
+            Reply::Read { autostart, system_dark } => {
+                self.system_dark.set(system_dark);
+                self.update_dark();
+                self.reg_autostart.set(Some(autostart));
+                set_check(self.ctl.autostart, autostart);
+                self.enable(self.ctl.autostart, true);
+                self.changed();
+                // SAFETY: `self.hwnd` is this window, alive while its procedure runs.
+                if !unsafe { IsWindowVisible(self.hwnd) }.as_bool() {
+                    show(self.hwnd);
+                }
+            }
+            Reply::Theme { system_dark } => {
+                self.system_dark.set(system_dark);
+                self.update_dark();
+            }
+            Reply::SetAutostart { error, autostart } => {
+                self.reg_autostart.set(Some(autostart));
+                let Some((mut c, close)) = self.pending.take() else { return };
+                if let Some(e) = error {
+                    let msg = HSTRING::from(format!(
+                        "Couldn't update the startup entry.
+
+{e}"
+                    ));
+                    unsafe { MessageBoxW(Some(self.hwnd), &msg, w!("busy"), MB_ICONERROR | MB_OK) };
+                }
+                // Reflects the registry as read back, not the request.
+                c.autostart = autostart;
+                set_check(self.ctl.autostart, autostart);
+                for h in [self.ctl.autostart, self.ctl.ok] {
+                    self.enable(h, true);
+                }
+                self.finish(c, close);
+            }
+        }
     }
 }
 
