@@ -1,6 +1,6 @@
 //! Choices of what to show, made from a snapshot and the config. Pure logic, no Win32.
 
-use busy_core::{Config, NetInterface, NetKind, SensorKind, SensorPick, SensorReading, Snapshot, VolumeInfo};
+use busy_core::{Config, GpuInfo, NetInterface, NetKind, SensorKind, SensorPick, SensorReading, Snapshot, VolumeInfo};
 
 /// Most bars the CPU "Cores" bar style draws (design: 8).
 const CORE_BARS: usize = 8;
@@ -68,6 +68,20 @@ pub(crate) fn net_rates(snap: &Snapshot, cfg: &Config) -> Option<(f64, f64)> {
         NetInterface::Ethernet => sum(&|i| i.kind == NetKind::Ethernet),
         NetInterface::Named(name) => sum(&|i| &i.name == name),
     })
+}
+
+/// The GPU the taskbar cell and the flyout show: the busiest, with its index into `Snapshot::gpus` (and the
+/// history's `gpus`).
+pub(crate) fn busiest_gpu(snap: &Snapshot) -> Option<(usize, &GpuInfo)> {
+    snap.gpus.iter().enumerate().max_by(|a, b| a.1.util_pct.total_cmp(&b.1.util_pct))
+}
+
+/// Up to three engines for the GPU flyout's legend, busiest first; idle ones (under 1 %) are left out, except
+/// that the busiest is always shown so the legend isn't empty on an idle GPU.
+pub(crate) fn busy_engines(engines: &[(String, f32)]) -> Vec<(&str, f32)> {
+    let mut v: Vec<(&str, f32)> = engines.iter().map(|(n, p)| (n.as_str(), *p)).collect();
+    v.sort_by(|a, b| b.1.total_cmp(&a.1));
+    v.into_iter().enumerate().filter(|(i, e)| *i == 0 || e.1 >= 1.0).take(3).map(|(_, e)| e).collect()
 }
 
 /// The CPU "Cores" bars: at most `CORE_BARS`, each the mean of an equal run of logical processors (pairs on a
@@ -217,6 +231,19 @@ mod tests {
         assert_eq!(rates(NetInterface::Named("vEthernet".into())), Some((50.0, 5.0)));
         assert_eq!(rates(NetInterface::Named("gone".into())), Some((0.0, 0.0)));
         assert_eq!(net_rates(&Snapshot::default(), &Config::default()), None);
+    }
+
+    #[test]
+    fn gpu_choices() {
+        let gpu = |name: &str, util| GpuInfo { name: name.into(), util_pct: util, ..GpuInfo::default() };
+        let s = Snapshot { gpus: vec![gpu("iGPU", 5.0), gpu("dGPU", 40.0)], ..Snapshot::default() };
+        assert_eq!(super::busiest_gpu(&s).map(|(i, g)| (i, g.name.as_str())), Some((1, "dGPU")));
+        assert!(super::busiest_gpu(&Snapshot::default()).is_none());
+        let e = |n: &str, p| (n.to_string(), p);
+        let engines = [e("Copy", 0.4), e("3D", 30.0), e("Video Decode", 2.0), e("Compute", 1.5)];
+        assert_eq!(super::busy_engines(&engines), vec![("3D", 30.0), ("Video Decode", 2.0), ("Compute", 1.5)]);
+        let idle = [e("Copy", 0.0), e("3D", 0.2)];
+        assert_eq!(super::busy_engines(&idle), vec![("3D", 0.2)]);
     }
 
     #[test]

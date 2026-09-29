@@ -134,10 +134,8 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
                 let p = m.used as f32 * 100.0 / m.total as f32;
                 pct_body(p, Some(&hist.mem), (fill(p), value(p)))
             }),
-            Module::Gpu => {
-                let busiest = snap.gpus.iter().enumerate().max_by(|a, b| a.1.util_pct.total_cmp(&b.1.util_pct));
-                busiest.map(|(i, g)| pct_body(g.util_pct, hist.gpus.get(i), (fill(g.util_pct), value(g.util_pct))))
-            }
+            Module::Gpu => select::busiest_gpu(snap)
+                .map(|(i, g)| pct_body(g.util_pct, hist.gpus.get(i), (fill(g.util_pct), value(g.util_pct)))),
             Module::Battery => snap.battery.as_ref().map(|b| {
                 let (f, v) = tone::battery(mc, b);
                 pct_body(b.percent, Some(&hist.battery), (t.color(f), t.color(v)))

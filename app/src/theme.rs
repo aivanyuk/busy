@@ -23,7 +23,7 @@ pub(crate) fn alpha(c: Color, a: f32) -> Color {
 
 /// One field per design token (`--tb` → `tb`, `--on-accent` → `on_accent`). Tokens only the settings window
 /// uses (`--win`, `--card`, `--ctl*`, `--pop`, `--knob`) are left to Phase 4; `dim` is a color the design's `fly()`
-/// hard-codes per theme.
+/// hard-codes per theme, like `standby`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Theme {
     pub(crate) dark: bool,
@@ -58,6 +58,8 @@ pub(crate) struct Theme {
     pub(crate) tile: Color,
     /// Idle / free parts of a composition (design `dim`).
     pub(crate) dim: Color,
+    /// Memory standby list (design `sbc`).
+    pub(crate) standby: Color,
     /// Module palette (design `PAL`), indexed by `ModuleCfg::color_index`.
     pub(crate) pal: [Color; PALETTE_LEN as usize],
     /// Load colors (design `LOAD`): normal, elevated, high.
@@ -85,6 +87,7 @@ const DARK: Theme = Theme {
     link: rgb(0x60CDFF),
     tile: rgba(0xFFFFFF, 0.16),
     dim: rgb(0x6B6B6B),
+    standby: rgb(0x3E6A80),
     pal: [rgb(0x60CDFF), rgb(0xC3A1FF), rgb(0x6FD49A), rgb(0xE8C46A), rgb(0xFF9B7A), rgb(0xFF8AC6)],
     load: [rgb(0x6FD49A), rgb(0xF2C661), rgb(0xFF7B72)],
 };
@@ -110,6 +113,7 @@ const LIGHT: Theme = Theme {
     link: rgb(0x005FB8),
     tile: rgba(0x000000, 0.14),
     dim: rgb(0xB8B8B8),
+    standby: rgb(0x9CC3E0),
     pal: [rgb(0x0067C0), rgb(0x7A4FC4), rgb(0x0E7A45), rgb(0x8A5E00), rgb(0xC24A26), rgb(0xB8327A)],
     load: [rgb(0x0E7A45), rgb(0x8A5E00), rgb(0xC42B1C)],
 };

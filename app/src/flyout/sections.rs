@@ -1,7 +1,7 @@
 //! One flyout section per module: what it shows and in which order.
 
 use super::painter::Painter;
-use crate::render::{Align, Rect, nice_max};
+use crate::render::nice_max;
 use crate::tone::{self, SECOND};
 use crate::{fmt, select};
 use busy_core::{Module, ModuleCfg, ProcEntry, SensorKind};
@@ -16,89 +16,10 @@ impl Painter<'_> {
         let (color, second) = (t.color(tone::module(mc)), t.color(SECOND));
         let fill = |pct| t.color(tone::fill(mc, pct));
         let value = |pct| t.color(tone::value(mc, pct));
-        let pct = &|v: f32| fmt::pct(v);
         let rate = &|v: f32| fmt::rate(v as f64);
         match mc.module {
-            // Drawn by `modules::cpu`.
-            Module::Cpu => {}
-            Module::Memory => {
-                let Some(mem) = snap.memory.as_ref().filter(|m| m.total > 0) else { return self.missing("Memory") };
-                let p = mem.used as f32 * 100.0 / mem.total as f32;
-                self.header("Memory", &fmt::pct(p), value(p));
-                self.sub(&format!("{} of {} used", fmt::bytes(mem.used), fmt::bytes(mem.total)));
-                self.gap(2.0);
-                self.bar(p / 100.0, fill(p));
-                self.graph(&[(&hist.mem, color)], 100.0, 44.0, pct, None);
-                let mut kv = vec![("Used", fmt::bytes(mem.used)), ("Available", fmt::bytes(mem.available))];
-                if let Some(c) = mem.cached {
-                    kv.push(("Cached", fmt::bytes(c)));
-                }
-                if let Some(c) = mem.compressed {
-                    kv.push(("Compressed", fmt::bytes(c)));
-                }
-                self.kv(&kv);
-                self.row_kv(
-                    "Committed",
-                    &format!("{} / {}", fmt::bytes(mem.commit_used), fmt::bytes(mem.commit_limit)),
-                    t.fg,
-                );
-            }
-            Module::Gpu => {
-                if snap.gpus.is_empty() {
-                    return self.missing("GPU");
-                }
-                let top = snap.gpus.iter().map(|g| g.util_pct).fold(0.0, f32::max);
-                self.header("GPU", &fmt::pct(top), value(top));
-                for (i, g) in snap.gpus.iter().enumerate() {
-                    if i > 0 {
-                        self.gap(6.0);
-                    }
-                    let r = Rect::new(self.x, self.y, self.w, 18.0);
-                    self.text(&g.name, &self.f.bold, Rect { w: r.w - 50.0, ..r }, t.fg, Align::Left);
-                    self.text(&fmt::pct(g.util_pct), &self.f.bold, r, value(g.util_pct), Align::Right);
-                    self.y += 22.0;
-                    if let Some(s) = hist.gpus.get(i) {
-                        self.graph(&[(s, color)], 100.0, 40.0, pct, None);
-                    }
-                    if g.vram_total > 0 {
-                        self.row_kv(
-                            "Dedicated memory",
-                            &format!("{} / {}", fmt::bytes(g.vram_used), fmt::bytes(g.vram_total)),
-                            t.fg,
-                        );
-                        let frac = g.vram_used as f32 / g.vram_total as f32;
-                        self.bar(frac, fill(frac * 100.0));
-                    }
-                    let mut engines: Vec<_> = g.engines.iter().collect();
-                    engines.sort_by(|a, b| b.1.total_cmp(&a.1));
-                    let mut kv: Vec<(&str, String)> =
-                        engines.iter().take(4).map(|(n, v)| (n.as_str(), fmt::pct(*v))).collect();
-                    if g.shared_used > 0 {
-                        kv.push(("Shared", fmt::bytes(g.shared_used)));
-                    }
-                    if let Some(v) = g.temp_c {
-                        kv.push(("Temperature", fmt::temp(v, unit)));
-                    }
-                    if let Some(v) = g.hotspot_c {
-                        kv.push(("Hot spot", fmt::temp(v, unit)));
-                    }
-                    match (g.fan_rpm, g.fan_pct) {
-                        (Some(r), _) => kv.push(("Fan", format!("{r} rpm"))),
-                        (None, Some(p)) => kv.push(("Fan", fmt::pct(p))),
-                        _ => {}
-                    }
-                    if let Some(v) = g.power_w {
-                        kv.push(("Power", fmt::watts(v)));
-                    }
-                    if let Some(v) = g.core_clock_mhz {
-                        kv.push(("Core clock", fmt::mhz(v)));
-                    }
-                    if let Some(v) = g.mem_clock_mhz {
-                        kv.push(("Mem clock", fmt::mhz(v)));
-                    }
-                    self.kv(&kv);
-                }
-            }
+            // Drawn by `modules`.
+            Module::Cpu | Module::Memory | Module::Gpu => {}
             Module::Network => {
                 let Some(n) = &snap.net else { return self.missing("Network") };
                 self.header("Network", "", t.fg);
