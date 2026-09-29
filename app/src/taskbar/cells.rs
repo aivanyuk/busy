@@ -58,6 +58,18 @@ pub(super) struct Key {
 }
 
 impl Cell<'_> {
+    /// Tooltip text (design `title`): "<Module>: <value>", both rates for Io, the name alone without a value.
+    pub(super) fn tip(&self) -> String {
+        let name = self.module.label();
+        match &self.body {
+            Body::Text { value, .. } | Body::Graph { value, .. } | Body::Bar { value, .. } if !value.is_empty() => {
+                format!("{name}: {value}")
+            }
+            Body::Io { rows: [(k1, _, v1), (k2, _, v2)] } => format!("{name}: {k1} {v1}  {k2} {v2}"),
+            _ => name.into(),
+        }
+    }
+
     pub(super) fn key(&self) -> Key {
         let mut key = Key {
             module: self.module,
@@ -200,5 +212,28 @@ fn label(m: Module, style: CellStyle, ctx: &Ctx) -> String {
             _ => "TEMP".into(),
         },
         Module::Processes => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Body, Cell};
+    use crate::theme::Color;
+    use busy_core::Module;
+
+    fn cell(module: Module, body: Body<'static>) -> Cell<'static> {
+        Cell { module, label: None, body }
+    }
+
+    #[test]
+    fn tips_name_the_module_and_its_reading() {
+        let c = Color::default();
+        let text = cell(Module::Memory, Body::Text { value: "35%".into(), color: c });
+        assert_eq!(text.tip(), "Memory: 35%");
+        let io = cell(Module::Network, Body::Io { rows: [("↑", c, "24 KB/s".into()), ("↓", c, "3 MB/s".into())] });
+        assert_eq!(io.tip(), "Network: ↑ 24 KB/s  ↓ 3 MB/s");
+        // Design: a Network graph has no value, so the tip is the name alone.
+        let graph = cell(Module::Network, Body::Graph { value: String::new(), lines: Vec::new(), max: 1.0 });
+        assert_eq!(graph.tip(), "Network");
     }
 }
