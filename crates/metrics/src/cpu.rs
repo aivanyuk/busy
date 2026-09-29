@@ -1,8 +1,10 @@
 use crate::pdh::{Counter, NOCAP100, Query};
-use crate::util::{perf_info, reg_dword, reg_string};
+use crate::util::perf_info;
 use busy_core::{CpuInfo, Module, Snapshot, Source};
+use busy_win::{reg_dword, reg_string};
 use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SystemProcessorPerformanceInformation};
 use windows::Win32::System::Power::{CallNtPowerInformation, PROCESSOR_POWER_INFORMATION, ProcessorInformation};
+use windows::Win32::System::Registry::HKEY_LOCAL_MACHINE;
 use windows::Win32::System::SystemInformation::{
     GetLogicalProcessorInformationEx, GetTickCount64, RelationProcessorCore, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX,
 };
@@ -32,10 +34,12 @@ impl Cpu {
     pub fn new() -> Self {
         let logical = unsafe { GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) };
         let mut s = Self {
-            name: reg_string(CPU_KEY, "ProcessorNameString").unwrap_or_else(|| "CPU".into()),
+            name: reg_string(HKEY_LOCAL_MACHINE, CPU_KEY, "ProcessorNameString").unwrap_or_else(|| "CPU".into()),
             logical,
             physical: physical_cores(),
-            base_mhz: reg_dword(CPU_KEY, "~MHz").filter(|&m| m > 0).or_else(|| power_max_mhz(logical)),
+            base_mhz: reg_dword(HKEY_LOCAL_MACHINE, CPU_KEY, "~MHz")
+                .filter(|&m| m > 0)
+                .or_else(|| power_max_mhz(logical)),
             pdh: Pdh::open(),
             prev: Vec::new(),
         };
