@@ -18,7 +18,6 @@ use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use windows::Win32::Foundation::*;
-use windows::Win32::System::SystemInformation::GetTickCount64;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{PCWSTR, Result, w};
 
@@ -35,7 +34,6 @@ const ID_ANCHOR_LEFT: u32 = 4;
 const ID_TOGGLE: u32 = 100;
 
 static MAIN: AtomicIsize = AtomicIsize::new(0);
-static FLYOUT: AtomicIsize = AtomicIsize::new(0);
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
 /// Config handed over from another thread / the settings window, applied on WM_APP_CONFIG.
 static PENDING: Mutex<Option<Config>> = Mutex::new(None);
@@ -111,9 +109,6 @@ pub fn run(open_flyout: bool) -> Result<()> {
     }
     let theme = Theme::resolve(cfg.theme);
     let flyout = Flyout::create(&gfx, main, &theme);
-    if let Some(f) = &flyout {
-        FLYOUT.store(f.hwnd.0 as isize, Ordering::Relaxed);
-    }
     let app = App {
         main,
         sampler: Sampler::start(cfg.clone(), main, WM_APP_SNAPSHOT),
@@ -195,7 +190,7 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             WM_APP_FLYOUT_DEACTIVATED => {
                 with(|a| {
                     if let Some(f) = &mut a.flyout
-                        && GetForegroundWindow() != f.hwnd
+                        && !f.is_foreground()
                         // Debug builds: `BUSY_PIN_FLYOUT=1` keeps it open for screenshots.
                         && !(cfg!(debug_assertions) && std::env::var_os("BUSY_PIN_FLYOUT").is_some())
                     {
@@ -292,8 +287,9 @@ impl App {
     }
 
     fn set_hover(&mut self, hover: bool) {
-        if let Some(tb) = self.taskbar.as_mut().filter(|t| t.hover != hover) {
-            tb.hover = hover;
+        if let Some(tb) = &mut self.taskbar
+            && tb.set_hover(hover)
+        {
             let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
             tb.render(&ctx);
         }
@@ -301,15 +297,8 @@ impl App {
 
     fn toggle_flyout(&mut self) {
         let (Some(f), Some(tb)) = (&mut self.flyout, &self.taskbar) else { return };
-        if f.visible {
-            f.hide(false);
-        } else if unsafe { GetTickCount64() }.saturating_sub(f.deactivated_at) < 250 {
-            // The press that deactivated (and hid) the flyout was on the widget itself: stay closed.
-        } else {
-            let dpi = unsafe { windows::Win32::UI::HiDpi::GetDpiForWindow(tb.tray) };
-            let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
-            f.show(&ctx, tb.screen_rect(), dpi);
-        }
+        let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
+        f.toggle(&ctx, tb.screen_rect(), tb.dpi());
     }
 
     fn hide_flyout(&mut self) {
