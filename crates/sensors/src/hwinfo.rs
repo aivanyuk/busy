@@ -9,11 +9,11 @@
 use std::time::{Duration, Instant};
 
 use busy_core::{SensorKind, SensorReading};
-use windows::Win32::Foundation::CloseHandle;
 use windows::Win32::System::Memory::{
-    FILE_MAP_READ, MEMORY_BASIC_INFORMATION, MapViewOfFile, OpenFileMappingW, UnmapViewOfFile, VirtualQuery,
+    FILE_MAP_READ, MEMORY_BASIC_INFORMATION, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile, OpenFileMappingW,
+    UnmapViewOfFile, VirtualQuery,
 };
-use windows::core::w;
+use windows::core::{Owned, PCWSTR, w};
 
 use crate::{ansi, reading};
 
@@ -40,23 +40,37 @@ impl HwInfo {
     }
 }
 
+/// A mapped view, unmapped on drop. The `windows` crate has no `Free` for view addresses, so no `Owned`.
+struct View(MEMORY_MAPPED_VIEW_ADDRESS);
+
+impl View {
+    fn map(name: PCWSTR) -> Option<Self> {
+        // SAFETY: `name` is NUL-terminated (a `w!` literal); on success we own the returned handle.
+        let h = unsafe { Owned::new(OpenFileMappingW(FILE_MAP_READ.0, false, name).ok()?) };
+        // SAFETY: `h` is an open mapping handle; the view keeps the section alive after `h` closes.
+        let v = unsafe { MapViewOfFile(*h, FILE_MAP_READ, 0, 0, 0) };
+        (!v.Value.is_null()).then_some(Self(v))
+    }
+}
+
+impl Drop for View {
+    fn drop(&mut self) {
+        // SAFETY: we own the view `map` created.
+        unsafe { _ = UnmapViewOfFile(self.0) };
+    }
+}
+
 /// Copies the whole mapping (HWiNFO writes concurrently; parse the copy).
 fn snapshot() -> Option<Vec<u8>> {
-    unsafe {
-        let h = OpenFileMappingW(FILE_MAP_READ.0, false, w!(r"Global\HWiNFO_SENS_SM2")).ok()?;
-        let view = MapViewOfFile(h, FILE_MAP_READ, 0, 0, 0);
-        _ = CloseHandle(h);
-        if view.Value.is_null() {
-            return None;
-        }
-        let mut mbi = MEMORY_BASIC_INFORMATION::default();
-        let n = VirtualQuery(Some(view.Value), &mut mbi, size_of::<MEMORY_BASIC_INFORMATION>());
-        let len = if n == 0 { 0 } else { mbi.RegionSize.min(64 << 20) };
-        let mut buf = vec![0u8; len];
-        std::ptr::copy_nonoverlapping(view.Value.cast::<u8>(), buf.as_mut_ptr(), len);
-        _ = UnmapViewOfFile(view);
-        Some(buf)
-    }
+    let view = View::map(w!(r"Global\HWiNFO_SENS_SM2"))?;
+    let mut mbi = MEMORY_BASIC_INFORMATION::default();
+    // SAFETY: `mbi` is a writable buffer of the size passed.
+    let n = unsafe { VirtualQuery(Some(view.0.Value), &mut mbi, size_of::<MEMORY_BASIC_INFORMATION>()) };
+    let len = if n == 0 { 0 } else { mbi.RegionSize.min(64 << 20) };
+    let mut buf = vec![0u8; len];
+    // SAFETY: the view's region holds at least `RegionSize` >= `len` readable bytes from its base.
+    unsafe { std::ptr::copy_nonoverlapping(view.0.Value.cast::<u8>(), buf.as_mut_ptr(), len) };
+    Some(buf)
 }
 
 fn parse(m: &[u8]) -> Option<Vec<SensorReading>> {
