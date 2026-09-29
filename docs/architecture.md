@@ -42,7 +42,7 @@ Rules:
 - **Domain decisions live in pure modules.** Choosing what to show (the pinned sensor, the busiest GPU) is in `select.rs` or `busy-core`, with tests, not in the router or a window procedure.
 - **One implementation of each Win32 helper.** Wide-string conversion, registry reads, DLL loading and the PDH wrapper exist once, in `busy-win`; kernel handles are held in `windows::core::Owned`. A new `encode_utf16().chain(..)`, `RegGetValueW`, `PdhOpenQueryW`, `LoadLibraryExW` or bare `CloseHandle` elsewhere is a duplicate.
 - **One concern per file, 500 lines at most.** A file that passes 500 lines, or that combines a window procedure with layout and painting, is split in the PR that grows it.
-- **Workers get only what they use.** The sampler receives `sampler::Params` (interval and active modules), not the whole `Config`.
+- **Workers get only what they use.** The sampler receives `sampler::Params` (interval, active modules and the `SourceOptions` its sources act on), not the whole `Config`.
 - **Items in private modules are `pub(crate)` or private**, never plain `pub`, so the crate's real surface is its `lib.rs`.
 
 ## Data flow
@@ -54,7 +54,7 @@ sampler thread (COM MTA)                       UI thread (message loop)
     snap = Snapshot::default()                   taskbar widget (child of Shell_TrayWnd)
     for s in active sources: s.sample(&mut snap) flyout (top-level popup)
     hand snap to UI + PostMessage(WM_APP) ──────▶ on WM_APP: push history, redraw
-  ◀── Params changes (interval / active modules)  settings window (busy-settings)
+  ◀── Params (interval / active / SourceOptions)  settings window (busy-settings)
                                                   │ on_apply → submit_config → WM_APP_CONFIG
 config writer thread ◀── latest Config ───────────┘ (persisted off the UI thread)
 ```
@@ -62,6 +62,7 @@ config writer thread ◀── latest Config ───────────�
 - One fresh `Snapshot` per tick; each source fills only its part. Sources are ordered: the GPU source runs before the Sensors source (they share state via `Rc<RefCell<_>>`, which is why `Source` has no `Send` bound).
 - Sources are constructed **on** the sampler thread after `CoInitializeEx(COINIT_MULTITHREADED)` and never leave it.
 - Sources skipped when `Config::is_active(module)` is false.
+- Settings reach sources only as `SourceOptions` (`Config::source_options()`), carried in `sampler::Params`: the sampler calls `Source::configure` on every source before the first tick and whenever the options change, on the sampler thread. Sources never see the `Config`.
 - Rates are computed inside sources from deltas; the first sample may have zero rates.
 - A config from another thread (the settings window's `on_apply`) is parked in a latest-wins slot and applied on `WM_APP_CONFIG`.
 

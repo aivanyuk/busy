@@ -1,5 +1,6 @@
 //! Opt-in data sources: off by default, each with a risk stated in docs/plans/design-migration.md.
 
+use crate::Config;
 use serde::{Deserialize, Serialize};
 
 /// Data sources that contact an external service, need administrator rights, run a slow API or read another
@@ -19,10 +20,24 @@ pub struct OptIn {
     pub third_party_sensors: bool,
 }
 
+/// The settings sources act on, handed to them through `Source::configure`. Sources get this rather than the
+/// whole `Config`: they see only what they use, and being `Copy` it travels in the sampler's parameters
+/// without allocating under their lock.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SourceOptions {
+    /// Read LibreHardwareMonitor and HWiNFO (`OptIn::third_party_sensors`).
+    pub third_party_sensors: bool,
+}
+
+impl Config {
+    pub fn source_options(&self) -> SourceOptions {
+        SourceOptions { third_party_sensors: self.opt_in.third_party_sensors }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Config;
 
     fn load_str(json: &str) -> Config {
         let mut cfg: Config = serde_json::from_str(json).unwrap();
@@ -54,5 +69,16 @@ mod tests {
             third_party_sensors: true,
         };
         assert_eq!(serde_json::from_str::<OptIn>(&serde_json::to_string(&o).unwrap()).unwrap(), o);
+    }
+
+    #[test]
+    fn source_options_follow_the_opt_ins() {
+        let mut cfg = Config::default();
+        assert_eq!(cfg.source_options(), SourceOptions::default());
+        assert!(!cfg.source_options().third_party_sensors);
+        cfg.opt_in = OptIn { public_ip: true, memory_speed: true, ..OptIn::default() };
+        assert!(!cfg.source_options().third_party_sensors);
+        cfg.opt_in.third_party_sensors = true;
+        assert_eq!(cfg.source_options(), SourceOptions { third_party_sensors: true });
     }
 }

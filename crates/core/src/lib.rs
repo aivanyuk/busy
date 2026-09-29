@@ -15,6 +15,10 @@ pub use options::*;
 /// the first call may leave rate fields at 0.
 pub trait Source {
     fn module(&self) -> Module;
+    /// Called before the first `sample` and whenever the options change, whether or not the module is active.
+    /// For sources that gate or tune themselves on a setting (e.g. an opt-in reader). Must be cheap (defer I/O
+    /// to the next `sample`) and must not panic; the default ignores the options.
+    fn configure(&mut self, _opts: SourceOptions) {}
     /// Fill this source's part of `snap`. Must not panic; on failure leave fields untouched.
     fn sample(&mut self, snap: &mut Snapshot);
 }
