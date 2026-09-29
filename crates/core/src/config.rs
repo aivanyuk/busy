@@ -1,4 +1,4 @@
-use crate::{CONFIG_VERSION, Module, ModuleOptions};
+use crate::{CONFIG_VERSION, Module, ModuleOptions, OptIn};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::PathBuf;
 
@@ -122,6 +122,7 @@ pub struct Config {
     pub history_secs: u32,
     pub temp_unit: TempUnit,
     pub options: ModuleOptions,
+    pub opt_in: OptIn,
     /// v1's `pinned_sensor` ("hardware/name", empty = hottest CPU). Only read: `normalize()` moves it to
     /// `options.sensors.sensor` and it is never written back.
     #[serde(rename = "pinned_sensor", skip_serializing)]
@@ -152,6 +153,7 @@ impl Default for Config {
             history_secs: 120,
             temp_unit: TempUnit::Celsius,
             options: ModuleOptions::default(),
+            opt_in: OptIn::default(),
             legacy_pinned_sensor: String::new(),
         }
     }
@@ -404,6 +406,7 @@ mod tests {
         };
         cfg.options.network.interface = crate::NetInterface::Named("Ethernet 2".into());
         cfg.options.sensors.sensor = crate::SensorPick::Gpu;
+        cfg.opt_in.memory_speed = true;
         let back: Config = serde_json::from_str(&serde_json::to_string(&cfg).unwrap()).unwrap();
         assert_eq!(cfg, back);
     }
