@@ -21,7 +21,7 @@ pub fn alpha(c: Color, a: f32) -> Color {
     Color { a: c.a * a, ..c }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Theme {
     pub dark: bool,
     pub text: Color,

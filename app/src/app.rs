@@ -283,7 +283,7 @@ impl App {
             self.recreate_taskbar();
         } else if let Some(tb) = &mut self.taskbar {
             let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
-            tb.render(&ctx);
+            tb.watch(&ctx);
         }
     }
 

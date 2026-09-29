@@ -18,6 +18,7 @@ pub(super) struct Fonts {
     pub(super) tiny: IDWriteTextFormat,
 }
 
+#[derive(Clone, PartialEq)]
 enum Val {
     One(String),
     /// Two stacked (prefix, prefix color, text) rows, e.g. upload/download.
@@ -34,6 +35,20 @@ pub(super) struct Cell<'a> {
     series: Vec<(&'a Series, Color)>,
     max: f32,
     bars: Vec<(f32, Color)>,
+}
+
+/// What a cell's pixels depend on, owned so the widget can compare it with the last drawn frame.
+#[derive(PartialEq)]
+pub(super) struct Key {
+    style: CellStyle,
+    label: String,
+    val: Option<Val>,
+    short: String,
+    /// Graph cells: (samples pushed, samples held, color) per series; the samples themselves never change.
+    series: Vec<(u64, usize, Color)>,
+    max: f32,
+    /// Bar cells: fill in 1/256 steps, under half a device pixel of the 30-DIP bar up to 400 % scale.
+    bars: Vec<(u8, Color)>,
 }
 
 const PCT: &[&str] = &["100%"];
@@ -154,6 +169,29 @@ impl Cell<'_> {
                     + 3.0
                     + worst(&f.pair).max(rows.iter().map(|r| gfx.text_width(&f.pair, &r.2)).fold(0.0, f32::max))
             }
+        }
+    }
+
+    /// Only what the cell's style draws goes in, so e.g. a Text cell ignores its history.
+    pub(super) fn key(&self) -> Key {
+        let graph = self.style == CellStyle::Graph;
+        let bar = self.style == CellStyle::Bar;
+        Key {
+            style: self.style,
+            label: self.label.clone(),
+            val: (!graph).then(|| self.val.clone()),
+            short: if graph { self.short.clone() } else { String::new() },
+            series: if graph {
+                self.series.iter().map(|(s, c)| (s.pushed(), s.len(), *c)).collect()
+            } else {
+                Vec::new()
+            },
+            max: if graph { self.max } else { 0.0 },
+            bars: if bar {
+                self.bars.iter().map(|(f, c)| ((f.clamp(0.0, 1.0) * 255.0).round() as u8, *c)).collect()
+            } else {
+                Vec::new()
+            },
         }
     }
 
