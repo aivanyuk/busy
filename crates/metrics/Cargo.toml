@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 busy-core.workspace = true
+busy-win.workspace = true
 windows = { workspace = true, features = [
     "Wdk_System_SystemInformation",
     "Win32_Devices_DeviceAndDriverInstallation",

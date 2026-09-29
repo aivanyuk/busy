@@ -8,8 +8,9 @@
 //! IPv4 address check sees an interface gain an address; each sample polls those with GetIfEntry2
 //! (~tens of µs each).
 
-use crate::util::{Clock, Every, from_wide};
+use crate::util::{Clock, Every};
 use busy_core::{Module, NetIf, NetInfo, Snapshot, Source};
+use busy_win::from_wide;
 use std::collections::{HashMap, HashSet};
 use std::net::Ipv4Addr;
 use windows::Win32::Foundation::ERROR_SUCCESS;

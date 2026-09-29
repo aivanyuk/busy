@@ -1,4 +1,4 @@
-use crate::util::{from_wide, wide};
+use busy_win::{from_wide, wide};
 use windows::Win32::System::Performance::*;
 use windows::core::PCWSTR;
 

@@ -1,6 +1,7 @@
 use crate::pdh::{Counter, Query};
-use crate::util::{Every, from_wide};
+use crate::util::Every;
 use busy_core::{DiskInfo, Module, Snapshot, Source, VolumeInfo};
+use busy_win::from_wide;
 use std::collections::HashMap;
 use windows::Win32::Storage::FileSystem::{
     GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDriveStringsW, GetVolumeInformationW,
