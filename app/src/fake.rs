@@ -86,6 +86,8 @@ impl Source for Fake {
             Module::Memory => {
                 let total = 32 * GB;
                 let used = (self.walk(0, 0.35, 0.9, 0.02) * total as f32) as u64;
+                let modified = (self.walk(3, 0.1, 0.6, 0.02) * GB as f32) as u64;
+                let free = (total - used) / 5;
                 snap.memory = Some(MemInfo {
                     total,
                     used,
@@ -94,7 +96,12 @@ impl Source for Fake {
                     commit_limit: total + 8 * GB,
                     cached: Some((self.walk(1, 3.0, 9.0, 0.2) * GB as f32) as u64),
                     compressed: Some((self.walk(2, 0.1, 1.5, 0.05) * GB as f32) as u64),
-                    ..Default::default()
+                    modified: Some(modified.min(used)),
+                    standby: Some(total - used - free),
+                    free: Some(free),
+                    paged_pool: Some(700 << 20),
+                    nonpaged_pool: Some(450 << 20),
+                    hardware_reserved: Some(180 << 20),
                 });
             }
             Module::Disk => {
@@ -109,7 +116,10 @@ impl Source for Fake {
                             read_bps: r,
                             write_bps: w,
                             active_pct: self.walk(i * 3 + 2, 0.0, 60.0, 10.0),
-                            ..Default::default()
+                            avg_response_ms: Some(self.walk(i * 3 + 20, 0.1, 12.0, 1.0)),
+                            read_total: Some(40 * GB * (i as u64 + 1)),
+                            written_total: Some(12 * GB * (i as u64 + 1)),
+                            index: Some(i as u32),
                         }
                     })
                     .collect();
@@ -119,14 +129,16 @@ impl Source for Fake {
                         label: "Windows".into(),
                         total: 1862 * GB,
                         free: 713 * GB,
-                        ..Default::default()
+                        disk_index: Some(0),
+                        is_system: true,
                     },
                     VolumeInfo {
                         mount: "D:".into(),
                         label: "Data".into(),
                         total: 3726 * GB,
                         free: 402 * GB,
-                        ..Default::default()
+                        disk_index: Some(1),
+                        is_system: false,
                     },
                 ];
             }
@@ -150,6 +162,7 @@ impl Source for Fake {
                             ipv4: vec!["192.168.1.23".into()],
                             link_speed_bps: 2_500_000_000,
                             connected: true,
+                            kind: NetKind::Ethernet,
                             ..Default::default()
                         },
                         NetIf {
@@ -159,7 +172,13 @@ impl Source for Fake {
                             ipv4: vec!["10.0.0.57".into()],
                             link_speed_bps: 866_000_000,
                             connected: true,
-                            ..Default::default()
+                            kind: NetKind::Wifi,
+                            wifi: Some(WifiInfo {
+                                ssid: "Home-5G".into(),
+                                signal_pct: 86,
+                                rssi_dbm: Some(-52),
+                                channel_mhz: Some(5180),
+                            }),
                         },
                     ],
                 });
@@ -188,7 +207,8 @@ impl Source for Fake {
                         power_w: Some(self.walk(10, 20.0, 320.0, 25.0)),
                         core_clock_mhz: Some(self.walk(11, 210.0, 2800.0, 200.0) as u32),
                         mem_clock_mhz: Some(11200),
-                        ..Default::default()
+                        driver_version: Some("32.0.15.6094".into()),
+                        feature_level: Some((12, 2)),
                     },
                     GpuInfo {
                         name: "Fake Radeon Graphics".into(),
@@ -198,6 +218,8 @@ impl Source for Fake {
                         vram_used: 256 << 20,
                         vram_total: 512 << 20,
                         shared_used: (self.walk(12, 0.2, 1.5, 0.1) * GB as f32) as u64,
+                        driver_version: Some("31.0.21921.1000".into()),
+                        feature_level: Some((12, 1)),
                         ..Default::default()
                     },
                 ];
