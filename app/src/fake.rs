@@ -109,6 +109,7 @@ impl Source for Fake {
                             read_bps: r,
                             write_bps: w,
                             active_pct: self.walk(i * 3 + 2, 0.0, 60.0, 10.0),
+                            ..Default::default()
                         }
                     })
                     .collect();

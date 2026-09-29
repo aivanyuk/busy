@@ -33,6 +33,12 @@ fn sources_sample_without_panicking() {
         assert!(list <= mem.total, "{mem:?}");
     }
     assert!(mem.in_use().is_none_or(|u| u > 0 && u <= mem.total), "{mem:?}");
+    for d in &snap.disks {
+        assert!((0.0..=100.0).contains(&d.active_pct), "{d:?}");
+        assert!(d.avg_response_ms.is_none_or(|ms| ms.is_finite() && ms >= 0.0), "{d:?}");
+        // Since-start totals stay far below a since-boot count after two samples 300 ms apart.
+        assert!(d.read_total.is_none_or(|b| b < 1 << 40) && d.written_total.is_none_or(|b| b < 1 << 40), "{d:?}");
+    }
     assert!(snap.volumes.iter().all(|v| v.free <= v.total));
     assert!(!snap.top.by_mem.is_empty());
     assert!(snap.top.by_cpu.iter().all(|p| (0.0..=100.0).contains(&p.cpu_pct)));

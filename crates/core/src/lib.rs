@@ -131,6 +131,11 @@ pub struct DiskInfo {
     pub read_bps: f64,
     pub write_bps: f64,
     pub active_pct: f32,
+    /// Mean time per transfer over the last interval, ms (Task Manager "Average response time").
+    pub avg_response_ms: Option<f32>,
+    /// Bytes read / written since the disk was first sampled (busy start or hot-plug).
+    pub read_total: Option<u64>,
+    pub written_total: Option<u64>,
 }
 
 #[derive(Clone, Debug, Default)]
