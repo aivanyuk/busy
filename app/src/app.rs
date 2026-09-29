@@ -1,10 +1,11 @@
 //! Application state, config handling and message routing (UI thread only).
 //!
 //! The widget's input queue is attached to explorer's taskbar thread, so nothing here may block:
-//! sampling runs on the sampler thread and config file IO on short-lived worker threads.
+//! sampling runs on the sampler thread and config saves on the config writer thread.
 
 use crate::flyout::Flyout;
 use crate::history::{History, capacity};
+use crate::persist::Writer;
 use crate::render::Gfx;
 use crate::sampler::Sampler;
 use crate::taskbar::Taskbar;
@@ -54,6 +55,7 @@ pub struct App {
     main: HWND,
     cfg: Config,
     sampler: Sampler,
+    writer: Writer<Config>,
     hist: History,
     snap: Snapshot,
     theme: Theme,
@@ -158,6 +160,9 @@ pub fn run(open_flyout: bool) -> Result<()> {
     let app = App {
         main,
         sampler: Sampler::start(cfg.clone(), main, WM_APP_SNAPSHOT),
+        writer: Writer::start("busy-config", |cfg: Config| {
+            let _ = cfg.save();
+        }),
         hist: History::new(capacity(cfg.history_secs, cfg.interval_ms)),
         snap: Snapshot::default(),
         theme,
@@ -332,7 +337,7 @@ impl App {
         }
     }
 
-    /// Applies a new config live; `save` persists it on a worker thread.
+    /// Applies a new config live; `save` queues it to the config writer.
     fn apply_config(&mut self, mut cfg: Config, save: bool) {
         cfg.normalize();
         if cfg == self.cfg {
@@ -350,8 +355,7 @@ impl App {
             self.render_all();
         }
         if save {
-            let cfg = self.cfg.clone();
-            std::thread::spawn(move || cfg.save());
+            self.writer.submit(self.cfg.clone());
         }
     }
 
