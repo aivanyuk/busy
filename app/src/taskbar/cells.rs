@@ -1,12 +1,12 @@
 //! What the widget shows: one cell per enabled module, with its label, value and colors (design `widget()`).
 //! How a cell is measured and drawn in its style is `styles.rs`.
 
-use crate::ctx::Ctx;
-use crate::render::nice_max;
-use crate::theme::Color;
-use crate::tone::{self, SECOND};
 use busy_core::{CellStyle, CpuBar, Module, SensorKind};
+use busy_ui::ctx::Ctx;
 use busy_ui::history::Series;
+use busy_ui::render::nice_max;
+use busy_ui::theme::Color;
+use busy_ui::tone::{self, SECOND};
 use busy_ui::{fmt, select};
 
 pub(super) struct Cell<'a> {
@@ -216,8 +216,8 @@ fn label(m: Module, style: CellStyle, ctx: &Ctx) -> String {
 #[cfg(test)]
 mod tests {
     use super::{Body, Cell};
-    use crate::theme::Color;
     use busy_core::Module;
+    use busy_ui::theme::Color;
 
     fn cell(module: Module, body: Body<'static>) -> Cell<'static> {
         Cell { module, label: None, body }

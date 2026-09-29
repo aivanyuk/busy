@@ -9,8 +9,8 @@ mod network;
 mod sensors;
 
 use super::detail::Detail;
-use crate::ctx::Ctx;
 use busy_core::{Module, ModuleCfg, ProcEntry, TOP_N};
+use busy_ui::ctx::Ctx;
 
 /// The module's flyout content.
 pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {

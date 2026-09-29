@@ -1,8 +1,8 @@
 use super::super::detail::{BarRow, Chart, Detail, Value, series_span};
-use crate::ctx::Ctx;
-use crate::render::nice_max;
-use crate::tone::{self, SECOND};
 use busy_core::{Module, ModuleCfg, RateUnit, SensorPick};
+use busy_ui::ctx::Ctx;
+use busy_ui::render::nice_max;
+use busy_ui::tone::{self, SECOND};
 use busy_ui::{fmt, select};
 
 /// Design `fly('disk')`: active time, read/write rates over time, every volume's fill, response time and

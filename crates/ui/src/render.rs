@@ -1,7 +1,7 @@
 //! Shared Direct2D / DirectWrite helpers.
 
+use crate::history::Series;
 use crate::theme::{Color, alpha};
-use busy_ui::history::Series;
 use busy_win::utf16;
 use windows::Win32::Graphics::Direct2D::Common::*;
 use windows::Win32::Graphics::Direct2D::*;

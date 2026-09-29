@@ -7,17 +7,17 @@ use busy_win::reg_dword;
 use windows::Win32::Graphics::Direct2D::Common::D2D1_COLOR_F;
 use windows::Win32::System::Registry::HKEY_CURRENT_USER;
 
-pub(crate) type Color = D2D1_COLOR_F;
+pub type Color = D2D1_COLOR_F;
 
-pub(crate) const fn rgb(v: u32) -> Color {
+pub const fn rgb(v: u32) -> Color {
     rgba(v, 1.0)
 }
 
-pub(crate) const fn rgba(v: u32, a: f32) -> Color {
+pub const fn rgba(v: u32, a: f32) -> Color {
     Color { r: ((v >> 16) & 0xFF) as f32 / 255.0, g: ((v >> 8) & 0xFF) as f32 / 255.0, b: (v & 0xFF) as f32 / 255.0, a }
 }
 
-pub(crate) fn alpha(c: Color, a: f32) -> Color {
+pub fn alpha(c: Color, a: f32) -> Color {
     Color { a: c.a * a, ..c }
 }
 
@@ -25,48 +25,47 @@ pub(crate) fn alpha(c: Color, a: f32) -> Color {
 /// uses (`--win`, `--card`, `--pop`, `--knob`) are left to Phase 4; `dim` is a color the design's `fly()`
 /// hard-codes per theme, like `standby`.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct Theme {
-    pub(crate) dark: bool,
+pub struct Theme {
+    pub dark: bool,
     /// Taskbar surface. The widget draws over the real taskbar, so only the debug dump paints it.
-    #[cfg_attr(not(debug_assertions), allow(dead_code))]
-    pub(crate) tb: Color,
-    #[allow(dead_code)] // The taskbar's top border: Windows draws it (the divider before the tray is `line`).
-    pub(crate) tb_line: Color,
+    pub tb: Color,
+    /// The taskbar's top border: Windows draws it (the divider before the tray is `line`).
+    pub tb_line: Color,
     /// Flyout surface, painted over the acrylic backdrop (opaque when there is none).
-    pub(crate) fly: Color,
+    pub fly: Color,
     /// Flyout border (DWM draws it; blended over `fly` since it takes no alpha).
-    pub(crate) fly_line: Color,
-    pub(crate) fg: Color,
-    pub(crate) fg2: Color,
-    pub(crate) fg3: Color,
-    pub(crate) hover: Color,
+    pub fly_line: Color,
+    pub fg: Color,
+    pub fg2: Color,
+    pub fg3: Color,
+    pub hover: Color,
     /// The widget while its flyout is open.
-    pub(crate) active: Color,
+    pub active: Color,
     /// Empty part of bars and sparklines.
-    pub(crate) track: Color,
+    pub track: Color,
     /// Chart background in the flyout.
-    pub(crate) well: Color,
-    pub(crate) line: Color,
-    pub(crate) grid: Color,
+    pub well: Color,
+    pub line: Color,
+    pub grid: Color,
     /// Flyout footer band.
-    pub(crate) footer: Color,
-    pub(crate) accent: Color,
-    pub(crate) on_accent: Color,
-    pub(crate) link: Color,
+    pub footer: Color,
+    pub accent: Color,
+    pub on_accent: Color,
+    pub link: Color,
     /// Process icon placeholder.
-    pub(crate) tile: Color,
+    pub tile: Color,
     /// Button face, border and bottom edge (the flyout's settings button).
-    pub(crate) ctl: Color,
-    pub(crate) ctl_line: Color,
-    pub(crate) ctl_bottom: Color,
+    pub ctl: Color,
+    pub ctl_line: Color,
+    pub ctl_bottom: Color,
     /// Idle / free parts of a composition (design `dim`).
-    pub(crate) dim: Color,
+    pub dim: Color,
     /// Memory standby list (design `sbc`).
-    pub(crate) standby: Color,
+    pub standby: Color,
     /// Module palette (design `PAL`), indexed by `ModuleCfg::color_index`.
-    pub(crate) pal: [Color; PALETTE_LEN as usize],
+    pub pal: [Color; PALETTE_LEN as usize],
     /// Load colors (design `LOAD`): normal, elevated, high.
-    pub(crate) load: [Color; 3],
+    pub load: [Color; 3],
 }
 
 const DARK: Theme = Theme {
@@ -130,7 +129,7 @@ const LIGHT: Theme = Theme {
 impl Theme {
     /// Reads the registry for `ThemeMode::System`: call on the theme reader, or at startup before the widget
     /// exists.
-    pub(crate) fn resolve(mode: ThemeMode) -> Self {
+    pub fn resolve(mode: ThemeMode) -> Self {
         let dark = match mode {
             ThemeMode::Dark => true,
             ThemeMode::Light => false,
@@ -147,7 +146,7 @@ impl Theme {
     }
 
     /// This theme's value of a design color role (`tone.rs` decides which role).
-    pub(crate) fn color(&self, tone: Tone) -> Color {
+    pub fn color(&self, tone: Tone) -> Color {
         match tone {
             Tone::Fg => self.fg,
             Tone::Pal(i) => self.pal[(i as usize).min(self.pal.len() - 1)],

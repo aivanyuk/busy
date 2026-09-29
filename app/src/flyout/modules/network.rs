@@ -1,8 +1,8 @@
 use super::super::detail::{Chart, Detail, Value, series_span};
-use crate::ctx::Ctx;
-use crate::render::nice_max;
-use crate::tone::{self, SECOND};
 use busy_core::{Module, ModuleCfg, NetKind};
+use busy_ui::ctx::Ctx;
+use busy_ui::render::nice_max;
+use busy_ui::tone::{self, SECOND};
 use busy_ui::{fmt, select};
 
 /// Design `fly('net')`: download and upload of the chosen interface (`options.network.interface`, as on the

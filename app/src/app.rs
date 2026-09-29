@@ -3,19 +3,19 @@
 //! The widget's input queue is attached to explorer's taskbar thread, so nothing here may block:
 //! sampling runs on the sampler thread and config saves on the config writer thread.
 
-use crate::ctx::Ctx;
 use crate::flyout::{Action, Flyout};
 use crate::launch;
 use crate::menu::{self, Command};
-use crate::render::Gfx;
 use crate::sampler::{Params, Sampler};
 use crate::sync::lock;
 use crate::taskbar::Taskbar;
-use crate::theme::Theme;
 use crate::win::{self, Event, register_class};
 use crate::worker::Worker;
 use busy_core::{Config, Module, Snapshot, ThemeMode};
+use busy_ui::ctx::Ctx;
 use busy_ui::history::History;
+use busy_ui::render::Gfx;
+use busy_ui::theme::Theme;
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};

@@ -9,7 +9,7 @@ const LOAD_STEPS: [f32; 2] = [60.0, 85.0];
 
 /// A color by its role in the design, the same in dark and light.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Tone {
+pub enum Tone {
     /// Primary text (`--fg`).
     Fg,
     /// Module palette entry (`PAL`), `0..PALETTE_LEN`.
@@ -19,16 +19,16 @@ pub(crate) enum Tone {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Load {
+pub enum Load {
     Normal,
     Elevated,
     High,
 }
 
 /// Second series next to the module color: upload, write (design `upColor()` = `PAL[4]`).
-pub(crate) const SECOND: Tone = Tone::Pal(4);
+pub const SECOND: Tone = Tone::Pal(4);
 
-pub(crate) fn load(pct: f32) -> Load {
+pub fn load(pct: f32) -> Load {
     match LOAD_STEPS.iter().take_while(|&&s| pct >= s).count() {
         0 => Load::Normal,
         1 => Load::Elevated,
@@ -37,24 +37,24 @@ pub(crate) fn load(pct: f32) -> Load {
 }
 
 /// The module's palette color (its `color`, else `Module::default_color`).
-pub(crate) fn module(mc: &ModuleCfg) -> Tone {
+pub fn module(mc: &ModuleCfg) -> Tone {
     Tone::Pal(mc.color_index())
 }
 
 /// Graph and bar color at `pct` load (design `col()`): the load color with `color_by_load`, else the module's.
 /// Rates have no percentage and use `module`/`SECOND` directly.
-pub(crate) fn fill(mc: &ModuleCfg, pct: f32) -> Tone {
+pub fn fill(mc: &ModuleCfg, pct: f32) -> Tone {
     if mc.color_by_load { Tone::Load(load(pct)) } else { module(mc) }
 }
 
 /// Value text color (design `valueColor`): the load color with `color_by_load`, else `Fg`.
-pub(crate) fn value(mc: &ModuleCfg, pct: f32) -> Tone {
+pub fn value(mc: &ModuleCfg, pct: f32) -> Tone {
     if mc.color_by_load { Tone::Load(load(pct)) } else { Tone::Fg }
 }
 
 /// (fill, value) of the battery. Its load is how empty it is (100 − charge), so a full battery is not red;
 /// below 20 % on battery both are the high-load color whatever the settings, as a low-battery warning.
-pub(crate) fn battery(mc: &ModuleCfg, b: &BatteryInfo) -> (Tone, Tone) {
+pub fn battery(mc: &ModuleCfg, b: &BatteryInfo) -> (Tone, Tone) {
     if b.percent < 20.0 && !b.charging {
         (Tone::Load(Load::High), Tone::Load(Load::High))
     } else {
