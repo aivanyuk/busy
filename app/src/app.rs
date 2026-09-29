@@ -15,7 +15,7 @@ use crate::taskbar::Taskbar;
 use crate::theme::Theme;
 use crate::win::{self, Event, register_class};
 use crate::worker::Worker;
-use busy_core::{Config, Module, Snapshot, ThemeMode};
+use busy_core::{Config, Snapshot, ThemeMode};
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
@@ -307,10 +307,9 @@ impl App {
     }
 
     fn on_snapshot(&mut self) {
-        let Some(snap) = self.sampler.take() else { return };
+        let Some((snap, fresh)) = self.sampler.take() else { return };
         let sensor = taskbar_sensor(&snap, &self.cfg).map(|s| s.value);
-        // Every module is sampled on every tick for now.
-        self.hist.push(&snap, &[true; Module::ALL.len()], sensor);
+        self.hist.push(&snap, &fresh, sensor);
         self.snap = snap;
         self.render_all();
         if std::mem::take(&mut self.open_flyout) {
