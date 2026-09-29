@@ -23,7 +23,7 @@ Verified on Windows 11 build 26200.9457 (25H2), 3840×2160 @ 200 %, centered tas
   - Task-button extent: `ReBarWindow32` is **not** kept in sync on 26200; the hidden `Start` window's rect is, and with centered icons it is mirrored around the taskbar centre to find the icon group's right end.
   - Cells that don't fit are dropped from the end of the config order — the widget never covers task buttons.
 - Z-order: `SetWindowPos(HWND_TOP)` above `Windows.UI.Composition.DesktopWindowContentBridge` (the XAML island); each tick re-raised if `GetWindow(GW_HWNDPREV)` finds a sibling above.
-- Explorer restart: `RegisterWindowMessageW("TaskbarCreated")` → re-find and re-parent. Exit: state drop destroys the child and joins the sampler.
+- Explorer restart: `RegisterWindowMessageW("TaskbarCreated")` → re-find and re-parent. Exit: `App`'s `Drop` destroys the child and the flyout first, then joins the sampler (joining while the child exists would freeze the taskbar for as long as a WMI call runs).
 
 **Critical:** cross-process parenting attaches our input queue to explorer's. Any blocking on the UI thread freezes the user's taskbar. No sampling, file I/O, or waits on the UI thread.
 
