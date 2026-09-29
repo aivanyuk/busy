@@ -1,9 +1,10 @@
 //! The widget embedded in the taskbar: a layered WS_CHILD of `Shell_TrayWnd` rendered with per-pixel alpha.
 
-use crate::app::{self, App, Ctx};
+use crate::ctx::Ctx;
 use crate::history::Series;
 use crate::render::{Align, Canvas, Gfx, Rect, nice_max};
 use crate::theme::{Color, rgba};
+use crate::win::{self, Event, raise};
 use crate::{fmt, select};
 use busy_core::{Anchor, CellStyle, Config, Module};
 use windows::Win32::Foundation::*;
@@ -112,7 +113,7 @@ fn rect_in(h: HWND, parent: HWND) -> Option<RECT> {
 impl Taskbar {
     pub fn create(gfx: &Gfx) -> Option<Self> {
         let tray = find_tray()?;
-        app::register_class(CLASS, Some(wndproc));
+        win::register_class(CLASS, Some(wndproc));
         unsafe {
             // Created directly as a child of the (foreign-process) taskbar; equivalent to SetParent
             // on a popup but without the style flip. WS_EX_LAYERED on a child needs the Win8 manifest.
@@ -127,7 +128,7 @@ impl Taskbar {
                 0,
                 Some(tray),
                 None,
-                Some(app::hinstance()),
+                Some(win::hinstance()),
                 None,
             )
             .ok()?;
@@ -536,7 +537,7 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
                 LRESULT(1)
             }
             WM_MOUSEMOVE => {
-                app::with(|a| a.set_hover(true));
+                raise(Event::WidgetHover(true));
                 let mut tme = TRACKMOUSEEVENT {
                     cbSize: size_of::<TRACKMOUSEEVENT>() as u32,
                     dwFlags: TME_LEAVE,
@@ -547,19 +548,19 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
                 LRESULT(0)
             }
             WM_MOUSELEAVE => {
-                app::with(|a| a.set_hover(false));
+                raise(Event::WidgetHover(false));
                 LRESULT(0)
             }
             WM_LBUTTONUP => {
-                app::with(App::toggle_flyout);
+                raise(Event::WidgetClick);
                 LRESULT(0)
             }
             WM_RBUTTONUP => {
-                app::context_menu();
+                raise(Event::WidgetMenu);
                 LRESULT(0)
             }
             WM_DPICHANGED_AFTERPARENT | WM_DISPLAYCHANGE => {
-                app::post(app::WM_APP_RENDER);
+                raise(Event::WidgetRerender);
                 LRESULT(0)
             }
             _ => DefWindowProcW(hwnd, msg, wp, lp),

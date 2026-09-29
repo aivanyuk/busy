@@ -109,7 +109,7 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 
 | Gap | Rule |
 |---|---|
-| `taskbar.rs` and `flyout.rs` call back into `crate::app`; `Taskbar`/`Flyout` expose `pub` fields; `pinned_sensor` lives in `app.rs`. | Layering: app modules |
+| `Taskbar`/`Flyout` expose `pub` fields read and written by `app.rs`. | Layering: no `pub` fields on window structs |
 | `taskbar.rs` (595 lines) and `flyout.rs` (800) mix window procedure, layout and painting; `crates/settings/src/window.rs` is 977 lines. | Layering: one concern per file |
 | The sampler receives the whole `Config`. | Layering: workers get only what they use |
 | The PDH wrapper exists twice (`busy-metrics` `pdh.rs`, `busy-sensors` `gpu.rs`); `gpu.rs` and `hwinfo.rs` close handles by hand. | Layering: one implementation |

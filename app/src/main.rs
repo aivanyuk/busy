@@ -3,6 +3,7 @@
 #![allow(linker_messages)]
 
 mod app;
+mod ctx;
 mod fake;
 mod flyout;
 mod fmt;
@@ -13,6 +14,7 @@ mod sampler;
 mod select;
 mod taskbar;
 mod theme;
+mod win;
 
 use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError};
 use windows::Win32::System::Threading::CreateMutexW;

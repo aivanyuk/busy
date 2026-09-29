@@ -1,9 +1,10 @@
 //! Detail flyout: a borderless tool window with a DWM backdrop, drawn with Direct2D.
 
-use crate::app::{self, App, Ctx};
+use crate::ctx::Ctx;
 use crate::history::Series;
 use crate::render::{Align, Canvas, Gfx, Rect, nice_max};
 use crate::theme::{Color, Theme, alpha};
+use crate::win::{self, Event, raise};
 use crate::{fmt, select};
 use busy_core::{Anchor, Module, ProcEntry, SensorKind};
 use windows::Win32::Foundation::*;
@@ -54,7 +55,7 @@ pub struct Flyout {
 
 impl Flyout {
     pub fn create(gfx: &Gfx, owner: HWND, theme: &Theme) -> Option<Self> {
-        app::register_class(CLASS, Some(wndproc));
+        win::register_class(CLASS, Some(wndproc));
         let fonts = (|| -> Result<Fonts> {
             Ok(Fonts {
                 title: gfx.format(14.0, true)?,
@@ -77,7 +78,7 @@ impl Flyout {
                 0,
                 Some(owner),
                 None,
-                Some(app::hinstance()),
+                Some(win::hinstance()),
                 None,
             )
             .ok()?
@@ -750,18 +751,17 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
         match msg {
             WM_ACTIVATE => {
                 if (wp.0 & 0xFFFF) as u32 == WA_INACTIVE {
-                    // Posted: WM_ACTIVATE may arrive re-entrantly while the app state is borrowed.
-                    app::post(app::WM_APP_FLYOUT_DEACTIVATED);
+                    raise(Event::FlyoutDeactivated);
                 }
                 LRESULT(0)
             }
             WM_KEYDOWN if wp.0 == VK_ESCAPE.0 as usize => {
-                app::with(App::hide_flyout);
+                raise(Event::FlyoutEscape);
                 LRESULT(0)
             }
             WM_MOUSEWHEEL => {
                 let delta = ((wp.0 >> 16) & 0xFFFF) as i16;
-                app::with(|a| a.flyout_event(|f, ctx| f.on_wheel(ctx, delta)));
+                raise(Event::FlyoutWheel(delta));
                 LRESULT(0)
             }
             WM_MOUSEMOVE => {
@@ -772,22 +772,21 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
                     dwHoverTime: 0,
                 };
                 let _ = TrackMouseEvent(&mut tme);
-                let p = xy();
-                app::with(|a| a.flyout_event(|f, ctx| f.on_mouse(ctx, Some(p))));
+                raise(Event::FlyoutPointer(Some(xy())));
                 LRESULT(0)
             }
             WM_MOUSELEAVE => {
-                app::with(|a| a.flyout_event(|f, ctx| f.on_mouse(ctx, None)));
+                raise(Event::FlyoutPointer(None));
                 LRESULT(0)
             }
             WM_LBUTTONDOWN => {
                 let (x, y) = xy();
-                app::with(|a| a.flyout_event(|f, ctx| f.on_click(ctx, x, y)));
+                raise(Event::FlyoutClick(x, y));
                 LRESULT(0)
             }
             WM_PAINT => {
                 let _ = ValidateRect(Some(hwnd), None);
-                app::with(|a| a.flyout_event(Flyout::paint));
+                raise(Event::FlyoutPaint);
                 LRESULT(0)
             }
             WM_ERASEBKGND => LRESULT(1),

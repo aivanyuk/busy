@@ -3,6 +3,7 @@
 //! The widget's input queue is attached to explorer's taskbar thread, so nothing here may block:
 //! sampling runs on the sampler thread and config saves on the config writer thread.
 
+use crate::ctx::Ctx;
 use crate::flyout::Flyout;
 use crate::history::{History, capacity};
 use crate::persist::Writer;
@@ -11,20 +12,20 @@ use crate::sampler::Sampler;
 use crate::select::pinned_sensor;
 use crate::taskbar::Taskbar;
 use crate::theme::Theme;
+use crate::win::{self, Event, register_class};
 use busy_core::{Anchor, Config, Module, Snapshot};
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use windows::Win32::Foundation::*;
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::SystemInformation::GetTickCount64;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{PCWSTR, Result, w};
 
-pub const WM_APP_SNAPSHOT: u32 = WM_APP + 1;
-pub const WM_APP_RENDER: u32 = WM_APP + 2;
-pub const WM_APP_CONFIG: u32 = WM_APP + 3;
-pub const WM_APP_FLYOUT_DEACTIVATED: u32 = WM_APP + 4;
+const WM_APP_SNAPSHOT: u32 = WM_APP + 1;
+const WM_APP_RENDER: u32 = WM_APP + 2;
+const WM_APP_CONFIG: u32 = WM_APP + 3;
+const WM_APP_FLYOUT_DEACTIVATED: u32 = WM_APP + 4;
 
 const TIMER_WATCH: usize = 1;
 const ID_SETTINGS: u32 = 1;
@@ -43,16 +44,7 @@ thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
 }
 
-/// Read-only view passed to renderers.
-pub struct Ctx<'a> {
-    pub cfg: &'a Config,
-    pub snap: &'a Snapshot,
-    pub hist: &'a History,
-    pub theme: &'a Theme,
-    pub gfx: &'a Gfx,
-}
-
-pub struct App {
+struct App {
     main: HWND,
     cfg: Config,
     sampler: Sampler,
@@ -67,15 +59,15 @@ pub struct App {
 }
 
 /// Runs `f` on the app state unless it is already borrowed (re-entrant message); then returns None.
-pub fn with<R>(f: impl FnOnce(&mut App) -> R) -> Option<R> {
+fn with<R>(f: impl FnOnce(&mut App) -> R) -> Option<R> {
     APP.with(|a| a.try_borrow_mut().ok().and_then(|mut g| g.as_mut().map(f)))
 }
 
-pub fn main_hwnd() -> HWND {
+fn main_hwnd() -> HWND {
     HWND(MAIN.load(Ordering::Relaxed) as _)
 }
 
-pub fn post(msg: u32) {
+fn post(msg: u32) {
     unsafe {
         let _ = PostMessageW(Some(main_hwnd()), msg, WPARAM(0), LPARAM(0));
     }
@@ -87,26 +79,10 @@ pub fn submit_config(cfg: Config) {
     post(WM_APP_CONFIG);
 }
 
-pub fn hinstance() -> HINSTANCE {
-    unsafe { GetModuleHandleW(None).map(Into::into).unwrap_or_default() }
-}
-
-pub fn register_class(name: PCWSTR, proc: WNDPROC) {
-    let wc = WNDCLASSEXW {
-        cbSize: size_of::<WNDCLASSEXW>() as u32,
-        lpfnWndProc: proc,
-        hInstance: hinstance(),
-        lpszClassName: name,
-        hCursor: unsafe { LoadCursorW(None, IDC_ARROW).unwrap_or_default() },
-        ..Default::default()
-    };
-    // Fails harmlessly with ERROR_CLASS_ALREADY_EXISTS when re-creating windows.
-    unsafe { RegisterClassExW(&wc) };
-}
-
 pub fn run(open_flyout: bool) -> Result<()> {
     let cfg = Config::load();
     let gfx = Gfx::new()?;
+    win::set_handler(on_event);
     register_class(w!("busy.main"), Some(main_proc));
     // A hidden top-level window (not HWND_MESSAGE) so broadcasts like TaskbarCreated reach us.
     let main = unsafe {
@@ -121,7 +97,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
             0,
             None,
             None,
-            Some(hinstance()),
+            Some(win::hinstance()),
             None,
         )?
     };
@@ -169,6 +145,37 @@ pub fn run(open_flyout: bool) -> Result<()> {
     // Drops the widget (destroying our child of explorer's taskbar) and joins the sampler.
     APP.with(|a| a.borrow_mut().take());
     Ok(())
+}
+
+/// Input from our windows (see `win::Event`).
+fn on_event(ev: Event) {
+    match ev {
+        Event::WidgetHover(h) => {
+            with(|a| a.set_hover(h));
+        }
+        Event::WidgetClick => {
+            with(App::toggle_flyout);
+        }
+        Event::WidgetMenu => context_menu(),
+        Event::WidgetRerender => post(WM_APP_RENDER),
+        // Posted: WM_ACTIVATE may arrive re-entrantly while the app state is borrowed.
+        Event::FlyoutDeactivated => post(WM_APP_FLYOUT_DEACTIVATED),
+        Event::FlyoutEscape => {
+            with(App::hide_flyout);
+        }
+        Event::FlyoutWheel(delta) => {
+            with(|a| a.flyout_event(|f, ctx| f.on_wheel(ctx, delta)));
+        }
+        Event::FlyoutPointer(p) => {
+            with(|a| a.flyout_event(|f, ctx| f.on_mouse(ctx, p)));
+        }
+        Event::FlyoutClick(x, y) => {
+            with(|a| a.flyout_event(|f, ctx| f.on_click(ctx, x, y)));
+        }
+        Event::FlyoutPaint => {
+            with(|a| a.flyout_event(Flyout::paint));
+        }
+    }
 }
 
 extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
@@ -284,7 +291,7 @@ impl App {
         self.render_all();
     }
 
-    pub fn set_hover(&mut self, hover: bool) {
+    fn set_hover(&mut self, hover: bool) {
         if let Some(tb) = self.taskbar.as_mut().filter(|t| t.hover != hover) {
             tb.hover = hover;
             let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
@@ -292,7 +299,7 @@ impl App {
         }
     }
 
-    pub fn toggle_flyout(&mut self) {
+    fn toggle_flyout(&mut self) {
         let (Some(f), Some(tb)) = (&mut self.flyout, &self.taskbar) else { return };
         if f.visible {
             f.hide(false);
@@ -305,13 +312,13 @@ impl App {
         }
     }
 
-    pub fn hide_flyout(&mut self) {
+    fn hide_flyout(&mut self) {
         if let Some(f) = &mut self.flyout {
             f.hide(false);
         }
     }
 
-    pub fn flyout_event(&mut self, ev: impl FnOnce(&mut Flyout, &Ctx)) {
+    fn flyout_event(&mut self, ev: impl FnOnce(&mut Flyout, &Ctx)) {
         let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
         if let Some(f) = &mut self.flyout {
             ev(f, &ctx);
@@ -370,7 +377,7 @@ fn post_close() {
 }
 
 /// Shows the widget's context menu. Runs outside the app borrow: TrackPopupMenu spins a modal loop.
-pub fn context_menu() {
+fn context_menu() {
     let Some(cfg) = with(|a| {
         a.hide_flyout();
         a.cfg.clone()
