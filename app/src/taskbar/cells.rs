@@ -121,8 +121,8 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
                 let max = if is_temp { 100.0 } else { nice_max(hist.sensor.max()) };
                 let label =
                     if is_temp { "TEMP".into() } else { s.name.chars().take(6).collect::<String>().to_uppercase() };
-                let col = if is_temp { t.temp(s.value) } else { t.text };
-                let bar_col = if is_temp && col == t.text { t.accent } else { col };
+                let col = if is_temp { t.temp(s.value) } else { t.fg };
+                let bar_col = if is_temp && col == t.fg { t.accent } else { col };
                 Cell {
                     series: vec![(&hist.sensor, bar_col)],
                     max,
@@ -172,15 +172,15 @@ impl Cell<'_> {
         let y0 = (r.h - 30.0) / 2.0;
         match &self.val {
             Val::One(v) => {
-                cv.text(&self.label, &f.label, Rect::new(r.x, y0, r.w, 13.0), t.secondary, Align::Left);
-                cv.text(v, &f.value, Rect::new(r.x, y0 + 12.0, r.w, 18.0), t.text, Align::Left);
+                cv.text(&self.label, &f.label, Rect::new(r.x, y0, r.w, 13.0), t.fg2, Align::Left);
+                cv.text(v, &f.value, Rect::new(r.x, y0 + 12.0, r.w, 18.0), t.fg, Align::Left);
             }
             Val::Two(rows) => {
                 let pw = rows.iter().map(|row| ctx.gfx.text_width(&f.pair, row.0)).fold(0.0, f32::max);
                 for (i, (prefix, col, text)) in rows.iter().enumerate() {
                     let y = y0 + i as f32 * 15.0;
                     cv.text(prefix, &f.pair, Rect::new(r.x, y, pw, 15.0), *col, Align::Left);
-                    cv.text(text, &f.pair, Rect::new(r.x + pw + 3.0, y, r.w - pw - 3.0, 15.0), t.text, Align::Left);
+                    cv.text(text, &f.pair, Rect::new(r.x + pw + 3.0, y, r.w - pw - 3.0, 15.0), t.fg, Align::Left);
                 }
             }
         }
@@ -192,8 +192,8 @@ impl Cell<'_> {
             CellStyle::Text | CellStyle::Io => self.draw_text(cv, f, ctx, r),
             CellStyle::Graph => {
                 let y0 = (r.h - 32.0) / 2.0;
-                cv.text(&self.label, &f.label, Rect::new(r.x, y0, r.w, 13.0), t.secondary, Align::Left);
-                cv.text(&self.short, &f.tiny, Rect::new(r.x, y0, r.w, 13.0), t.text, Align::Right);
+                cv.text(&self.label, &f.label, Rect::new(r.x, y0, r.w, 13.0), t.fg2, Align::Left);
+                cv.text(&self.short, &f.tiny, Rect::new(r.x, y0, r.w, 13.0), t.fg, Align::Right);
                 let g = Rect::new(r.x, y0 + 15.0, r.w, 17.0);
                 cv.round(g, 3.0, t.track);
                 let inner = g.inset(1.0, 1.5);
