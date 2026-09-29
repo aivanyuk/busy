@@ -11,13 +11,13 @@ use busy_win::pdh::{ArrayBuf, Counter, PDH_FMT_NOCAP100, Query};
 use windows::Wdk::Graphics::Direct3D::*;
 use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SYSTEM_INFORMATION_CLASS};
 use windows::Win32::Foundation::LUID;
-use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE, IDXGIFactory1};
+use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE, IDXGIDevice, IDXGIFactory1};
 use windows::Win32::System::Threading::{
     OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
-use windows::core::{Owned, PWSTR};
+use windows::core::{Interface, Owned, PWSTR};
 
-use crate::{Shared, adl::Adl, nvml::Nvml, reading};
+use crate::{Shared, adl::Adl, dx, nvml::Nvml, reading};
 
 const REENUM: Duration = Duration::from_secs(60);
 
@@ -112,6 +112,8 @@ struct Adapter {
     kmt: Option<Kmt>,
     kmt_caps: D3DKMT_ADAPTER_PERFDATACAPS,
     vendor: Vendor,
+    driver_version: Option<String>,
+    feature_level: Option<(u8, u8)>,
 }
 
 impl Adapter {
@@ -133,6 +135,7 @@ impl Adapter {
 
 fn enumerate() -> Vec<Adapter> {
     let Ok(f) = (unsafe { CreateDXGIFactory1::<IDXGIFactory1>() }) else { return Vec::new() };
+    let dx_cache = dx::cached_adapters();
     let mut out: Vec<Adapter> = Vec::new();
     for i in 0.. {
         let Ok(a) = (unsafe { f.EnumAdapters1(i) }) else { break };
@@ -167,6 +170,10 @@ fn enumerate() -> Vec<Adapter> {
             kmt,
             kmt_caps,
             vendor: Vendor::None,
+            // ~0.5 ms per adapter; answered by the kernel driver without loading the user-mode driver.
+            // SAFETY: the IID is a valid GUID that outlives the call; `a` is a live adapter.
+            driver_version: unsafe { a.CheckInterfaceSupport(&IDXGIDevice::IID) }.ok().map(dx::driver_version),
+            feature_level: dx::level_for(&dx_cache, luid, (d.VendorId, d.DeviceId)),
         });
     }
     out
@@ -362,6 +369,8 @@ impl Source for GpuSource {
                     vram_total: a.vram_total,
                     vram_used: dedicated.get(&a.luid).copied().unwrap_or(0),
                     shared_used: shared_mem.get(&a.luid).copied().unwrap_or(0),
+                    driver_version: a.driver_version.clone(),
+                    feature_level: a.feature_level,
                     ..Default::default()
                 };
                 let mut types: Vec<(String, f32)> = Vec::new();

@@ -1,6 +1,6 @@
 # busy-sensors
 
-`crates/sensors` — `sources()` returns `[Gpu, Sensors]` (in that order; they share `Rc<RefCell<Shared>>`). Files: `gpu.rs` (DXGI + PDH through `busy_win::pdh` + D3DKMT), `nvml.rs`, `adl.rs`, `lhm.rs` (WMI), `hwinfo.rs` (shared memory), `lib.rs` (System32 DLL loader, sensors merge logic).
+`crates/sensors` — `sources()` returns `[Gpu, Sensors]` (in that order; they share `Rc<RefCell<Shared>>`). Files: `gpu.rs` (DXGI + PDH through `busy_win::pdh` + D3DKMT), `dx.rs` (driver version, feature level), `nvml.rs`, `adl.rs`, `lhm.rs` (WMI), `hwinfo.rs` (shared memory), `lib.rs` (System32 DLL loader, sensors merge logic).
 
 Live check: `cargo run -p busy-sensors --example dump_sensors` (add `-- --third-party` to also read LHM/HWiNFO).
 
@@ -13,6 +13,8 @@ LibreHardwareMonitor (WMI) and HWiNFO (shared memory) are read only when `Source
 | Backend | Provides | Notes |
 |---|---|---|
 | DXGI `EnumAdapters1` | adapters, name, LUID, VRAM total | Skips software + Microsoft (0x1414) adapters. Re-enumerated every 60 s. |
+| DXGI `CheckInterfaceSupport(IDXGIDevice)` | driver version (UMD, 4 × u16, e.g. 32.0.16.1692 = NVIDIA 616.92) | ~0.5 ms per adapter at enumeration; does not load the user-mode driver (checked: `nvwgf2umx.dll` stays unloaded). |
+| DirectX adapter cache `HKLM\SOFTWARE\Microsoft\DirectX\{GUID}` | feature level (`MaxD3D12FeatureLevel`, else `MaxD3D11FeatureLevel`) | Written by DXGI, read by dxdiag; read through `busy_win::reg_subkeys`/`reg_qword`/`reg_dword` (at most 64 entries). Matched by `AdapterLuid` (rewritten each boot), else by a unique vendor/device id. ~0.25 ms at enumeration (3 entries). Rejected: a `D3D12CreateDevice` probe took 200–350 ms and kept the UMD mapped (+17–23 MB private) even after release and `FreeLibrary`; D3D11 took 180–230 ms and caps at FL 12_1. |
 | PDH `\GPU Engine(*)`, `\GPU Adapter Memory(*)` | util, per-engine, VRAM used, per-process GPU | Opening the counters costs 540–680 ms once. First sample has no util (needs two collections). |
 | D3DKMT (`D3DKMTQueryAdapterInfo`) | PCI location, temp, fan RPM, mem clock | Task Manager's source; no DLL, any WDDM 2.5+ driver. Labelled "WDDM". Used to match NVML/ADL devices to DXGI adapters by PCI bus/device. |
 | NVML (`nvml.dll`) | temp, fan %, power, clocks | Loaded only if an NVIDIA adapter exists. No hotspot (not public). |

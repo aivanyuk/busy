@@ -190,6 +190,10 @@ pub struct GpuInfo {
     pub power_w: Option<f32>,
     pub core_clock_mhz: Option<u32>,
     pub mem_clock_mhz: Option<u32>,
+    /// User-mode driver version as Task Manager shows it, e.g. "32.0.16.1692".
+    pub driver_version: Option<String>,
+    /// Highest Direct3D feature level as (major, minor), e.g. (12, 2) for FL 12_2.
+    pub feature_level: Option<(u8, u8)>,
 }
 
 #[derive(Clone, Debug, Default)]
