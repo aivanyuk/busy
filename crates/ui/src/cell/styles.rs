@@ -1,15 +1,15 @@
 //! Measuring and drawing a cell in its style, to the design's `MeterWidget` geometry (sizes in DIPs).
 
-use super::cells::{Body, Cell};
-use busy_ui::render::{Align, Canvas, Gfx, Rect};
-use busy_ui::theme::Theme;
+use super::{Body, Cell};
+use crate::render::{Align, Canvas, Gfx, Rect};
+use crate::theme::Theme;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use windows::Win32::Graphics::DirectWrite::{DWRITE_FONT_WEIGHT_BOLD, IDWriteTextFormat};
 use windows::core::Result;
 
 /// Cell height; cells are centered in the taskbar.
-pub(super) const CELL_H: f32 = 40.0;
+pub const CELL_H: f32 = 40.0;
 /// Horizontal padding inside a cell.
 const PAD_X: f32 = 8.0;
 /// Labels: 9 px, letter-spacing .06em, line-height 1.15.
@@ -30,7 +30,7 @@ const BAR_H: f32 = 26.0;
 const IO_ROW_H: f32 = 15.0;
 const IO_MIN_W: f32 = 60.0;
 
-pub(super) struct Fonts {
+pub struct Fonts {
     /// Labels and the Graph row: 9 px semibold.
     small: IDWriteTextFormat,
     /// Text and Bar values: 13 px semibold.
@@ -53,7 +53,7 @@ enum Font {
 }
 
 impl Fonts {
-    pub(super) fn new(gfx: &Gfx) -> Result<Self> {
+    pub fn new(gfx: &Gfx) -> Result<Self> {
         Ok(Self {
             small: gfx.format(9.0, true)?,
             value: gfx.format(13.0, true)?,
@@ -98,7 +98,7 @@ impl Cell<'_> {
     }
 
     /// Total width, padding included.
-    pub(super) fn width(&self, gfx: &Gfx, f: &Fonts) -> f32 {
+    pub fn width(&self, gfx: &Gfx, f: &Fonts) -> f32 {
         let content = match &self.body {
             Body::Text { value, .. } => self.label_w(gfx, f).max(f.width(gfx, Font::Value, value)).max(TEXT_MIN_W),
             // The label row (label, value) is hidden with the label, as in the design.
@@ -120,7 +120,7 @@ impl Cell<'_> {
     }
 
     /// Draws the cell's content into `r`, the cell's full `CELL_H`-high rect.
-    pub(super) fn draw(&self, cv: &Canvas, gfx: &Gfx, f: &Fonts, t: &Theme, r: Rect) {
+    pub fn draw(&self, cv: &Canvas, gfx: &Gfx, f: &Fonts, t: &Theme, r: Rect) {
         let c = Rect::new(r.x + PAD_X, r.y, r.w - 2.0 * PAD_X, r.h);
         let label = |x: f32, y: f32, w: f32, align| {
             if let Some(l) = &self.label {
