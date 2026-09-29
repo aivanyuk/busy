@@ -14,7 +14,7 @@ Live check: `cargo run -p busy-sensors --example dump_sensors [samples]`.
 | NVML (`nvml.dll`) | temp, fan %, power, clocks | Loaded only if an NVIDIA adapter exists. No hotspot (not public). |
 | ADL (`atiadlxx.dll`) | edge/hotspot temp, fan, power, clocks (Overdrive8, fallback OverdriveN) | **Untested on real AMD hardware.** |
 | LibreHardwareMonitor / OpenHardwareMonitor WMI | all sensors incl. CPU temps | `root\LibreHardwareMonitor` then `root\OpenHardwareMonitor`. Lazy connect, retry every 30 s; queries >15 ms throttled to every 3 s. **Untested with LHM running.** |
-| HWiNFO `Global\HWiNFO_SENS_SM2` | all sensors | Requires "Shared Memory Support" enabled in HWiNFO. Whole view copied then parsed with bounds checks. **Untested with HWiNFO running.** |
+| HWiNFO `Global\HWiNFO_SENS_SM2` | all sensors | Requires "Shared Memory Support" enabled in HWiNFO. The view stays mapped; each sample copies only the header-declared extent into a reused buffer and parses it with bounds checks. The mapping is dropped (and reopened after 5 s, picking up a restarted HWiNFO's new section) when the signature is no longer `HWiS` (`DEAD` once HWiNFO stops) or the poll time has not moved for 30 s. **Untested with HWiNFO running.** |
 
 Precedence for `snap.sensors`: LHM → HWiNFO → NVML/ADL/WDDM readings (the latter only when neither tool is present, to avoid duplicates). LHM/HWiNFO also fill missing GPU temp/hotspot/fan, matched by GPU name.
 
