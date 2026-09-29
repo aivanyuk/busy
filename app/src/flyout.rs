@@ -1,10 +1,10 @@
 //! Detail flyout: a borderless tool window with a DWM backdrop, drawn with Direct2D.
 
 use crate::app::{self, App, Ctx};
-use crate::fmt;
 use crate::history::Series;
 use crate::render::{Align, Canvas, Gfx, Rect, nice_max};
 use crate::theme::{Color, Theme, alpha};
+use crate::{fmt, select};
 use busy_core::{Anchor, Module, ProcEntry, SensorKind};
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Direct2D::Common::*;
@@ -635,7 +635,7 @@ impl Painter<'_> {
                 }
             }
             Module::Sensors => {
-                let pinned = app::pinned_sensor(snap, ctx.cfg);
+                let pinned = select::pinned_sensor(snap, ctx.cfg);
                 let v = pinned.map(|s| fmt::sensor(s.value, s.kind, unit)).unwrap_or_default();
                 let vc = pinned.filter(|s| s.kind == SensorKind::Temperature).map_or(t.text, |s| t.temp(s.value));
                 self.header("Sensors", &v, vc);

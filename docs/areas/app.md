@@ -1,6 +1,6 @@
 # busy (app)
 
-`app/` — the binary. Files: `main.rs` (single instance, `--open-flyout` debug flag), `app.rs` (state, config, message routing), `sampler.rs`, `persist.rs` (config writer thread), `history.rs`, `fake.rs` (synthetic Source for UI dev), `taskbar.rs`, `flyout.rs`, `render.rs` (D2D/DWrite helpers), `theme.rs`, `fmt.rs`. Manifest: `app/app.manifest` embedded by `app/build.rs` via `/MANIFEST:EMBED /MANIFESTINPUT` (PerMonitorV2, comctl32 v6, supportedOS Win8/10 — required for layered child windows).
+`app/` — the binary. Files: `main.rs` (single instance, `--open-flyout` debug flag), `app.rs` (state, config, message routing), `sampler.rs`, `persist.rs` (config writer thread), `select.rs` (what to show: pinned sensor), `history.rs`, `fake.rs` (synthetic Source for UI dev), `taskbar.rs`, `flyout.rs`, `render.rs` (D2D/DWrite helpers), `theme.rs`, `fmt.rs`. Manifest: `app/app.manifest` embedded by `app/build.rs` via `/MANIFEST:EMBED /MANIFESTINPUT` (PerMonitorV2, comctl32 v6, supportedOS Win8/10 — required for layered child windows).
 
 Verified on Windows 11 build 26200.9457 (25H2), 3840×2160 @ 200 %, centered taskbar icons. Release exe ~500 KB.
 

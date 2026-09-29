@@ -1,10 +1,10 @@
 //! The widget embedded in the taskbar: a layered WS_CHILD of `Shell_TrayWnd` rendered with per-pixel alpha.
 
 use crate::app::{self, App, Ctx};
-use crate::fmt;
 use crate::history::Series;
 use crate::render::{Align, Canvas, Gfx, Rect, nice_max};
 use crate::theme::{Color, rgba};
+use crate::{fmt, select};
 use busy_core::{Anchor, CellStyle, Config, Module};
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Direct2D::Common::*;
@@ -415,7 +415,7 @@ fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
                     ..base("BAT", Val::One(v.clone()), &["100%⚡"], v)
                 }
             }),
-            Module::Sensors => app::pinned_sensor(snap, ctx.cfg).map(|s| {
+            Module::Sensors => select::pinned_sensor(snap, ctx.cfg).map(|s| {
                 let v = fmt::sensor(s.value, s.kind, ctx.cfg.temp_unit);
                 let is_temp = s.kind == busy_core::SensorKind::Temperature;
                 let max = if is_temp { 100.0 } else { nice_max(hist.sensor.max()) };

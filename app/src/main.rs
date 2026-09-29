@@ -10,6 +10,7 @@ mod history;
 mod persist;
 mod render;
 mod sampler;
+mod select;
 mod taskbar;
 mod theme;
 

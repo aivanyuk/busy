@@ -8,9 +8,10 @@ use crate::history::{History, capacity};
 use crate::persist::Writer;
 use crate::render::Gfx;
 use crate::sampler::Sampler;
+use crate::select::pinned_sensor;
 use crate::taskbar::Taskbar;
 use crate::theme::Theme;
-use busy_core::{Anchor, Config, Module, SensorKind, SensorReading, Snapshot};
+use busy_core::{Anchor, Config, Module, Snapshot};
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
@@ -101,26 +102,6 @@ pub fn register_class(name: PCWSTR, proc: WNDPROC) {
     };
     // Fails harmlessly with ERROR_CLASS_ALREADY_EXISTS when re-creating windows.
     unsafe { RegisterClassExW(&wc) };
-}
-
-/// The user's pinned sensor ("hardware/name"), else the hottest CPU temperature, else the hottest temperature.
-pub fn pinned_sensor<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a SensorReading> {
-    if !cfg.pinned_sensor.is_empty()
-        && let Some(s) = snap
-            .sensors
-            .iter()
-            .find(|s| cfg.pinned_sensor.split_once('/') == Some((s.hardware.as_str(), s.name.as_str())))
-    {
-        return Some(s);
-    }
-    let temps = || snap.sensors.iter().filter(|s| s.kind == SensorKind::Temperature);
-    let is_cpu = |s: &&SensorReading| {
-        let (h, n) = (s.hardware.to_lowercase(), s.name.to_lowercase());
-        ["cpu", "ryzen", "intel", "core i", "processor"].iter().any(|k| h.contains(k))
-            || ["cpu", "package", "tctl", "tdie"].iter().any(|k| n.contains(k))
-    };
-    let hottest = |a: &&SensorReading, b: &&SensorReading| a.value.total_cmp(&b.value);
-    temps().filter(is_cpu).max_by(hottest).or_else(|| temps().max_by(hottest))
 }
 
 pub fn run(open_flyout: bool) -> Result<()> {
