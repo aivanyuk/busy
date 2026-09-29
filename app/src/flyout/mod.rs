@@ -3,11 +3,8 @@
 mod detail;
 mod draw;
 mod modules;
-mod painter;
-mod sections;
 
-use draw::GraphHit;
-use painter::{Fonts, Painter};
+use draw::{Fonts, GraphHit};
 
 use crate::ctx::Ctx;
 use crate::render::{Canvas, Gfx, Rect};
@@ -24,11 +21,10 @@ use windows::Win32::System::SystemInformation::GetTickCount64;
 use windows::Win32::UI::Controls::{MARGINS, WM_MOUSELEAVE};
 use windows::Win32::UI::Input::KeyboardAndMouse::{TME_LEAVE, TRACKMOUSEEVENT, TrackMouseEvent, VK_ESCAPE};
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::{PCWSTR, Result, w};
+use windows::core::{PCWSTR, w};
 
 const CLASS: PCWSTR = w!("busy.flyout");
 const WIDTH: f32 = 360.0;
-const PAD: f32 = 16.0;
 const MARGIN: f32 = 12.0;
 
 /// What the pointer is over, as far as painting is concerned: a pointer move repaints only when it changes.
@@ -53,8 +49,6 @@ pub struct Flyout {
     hwnd: HWND,
     rt: Option<ID2D1HwndRenderTarget>,
     fonts: Fonts,
-    /// Fonts of the design's detailed layout (`draw.rs`).
-    detail_fonts: draw::Fonts,
     visible: bool,
     /// Tick of the last hide caused by deactivation (see `toggle`).
     deactivated_at: u64,
@@ -72,7 +66,6 @@ pub struct Flyout {
     mouse: Option<(f32, f32)>,
     /// `hover_at(mouse)` as of the last paint.
     hover: Hover,
-    tab: usize,
     hits: Vec<(Rect, usize)>,
     graphs: Vec<GraphHit>,
 }
@@ -80,17 +73,7 @@ pub struct Flyout {
 impl Flyout {
     pub fn create(gfx: &Gfx, owner: HWND, theme: &Theme) -> Option<Self> {
         win::register_class(CLASS, Some(wndproc));
-        let fonts = (|| -> Result<Fonts> {
-            Ok(Fonts {
-                title: gfx.format(14.0, true)?,
-                body: gfx.format(12.0, false)?,
-                bold: gfx.format(12.0, true)?,
-                small: gfx.format(11.0, false)?,
-                hint: gfx.wrapping(12.0)?,
-            })
-        })()
-        .ok()?;
-        let detail_fonts = draw::Fonts::new(gfx).ok()?;
+        let fonts = Fonts::new(gfx).ok()?;
         let hwnd = unsafe {
             CreateWindowExW(
                 WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
@@ -112,7 +95,6 @@ impl Flyout {
             hwnd,
             rt: None,
             fonts,
-            detail_fonts,
             visible: false,
             deactivated_at: 0,
             module: None,
@@ -126,7 +108,6 @@ impl Flyout {
             content_h: 0.0,
             mouse: None,
             hover: Hover::Nothing,
-            tab: 0,
             hits: Vec::new(),
             graphs: Vec::new(),
         };
@@ -338,27 +319,12 @@ impl Flyout {
     }
 
     fn layout(&self, ctx: &Ctx, cv: Option<&Canvas>) -> Layout {
-        let mc = self.module.and_then(|m| ctx.cfg.module(m));
-        if let Some(d) = mc.and_then(|mc| modules::detail(ctx, mc)) {
-            let drawn = draw::draw(&d, cv, ctx.gfx, ctx.theme, &self.detail_fonts, self.scroll, self.mouse);
-            return Layout { height: drawn.height, hits: Vec::new(), graphs: drawn.graphs };
-        }
-        let mut p = Painter {
-            cv,
-            ctx,
-            f: &self.fonts,
-            x: PAD,
-            w: WIDTH - 2.0 * PAD,
-            y: PAD - self.scroll,
-            mouse: self.mouse,
-            hits: Vec::new(),
-            graphs: Vec::new(),
-            tab: self.tab,
+        let Some(mc) = self.module.and_then(|m| ctx.cfg.module(m)) else {
+            return Layout { height: 1.0, hits: Vec::new(), graphs: Vec::new() };
         };
-        if let Some(mc) = mc {
-            p.section(mc);
-        }
-        Layout { height: p.y + self.scroll + PAD - 4.0, hits: p.hits, graphs: p.graphs }
+        let d = modules::detail(ctx, mc);
+        let drawn = draw::draw(&d, cv, ctx.gfx, ctx.theme, &self.fonts, self.scroll, self.mouse);
+        Layout { height: drawn.height, hits: Vec::new(), graphs: drawn.graphs }
     }
 
     pub fn on_mouse(&mut self, ctx: &Ctx, pos: Option<(f32, f32)>) {
@@ -374,14 +340,8 @@ impl Flyout {
         self.render(ctx);
     }
 
-    pub fn on_click(&mut self, ctx: &Ctx, x: f32, y: f32) {
-        let (x, y) = (x / self.scale(), y / self.scale());
-        if let Some(&(_, tab)) = self.hits.iter().find(|(r, _)| r.contains(x, y)) {
-            self.tab = tab;
-            // A tab can list fewer rows than the last one: re-measure.
-            self.render(ctx);
-        }
-    }
+    /// The layout has no click targets yet (the Processes tabs were the only ones).
+    pub fn on_click(&mut self, _ctx: &Ctx, _x: f32, _y: f32) {}
 }
 
 impl Drop for Flyout {

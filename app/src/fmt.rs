@@ -61,6 +61,12 @@ pub fn wifi_band(mhz: u32) -> String {
     .into()
 }
 
+/// Time left in words (design `remaining(false)`): `4500` -> `"1 h 15 min"`, `600` -> `"10 min"`.
+pub fn hours_minutes_long(secs: u32) -> String {
+    let m = secs.div_ceil(60);
+    if m < 60 { format!("{m} min") } else { format!("{} h {} min", m / 60, m % 60) }
+}
+
 /// Time left as `h:mm` (design `remaining(short)`): `4500` -> `"1:15"`.
 pub fn hours_minutes(secs: u32) -> String {
     let m = secs.div_ceil(60);
@@ -157,6 +163,7 @@ mod tests {
         assert_eq!(rate_in(350.0 * 1024.0, RateUnit::Bits), "2.7 Mb/s");
         assert_eq!(rate_in(64.0, RateUnit::Bits), "0.5 Kb/s");
         assert_eq!(hours_minutes(4500), "1:15");
+        assert_eq!((hours_minutes_long(4500), hours_minutes_long(600)), ("1 h 15 min".into(), "10 min".into()));
         assert_eq!((link_speed(2_500_000_000), link_speed(866_000_000)), ("2.5 Gbps".into(), "866 Mbps".into()));
         assert_eq!([2437, 5180, 6115].map(wifi_band), ["2.4 GHz", "5 GHz", "6 GHz"]);
         assert_eq!(hours_minutes(59), "0:01");

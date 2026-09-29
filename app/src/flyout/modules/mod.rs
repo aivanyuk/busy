@@ -1,24 +1,29 @@
 //! One file per module: what its flyout shows (design `fly()`), as a `Detail`.
 
+mod battery;
 mod cpu;
 mod disk;
 mod gpu;
 mod memory;
 mod network;
+mod sensors;
 
 use super::detail::Detail;
 use crate::ctx::Ctx;
 use busy_core::{Module, ModuleCfg, ProcEntry, TOP_N};
 
-/// The module's flyout content; `None` for a module still drawn by the older sections.
-pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Detail<'a>> {
+/// The module's flyout content.
+pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
     match mc.module {
-        Module::Cpu => Some(cpu::detail(ctx, mc)),
-        Module::Memory => Some(memory::detail(ctx, mc)),
-        Module::Gpu => Some(gpu::detail(ctx, mc)),
-        Module::Disk => Some(disk::detail(ctx, mc)),
-        Module::Network => Some(network::detail(ctx, mc)),
-        _ => None,
+        Module::Cpu => cpu::detail(ctx, mc),
+        Module::Memory => memory::detail(ctx, mc),
+        Module::Gpu => gpu::detail(ctx, mc),
+        Module::Disk => disk::detail(ctx, mc),
+        Module::Network => network::detail(ctx, mc),
+        Module::Battery => battery::detail(ctx, mc),
+        Module::Sensors => sensors::detail(ctx, mc),
+        // No cell, so never opened; its lists are part of the CPU, Memory and Disk flyouts.
+        Module::Processes => Detail::new("Processes"),
     }
 }
 
