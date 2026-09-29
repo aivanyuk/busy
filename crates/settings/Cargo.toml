@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 busy-core.workspace = true
+busy-win.workspace = true
 windows = { workspace = true, features = [
     "Win32_Foundation",
     "Win32_Graphics_Dwm",
