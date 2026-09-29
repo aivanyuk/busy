@@ -22,6 +22,7 @@ pub trait Source {
 
 ## Snapshot semantics worth knowing
 
+- Each module's source owns a fixed set of fields, and `Snapshot::clear(module)` drops exactly those: Disk owns `disks` and `volumes`, Gpu owns `gpus` and `top.by_gpu`, Processes the other `top` lists, the rest their one field. The sampler keeps one snapshot across ticks and clears a module before its source refills it, so modules can run at different intervals. A source must not write another module's fields; the one exception is the Sensors source filling third-party temperatures into `gpus`, which is why the sampler always runs GPU and Sensors together.
 - `CpuInfo.total` matches Task Manager (`% Processor Utility`, clamped).
 - `NetInfo.rx_bps/tx_bps` sum physical interfaces only (see metrics doc for the rule); `interfaces` lists more.
 - `ProcEntry.io_bps` is **all** process I/O (read + write + other), not disk-only.
