@@ -1,18 +1,15 @@
 //! The widget embedded in the taskbar: a layered WS_CHILD of `Shell_TrayWnd` rendered with per-pixel alpha.
 
-mod cells;
 mod explorer;
-mod styles;
 mod surface;
 mod tip;
 
-use cells::Cell;
-use styles::{CELL_H, Fonts};
 use surface::Surface;
 use tip::Tip;
 
 use crate::win::{self, Event, raise};
 use busy_core::{Anchor, Config, Module};
+use busy_ui::cell::{self, CELL_H, Cell, Fonts};
 use busy_ui::ctx::Ctx;
 use busy_ui::render::{Canvas, Gfx, Rect};
 use busy_ui::theme::Theme;
@@ -63,7 +60,7 @@ struct Frame {
     hover: Option<Module>,
     active: Option<Module>,
     theme: Theme,
-    cells: Vec<(cells::Key, f32)>,
+    cells: Vec<(cell::Key, f32)>,
 }
 
 pub struct Taskbar {
@@ -215,7 +212,7 @@ impl Taskbar {
         let Geometry { dpi, client, slot } = geom;
         let scale = dpi as f32 / 96.0;
         let h_px = client.bottom - client.top;
-        let mut cells = cells::cells(ctx);
+        let mut cells = cell::cells(ctx);
         let mut widths: Vec<f32> = cells.iter().map(|c| c.width(ctx.gfx, &self.fonts)).collect();
         let divider = if ctx.cfg.anchor == Anchor::NearTray { DIVIDER } else { 0.0 };
         let total = |ws: &[f32]| ws.iter().sum::<f32>() + GAP * ws.len().saturating_sub(1) as f32 + divider;

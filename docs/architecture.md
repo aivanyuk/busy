@@ -9,7 +9,7 @@
 | `busy-metrics` | `crates/metrics` | Collectors: CPU, memory, disk, network, battery, top processes. |
 | `busy-sensors` | `crates/sensors` | GPU (DXGI/PDH/D3DKMT/NVML/ADL) and temperature/fan sensors (LHM WMI, HWiNFO shared memory). |
 | `busy-settings` | `crates/settings` | Modeless native settings window, autostart registry. |
-| `busy-ui` | `crates/ui` | What the windows show and how they draw it, shared by the app and the settings window: formatting, choices of what to show, rolling history, the design's colors, D2D/DWrite helpers. |
+| `busy-ui` | `crates/ui` | What the windows show and how they draw it, shared by the app and the settings window: formatting, choices of what to show, rolling history, the design's colors, D2D/DWrite helpers, the taskbar cell. |
 | `busy` | `app` | Binary: sampler thread, history, taskbar widget, flyout, theme. |
 
 Dependency direction: `busy` → {`busy-metrics`, `busy-sensors`, `busy-settings`, `busy-ui`} → {`busy-core`, `busy-win`}. Collector and UI crates never depend on each other; data they share goes through `busy-core`, Win32 helpers through `busy-win`.
@@ -24,7 +24,7 @@ Each crate may depend only on the crates in its row, and exposes only what its r
 | `busy-win` | `windows` | Win32 plumbing shared by more than one crate: wide strings, registry reads, the System32 DLL loader, the PDH wrapper. No `busy-*` dependency and no policy (it never decides *what* to read). |
 | `busy-metrics`, `busy-sensors` | `busy-core`, `busy-win` | `sources()` only (plus examples and tests). |
 | `busy-settings` | `busy-core`, `busy-win` | `open`, `is_open`, `is_dialog_message`, `autostart`. |
-| `busy-ui` | `busy-core`, `busy-win` | `fmt`, `select`, `history`, `tone`, `theme`, `render`, `ctx`. |
+| `busy-ui` | `busy-core`, `busy-win` | `fmt`, `select`, `history`, `tone`, `theme`, `render`, `ctx`, `cell`. |
 | `busy` | all of the above | The binary. |
 
 Inside the `busy` app crate, modules form layers too. A module may use the ones below it, never above:

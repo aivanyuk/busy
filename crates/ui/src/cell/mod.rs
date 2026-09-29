@@ -1,23 +1,27 @@
-//! What the widget shows: one cell per enabled module, with its label, value and colors (design `widget()`).
-//! How a cell is measured and drawn in its style is `styles.rs`.
+//! A module's taskbar cell: its label, value and colors (design `widget()`), shared by the taskbar widget and
+//! the settings window's preview. How a cell is measured and drawn in its style is `styles.rs`.
 
+mod styles;
+
+pub use styles::{CELL_H, Fonts};
+
+use crate::ctx::Ctx;
+use crate::history::Series;
+use crate::render::nice_max;
+use crate::theme::Color;
+use crate::tone::{self, SECOND};
+use crate::{fmt, select};
 use busy_core::{CellStyle, CpuBar, Module, ModuleCfg, SensorKind};
-use busy_ui::ctx::Ctx;
-use busy_ui::history::Series;
-use busy_ui::render::nice_max;
-use busy_ui::theme::Color;
-use busy_ui::tone::{self, SECOND};
-use busy_ui::{fmt, select};
 
-pub(super) struct Cell<'a> {
-    pub(super) module: Module,
+pub struct Cell<'a> {
+    pub module: Module,
     /// Caption above the value (design `M.short`); `None` when the module's `show_label` is off.
-    pub(super) label: Option<String>,
-    pub(super) body: Body<'a>,
+    label: Option<String>,
+    body: Body<'a>,
 }
 
 /// A cell's content in its style (design `MeterWidget`).
-pub(super) enum Body<'a> {
+enum Body<'a> {
     Text {
         value: String,
         color: Color,
@@ -44,7 +48,7 @@ pub(super) enum Body<'a> {
 
 /// What a cell's pixels depend on, owned so the widget can compare it with the last drawn frame.
 #[derive(PartialEq)]
-pub(super) struct Key {
+pub struct Key {
     module: Module,
     label: Option<String>,
     /// Every drawn string with its color.
@@ -59,7 +63,7 @@ pub(super) struct Key {
 
 impl Cell<'_> {
     /// Tooltip text (design `title`): "<Module>: <value>", both rates for Io, the name alone without a value.
-    pub(super) fn tip(&self) -> String {
+    pub fn tip(&self) -> String {
         let name = self.module.label();
         match &self.body {
             Body::Text { value, .. } | Body::Graph { value, .. } | Body::Bar { value, .. } if !value.is_empty() => {
@@ -70,7 +74,7 @@ impl Cell<'_> {
         }
     }
 
-    pub(super) fn key(&self) -> Key {
+    pub fn key(&self) -> Key {
         let mut key = Key {
             module: self.module,
             label: self.label.clone(),
@@ -98,12 +102,12 @@ impl Cell<'_> {
 }
 
 /// One cell per module with a taskbar cell that has data, in config order.
-pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
+pub fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
     ctx.cfg.modules.iter().filter(|m| m.taskbar).filter_map(|mc| cell(ctx, mc)).collect()
 }
 
 /// `mc`'s cell, whether or not it is on the taskbar; `None` while its module has no data.
-pub(super) fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
+pub fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
     let (snap, hist, t) = (ctx.snap, ctx.hist, ctx.theme);
     // Design `widget()`: graphs and bars in the module color (or by load), values in `fg` (or by load);
     // rates pair the module color (download, read) with `SECOND` (upload, write).
@@ -216,8 +220,8 @@ fn label(m: Module, style: CellStyle, ctx: &Ctx) -> String {
 #[cfg(test)]
 mod tests {
     use super::{Body, Cell};
+    use crate::theme::Color;
     use busy_core::Module;
-    use busy_ui::theme::Color;
 
     fn cell(module: Module, body: Body<'static>) -> Cell<'static> {
         Cell { module, label: None, body }
