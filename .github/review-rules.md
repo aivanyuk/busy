@@ -66,14 +66,19 @@ check, step 4; `docs/areas/settings.md` § Gotchas.
 | ID | Assertion | Trigger |
 | --- | --- | --- |
 | A1 | `busy-core` stays pure Rust with no Win32: no `windows` dependency, no FFI. | Any change to `crates/core` or its `Cargo.toml` |
-| A2 | Dependency direction is `busy` → {`busy-metrics`, `busy-sensors`, `busy-settings`} → `busy-core`. Collector and UI crates never depend on each other; what they share goes through `busy-core`. | A crate `Cargo.toml` `[dependencies]` change, a `use busy_*` across crates |
+| A2 | Dependency direction is `busy` → {`busy-metrics`, `busy-sensors`, `busy-settings`} → `busy-core`. Collector and UI crates never depend on each other; what they share goes through `busy-core` (data) or `busy-win` (Win32 plumbing, A7). | A crate `Cargo.toml` `[dependencies]` change, a `use busy_*` across crates |
 | A3 | A core type change is additive where it can be (a new `Option` field). Removing or renaming a field is one commit that builds the whole workspace, and is marked breaking (P2). | Removed/renamed field or variant in `crates/core` |
 | A4 | A new `Config` field has its default in `impl Default for Config`, loads from an old file through `#[serde(default)]`, is clamped/deduped in `normalize()` if it has a range, and comes with a test (default, roundtrip, old JSON without the field — Q2). `Config::load()` still never fails: a missing or invalid file gives defaults, then `normalize()`. | New or changed `Config` field, `load`, `normalize` |
 | A5 | A new `Module` variant updates `Module::ALL`, `label()` and `Config::default()` as well as every exhaustive `match` (the compiler finds only the last). Processes stays flyout-only. | New `Module` variant |
 | A6 | Config persists to `%APPDATA%\busy\config.json` by atomic write (temp file + rename), never an in-place overwrite. | `Config::save`, a new file write |
+| A7 | Crates depend only as the layering table allows: `busy-win` on `windows` alone; collectors and settings on `busy-core` + `busy-win`; each crate exposes only its row's API. | A crate `Cargo.toml` `[dependencies]` change, a new `pub` item in a `lib.rs` |
+| A8 | **One implementation of each Win32 helper, in `busy-win`**: wide strings, registry reads, handle RAII, DLL loading, the PDH wrapper. A new `encode_utf16().chain(..)`, `RegGetValueW`, `PdhOpenQueryW`, `LoadLibraryExW` or bare `CloseHandle` outside it duplicates one. | Any of those calls outside `crates/win` |
+| A9 | Inside `app/`, a module uses only layers below it: window modules (`taskbar/`, `flyout/`) never `use crate::app` and report input as `win::Event`s or posted messages; only `app.rs` changes state across windows. | `use crate::app` outside `app.rs`/`main.rs`, a window procedure calling into state |
+| A10 | A window-owning struct has no `pub` fields; items in private modules are `pub(crate)` or private; a choice of what to show (pinned sensor, busiest GPU) lives in a pure, tested module, not in the router or a window procedure. | `pub` field on a struct holding an `HWND`, `pub` item in a private module, selection logic in `app.rs`/`taskbar`/`flyout` |
+| A11 | A worker thread receives only what it uses: the sampler takes `sampler::Params`, not `Config`. | `Sampler` API, a new worker |
 
-Authority: `docs/architecture.md` § Workspace and § Persistence; `docs/areas/core.md` § Config and
-§ Changing core types.
+Authority: `docs/architecture.md` § Workspace, § Layering and § Persistence; `docs/areas/core.md`
+§ Config and § Changing core types.
 
 ## T — Threading
 
@@ -82,6 +87,10 @@ Authority: `docs/architecture.md` § Workspace and § Persistence; `docs/areas/c
 | T1 | **The UI thread never blocks.** Our taskbar window is a child of explorer's `Shell_TrayWnd`, so its input queue is attached to the taskbar's and a stall freezes the user's taskbar. No sampling (a `Source::sample`, PDH, WMI, NVML/ADL, `NtQuerySystemInformation`), no file I/O and no waits (sleep, `join`, blocking `recv`, `WaitFor*`) on it — in a window procedure, a message handler, a render path, or anything they call. | Code in `app/` or `crates/settings/` that runs on the message loop; a new call from a `WndProc` |
 | T2 | Sources are constructed **on** the sampler thread after `CoInitializeEx(COINIT_MULTITHREADED)` and never leave it. `Source` has no `Send` bound on purpose (the GPU and Sensors sources share `Rc<RefCell<_>>`); a diff that adds one, or builds sources elsewhere and moves them, is wrong. | `Source` trait, `sources()`, `sampler.rs`, thread spawn, `CoInitializeEx` |
 | T3 | The sampler hands a fresh `Snapshot` per tick to the UI and wakes it with `PostMessage(WM_APP)`; the UI pushes history and redraws on that message. Config changes (interval, active modules) flow back to the sampler; the UI never calls into a source. | Sampler/UI hand-off, `WM_APP`, interval or module toggling |
+| T4 | **No wait on the UI thread while a child of `Shell_TrayWnd` exists**: shutdown destroys the taskbar widget before it stops and joins any worker, whether by explicit calls or by struct field order. | `Drop` of `App` or a thread owner, field order of `App`, `join`, `WM_ENDSESSION`/`WM_DESTROY` handling |
+| T5 | No registry or file API is reachable from a window procedure or message handler; the result is computed on a worker and posted back. Startup before the widget is embedded is exempt. | `RegGetValueW`, `RegSetKeyValueW`, `std::fs`, `Theme::resolve`, `autostart::*` on a message path |
+| T6 | A critical section on a mutex shared with a worker holds only moves, swaps and `Copy` reads: no allocation, clone of a heap type, I/O or FFI under the lock. | `lock(`…`)` in `sampler.rs`, `persist.rs`, `app.rs` |
+| T7 | Config persistence goes through the config writer, never a `thread::spawn` per save; every thread the app starts is in the Threads table of `docs/architecture.md`. | `Config::save`, `thread::spawn`, `thread::Builder` |
 
 Authority: `CLAUDE.md` § Hard rules; `docs/architecture.md` § Data flow and § Threads;
 `docs/areas/app.md` § Taskbar widget ("Critical"); `docs/areas/core.md` § Source contract;
@@ -203,11 +212,41 @@ Authority: `docs/code-quality.md` § Enforced.
 | ID | Assertion | Trigger |
 | --- | --- | --- |
 | C1 | Comments explain *why* or document a Win32 quirk (struct layout source, undocumented behaviour, measured cost); they don't narrate what the code does. | New comment |
-| C2 | One concern per file, and each `Source` in its own file. | New source, a file gaining a second subject |
+| C2 | One concern per file, and each `Source` in its own file. A file that passes 500 lines, or that combines a window procedure with layout and painting, is split in the PR that grows it. | New source, a file gaining a second subject, a file growing past 500 lines |
 | C3 | Win32 types keep their Win32 names; our own types use Rust naming. | New type or binding |
 | C4 | Idiomatic, compact Rust matching the surrounding code: `let … else`, `?` on `Option`/`Result`, iterator chains over index loops where it reads better. Reported as `nit` at most. | New code |
 
-Authority: `docs/code-quality.md` § Style.
+Authority: `docs/code-quality.md` § Style; `docs/architecture.md` § Layering.
+
+## F — Performance
+
+| ID | Assertion | Trigger |
+| --- | --- | --- |
+| F1 | A module is sampled only while one of its surfaces needs it (taskbar cell, open flyout section); the sampler idles while the session is locked or the display is off. | `Config::is_active`, the sampler loop, a new source |
+| F2 | Sources reuse per-tick buffers (fields cleared and refilled); no mapping or handle is opened per tick; no per-tick copy is larger than the data parsed. | `Vec::new`/`HashMap::new`/`String` built in `sample`, `OpenFileMapping`/`MapViewOfFile`/`CreateFile` on a sample path |
+| F3 | A render path skips drawing, `UpdateLayeredWindow` and `SetWindowPos` when nothing differs from the last draw; a timer re-checks position without forcing a repaint; a pointer move repaints only when the hover target changes. | `render`, `paint`, `WM_TIMER`, `WM_MOUSEMOVE` |
+| F4 | No D2D/DWrite object is created in a paint path for constant inputs; brushes, formats and constant-string widths are cached per DPI and theme. | `Create*` on `ID2D1Factory`/`IDWriteFactory`/render target inside `render`/`paint`/`draw` |
+| F5 | `[profile.release]` changes carry measured size/CPU numbers in the commit body. | Root `Cargo.toml` `[profile.release]` |
+
+Authority: `docs/architecture.md` § Performance; `docs/code-quality.md` § Errors and robustness
+(budget).
+
+## X — Security baseline
+
+| ID | Assertion | Trigger |
+| --- | --- | --- |
+| X1 | A new or changed `unsafe` block carries a `// SAFETY:` comment naming the invariant it relies on. | New or changed `unsafe` block |
+| X2 | DLL search is System32-only for the whole process: `/DEPENDENTLOADFLAG:0x800` in `app/build.rs` and `SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32)` at the top of `main` stay in place. | `app/build.rs`, `main.rs`, a new DLL load |
+| X3 | Environment switches and flags that change behaviour are compiled only under `cfg(debug_assertions)`. | `std::env::var*`, `std::env::args` outside tests and examples |
+| X4 | Handles are opened with the narrowest access mask the call needs. | `OpenProcess`, `CreateFileW`, `RegOpenKeyExW` access arguments |
+| X5 | A count or length read from WMI, shared memory or the config file is capped before it sizes an allocation or a loop. | Parser or collector over foreign data, `Config` deserialisation |
+| X6 | CI pins third-party actions by commit SHA, declares least-privilege `permissions:`, and audits `Cargo.lock`. | `.github/workflows/*` |
+
+Authority: `docs/architecture.md` § Security baseline; `CLAUDE.md` § Hard rules;
+`docs/code-quality.md` § Unsafe / FFI.
+
+Existing code that predates a rule is listed in `docs/architecture.md` § Known gaps. A diff that
+touches a listed gap without making it worse is not a finding; a diff that adds a new instance is.
 
 ## Already enforced — not the reviewer's business
 
