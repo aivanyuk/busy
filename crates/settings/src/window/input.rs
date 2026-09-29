@@ -32,7 +32,7 @@ impl Ui {
             }
         }
         let (x, y) = self.dips(x, y);
-        let hit = self.view.borrow().hit(x, y);
+        let hit = self.view.borrow().hit(&self.gfx, &self.fonts, x, y);
         self.set_hover(hit);
     }
 
@@ -52,7 +52,7 @@ impl Ui {
 
     pub(super) fn on_down(&self, x: i32, y: i32) {
         let (x, y) = self.dips(x, y);
-        let hit = self.view.borrow().hit(x, y);
+        let hit = self.view.borrow().hit(&self.gfx, &self.fonts, x, y);
         // A press outside an open popup only closes it.
         if hit.is_none() && self.view.borrow().popup.is_some() {
             self.view.borrow_mut().popup = None;
@@ -69,7 +69,7 @@ impl Ui {
         // SAFETY: releases the capture taken in `on_down`, if any.
         let _ = unsafe { ReleaseCapture() };
         let (x, y) = self.dips(x, y);
-        let hit = self.view.borrow().hit(x, y);
+        let hit = self.view.borrow().hit(&self.gfx, &self.fonts, x, y);
         if let Some(t) = self.pressed.take().filter(|&p| Some(p) == hit) {
             self.activate(t);
         }
@@ -77,7 +77,7 @@ impl Ui {
 
     /// Re-evaluates hover at a point after the view changed under the pointer.
     fn on_move_dips(&self, x: f32, y: f32) {
-        let hit = self.view.borrow().hit(x, y);
+        let hit = self.view.borrow().hit(&self.gfx, &self.fonts, x, y);
         self.view.borrow_mut().hover = hit;
         self.invalidate();
     }
@@ -130,6 +130,19 @@ impl Ui {
                 }
             }
             Target::Ctl(i) => self.control(i),
+            Target::Part(i, k) => {
+                let edit = match self.view.borrow().items.get(i) {
+                    Some(Item::Row(r)) => match &r.control {
+                        Control::Segmented(opts, _) => opts.get(k).map(|o| Edit::Pick(o.pick.clone())),
+                        Control::Swatches(m, _) => Some(Edit::Color(*m, k as u8)),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if let Some(e) = edit {
+                    self.edit(e);
+                }
+            }
             Target::Up(i) | Target::Down(i) => {
                 let m = match self.view.borrow().items.iter().find_map(|it| match it {
                     Item::Order(list) => list.get(i).map(|&(m, _)| m),
@@ -162,6 +175,8 @@ impl Ui {
             Some(Item::Row(r)) => match &r.control {
                 Control::Toggle(flag, on) => Some(Edit::Flag(*flag, !on)),
                 Control::Dropdown(..) => None,
+                // Their parts are the targets (`Target::Part`).
+                Control::Segmented(..) | Control::Swatches(..) => return,
             },
             _ => return,
         };

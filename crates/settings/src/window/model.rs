@@ -70,6 +70,10 @@ pub(super) enum Control {
     Toggle(Flag, bool),
     /// Options and the selected one.
     Dropdown(Vec<Opt>, usize),
+    /// The same, drawn as side-by-side segments.
+    Segmented(Vec<Opt>, usize),
+    /// The module palette, with the module's color selected.
+    Swatches(Module, u8),
 }
 
 /// What a toggle switches.
@@ -90,12 +94,18 @@ pub(super) enum Flag {
 pub(super) enum Edit {
     Flag(Flag, bool),
     Pick(choices::Pick),
+    /// A palette index for a module's color.
+    Color(Module, u8),
     /// Moves a module one place up (earlier) or down in the taskbar order.
     Move(Module, bool),
 }
 
 fn toggle(title: &'static str, desc: impl Into<String>, flag: Flag, on: bool) -> Item {
     Item::Row(Row { title, desc: desc.into(), control: Control::Toggle(flag, on) })
+}
+
+fn segmented(title: &'static str, desc: impl Into<String>, (opts, i): (Vec<Opt>, usize)) -> Item {
+    Item::Row(Row { title, desc: desc.into(), control: Control::Segmented(opts, i) })
 }
 
 fn dropdown(title: &'static str, desc: impl Into<String>, (opts, i): (Vec<Opt>, usize)) -> Item {
@@ -142,6 +152,7 @@ fn module(m: Module, cfg: &Config, ch: &Choices) -> Vec<Item> {
         Item::Header("Taskbar"),
         toggle("Show on taskbar", format!("Display the {name} reading on the taskbar"), Flag::Taskbar(m), c.taskbar),
     ];
+    r.push(segmented("Style", "How the reading is drawn", choices::style(m, c.style)));
     if c.style != CellStyle::Io {
         r.push(toggle("Show label", "Small caption above the value", Flag::Label(m), c.show_label));
     }
@@ -162,11 +173,17 @@ fn module(m: Module, cfg: &Config, ch: &Choices) -> Vec<Item> {
         )),
         Module::Sensors => {
             r.push(dropdown("Taskbar sensor", "Which temperature to show", choices::sensor(&o.sensors.sensor, ch)));
+            r.push(segmented("Unit", "Applies everywhere in busy", choices::temp_unit(cfg.temp_unit)));
         }
         _ => {}
     }
     let rises = if m == Module::Sensors { "temperature" } else { "usage" };
     r.push(Item::Header("Color"));
+    r.push(Item::Row(Row {
+        title: "Widget color",
+        desc: "Used for graphs, bars and the flyout chart".into(),
+        control: Control::Swatches(m, c.color_index()),
+    }));
     r.push(toggle(
         "Color by load",
         format!("Shift green \u{2192} amber \u{2192} red as {rises} rises"),
@@ -232,15 +249,16 @@ mod tests {
         let ch = Choices::default();
         assert_eq!(
             rows(&items(Page::Module(Module::Cpu), &cfg, &ch)),
-            ["Show on taskbar", "Show label", "Bar shows", "Color by load", "Update interval"]
+            ["Show on taskbar", "Style", "Show label", "Bar shows", "Widget color", "Color by load", "Update interval"]
         );
         // Network's default style is Io, which has no label.
         assert_eq!(
             rows(&items(Page::Module(Module::Network), &cfg, &ch)),
-            ["Show on taskbar", "Units", "Interface", "Color by load", "Update interval"]
+            ["Show on taskbar", "Style", "Units", "Interface", "Widget color", "Color by load", "Update interval"]
         );
         cfg.modules.iter_mut().for_each(|c| c.style = CellStyle::Text);
-        assert!(rows(&items(Page::Module(Module::Sensors), &cfg, &ch)).contains(&"Taskbar sensor"));
+        let sensors = rows(&items(Page::Module(Module::Sensors), &cfg, &ch));
+        assert!(sensors.contains(&"Taskbar sensor") && sensors.contains(&"Unit"));
         assert_eq!(rows(&items(Page::Module(Module::Processes), &cfg, &ch)), ["Top processes", "Update interval"]);
         let Some(Item::Row(r)) = items(Page::Module(Module::Memory), &cfg, &ch).into_iter().nth(1) else {
             panic!("no row")

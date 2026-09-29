@@ -3,9 +3,11 @@
 //! read it, so what is drawn is what is clicked.
 
 use super::choices::Opt;
-use super::controls::{dropdown, order, toggle};
+use super::controls::{dropdown, order, segmented, swatch, toggle};
 use super::model::{Control, Item, Page};
 use busy_ui::render::{Gfx, Rect};
+use std::cell::RefCell;
+use std::collections::HashMap;
 use windows::Win32::Graphics::DirectWrite::{DWRITE_FONT_WEIGHT_SEMI_BOLD, IDWriteTextFormat};
 use windows::core::Result;
 
@@ -59,6 +61,10 @@ pub(super) struct Fonts {
     pub(super) desc: IDWriteTextFormat,
     pub(super) sub: IDWriteTextFormat,
     pub(super) title: IDWriteTextFormat,
+    /// Segment labels: 13 px.
+    pub(super) seg: IDWriteTextFormat,
+    /// Widths of segment labels, which are constant: measured once, not on every paint or pointer move.
+    seg_widths: RefCell<HashMap<String, f32>>,
 }
 
 impl Fonts {
@@ -71,7 +77,18 @@ impl Fonts {
             desc: gfx.wrapping(12.0)?,
             sub: gfx.format(13.0, false)?,
             title: gfx.format_weight(28.0, DWRITE_FONT_WEIGHT_SEMI_BOLD)?,
+            seg: gfx.format(13.0, false)?,
+            seg_widths: RefCell::new(HashMap::new()),
         })
+    }
+
+    pub(super) fn seg_width(&self, gfx: &Gfx, s: &str) -> f32 {
+        let mut cache = self.seg_widths.borrow_mut();
+        // Bounded: the labels are a handful of constant strings.
+        if cache.len() > 64 {
+            cache.clear();
+        }
+        *cache.entry(s.to_owned()).or_insert_with(|| gfx.text_width(&self.seg, s))
     }
 }
 
@@ -84,6 +101,8 @@ pub(super) enum Target {
     Nav(usize),
     /// A row's control (toggle, dropdown button), by item index.
     Ctl(usize),
+    /// Part `k` of a row's control: a segment or a swatch.
+    Part(usize, usize),
     /// The taskbar order's ↑ and ↓ of its `i`th module.
     Up(usize),
     Down(usize),
@@ -238,7 +257,7 @@ impl View {
         self.popup = Some(Popup { item: i, rect: Rect::new(x, y, w, h), first, visible });
     }
 
-    pub(super) fn hit(&self, x: f32, y: f32) -> Option<Target> {
+    pub(super) fn hit(&self, gfx: &Gfx, f: &Fonts, x: f32, y: f32) -> Option<Target> {
         if let Some(p) = &self.popup {
             // Everything under an open popup belongs to it (a click elsewhere only closes it).
             let k = (p.first..p.first + p.visible).find(|&k| self.option_rect(k).is_some_and(|r| r.contains(x, y)));
@@ -260,7 +279,15 @@ impl View {
                 continue;
             }
             return match item {
-                Item::Row(_) => p.ctl.contains(cx, cy).then_some(Target::Ctl(i)),
+                Item::Row(row) if p.ctl.contains(cx, cy) => match &row.control {
+                    Control::Segmented(opts, _) => segmented::segments(gfx, f, opts, p.ctl)
+                        .iter()
+                        .position(|s| s.contains(cx, cy))
+                        .map(|k| Target::Part(i, k)),
+                    Control::Swatches(..) => swatch::hit(p.ctl, cx, cy).map(|k| Target::Part(i, k)),
+                    _ => Some(Target::Ctl(i)),
+                },
+                Item::Row(_) => None,
                 Item::Order(list) => order::hit(p.rect, list.len(), cx, cy),
                 Item::Header(_) => None,
             };
@@ -281,6 +308,8 @@ fn place(item: &Item, y: f32, width: f32, gfx: &Gfx, f: &Fonts) -> Placed {
             let (cw, ch) = match &row.control {
                 Control::Toggle(..) => toggle::SIZE,
                 Control::Dropdown(opts, _) => dropdown::size(gfx, &f.body, opts),
+                Control::Segmented(opts, _) => segmented::size(gfx, f, opts),
+                Control::Swatches(..) => swatch::SIZE,
             };
             let inner = width - CARD_PAD_L - CARD_PAD_R;
             let side = inner - cw - 16.0;

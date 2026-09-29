@@ -2,7 +2,7 @@
 //! among the design's options (a hand-edited file, a drive that is gone) is kept as an extra option, so opening
 //! the window never changes a setting by itself.
 
-use busy_core::{Anchor, CpuBar, Module, NetInterface, RateUnit, SensorPick, ThemeMode};
+use busy_core::{Anchor, CellStyle, CpuBar, Module, NetInterface, RateUnit, SensorPick, TempUnit, ThemeMode};
 
 /// A value a dropdown option sets.
 #[derive(Clone, Debug, PartialEq)]
@@ -19,6 +19,8 @@ pub(super) enum Pick {
     Sensor(SensorPick),
     /// A module's own interval in seconds; `None` = the default.
     ModuleInterval(Module, Option<u32>),
+    Style(Module, CellStyle),
+    TempUnit(TempUnit),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -163,6 +165,28 @@ pub(super) fn sensor(current: &SensorPick, ch: &Choices) -> (Vec<Opt>, usize) {
     list(opts, Pick::Sensor(current.clone()), |_| name)
 }
 
+/// Design `styleName`: Io reads "Read / write" for Disk, "Up / down" for Network.
+fn style_name(m: Module, s: CellStyle) -> &'static str {
+    match s {
+        CellStyle::Text => "Text",
+        CellStyle::Graph => "Graph",
+        CellStyle::Bar => "Bar",
+        CellStyle::Io if m == Module::Disk => "Read / write",
+        CellStyle::Io => "Up / down",
+    }
+}
+
+/// The module's allowed styles, preferred first (design `M.styles`).
+pub(super) fn style(m: Module, s: CellStyle) -> (Vec<Opt>, usize) {
+    let opts = m.allowed_styles().iter().map(|&a| (style_name(m, a).to_string(), Pick::Style(m, a))).collect();
+    list(opts, Pick::Style(m, s), |_| style_name(m, s).to_string())
+}
+
+pub(super) fn temp_unit(u: TempUnit) -> (Vec<Opt>, usize) {
+    let opts = [("\u{b0}C", Pick::TempUnit(TempUnit::Celsius)), ("\u{b0}F", Pick::TempUnit(TempUnit::Fahrenheit))];
+    fixed(&opts, Pick::TempUnit(u))
+}
+
 /// A module's own interval; the first option follows the default (design "Default (1 second)").
 pub(super) fn module_interval(m: Module, secs: Option<u32>, default_ms: u32) -> (Vec<Opt>, usize) {
     let d = default_ms as f64 / 1000.0;
@@ -194,6 +218,12 @@ mod tests {
         let (opts, i) = module_interval(Module::Cpu, None, 5000);
         assert_eq!((opts[0].label.as_str(), i, opts.len()), ("Default (5 seconds)", 0, 4));
         assert_eq!(module_interval(Module::Cpu, Some(2), 1000).1, 2);
+        assert_eq!(
+            labels(style(Module::Disk, CellStyle::Bar)),
+            (vec!["Read / write".into(), "Text".into(), "Bar".into()], 2)
+        );
+        assert_eq!(labels(style(Module::Network, CellStyle::Io)).0, ["Up / down", "Graph"]);
+        assert_eq!(labels(temp_unit(TempUnit::Fahrenheit)), (vec!["\u{b0}C".into(), "\u{b0}F".into()], 1));
     }
 
     #[test]

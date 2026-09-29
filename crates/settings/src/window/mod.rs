@@ -358,6 +358,7 @@ impl Ui {
             cfg: &cfg,
             theme: &theme,
             fonts: &self.fonts,
+            gfx: &self.gfx,
             maximized,
             autostart_busy: self.autostart_busy(),
         };

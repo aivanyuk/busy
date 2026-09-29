@@ -4,6 +4,8 @@
 pub(super) mod dropdown;
 pub(super) mod nav;
 pub(super) mod order;
+pub(super) mod segmented;
+pub(super) mod swatch;
 pub(super) mod toggle;
 
 use busy_ui::render::{Canvas, Rect};
