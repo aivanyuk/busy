@@ -1,11 +1,11 @@
 //! Drawing the whole window from its `View`: title bar, nav, the page's cards, then the open popup on top.
 
-use super::controls::{dropdown, nav, order, toggle};
+use super::controls::{dropdown, nav, order, segmented, swatch, toggle};
 use super::frame;
 use super::layout::{CARD_PAD_L, CARD_PAD_Y, Fonts, LINE_14, PAGE_SUB_H, PAGE_TITLE_H, Target, View};
 use super::model::{self, Control, Flag, Item, Page};
 use busy_core::{Config, Module, ModuleCfg};
-use busy_ui::render::{Align, Canvas, Rect};
+use busy_ui::render::{Align, Canvas, Gfx, Rect};
 use busy_ui::theme::Theme;
 
 /// What painting needs besides the view.
@@ -13,6 +13,7 @@ pub(super) struct State<'a> {
     pub(super) cfg: &'a Config,
     pub(super) theme: &'a Theme,
     pub(super) fonts: &'a Fonts,
+    pub(super) gfx: &'a Gfx,
     pub(super) maximized: bool,
     /// The autostart toggle waits for the registry (first read or a write in flight).
     pub(super) autostart_busy: bool,
@@ -71,6 +72,8 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
                         let label = opts.get(*sel).map_or("", |o| o.label.as_str());
                         dropdown::draw(cv, ctl, label, hover, t, f);
                     }
+                    Control::Segmented(opts, sel) => segmented::draw(cv, s.gfx, ctl, opts, *sel, t, f),
+                    Control::Swatches(_, sel) => swatch::draw(cv, ctl, *sel, t),
                 }
             }
         }

@@ -33,7 +33,10 @@ pub(super) fn apply(cfg: &mut Config, e: &Edit) {
             Pick::Interface(i) => cfg.options.network.interface = i,
             Pick::Sensor(s) => cfg.options.sensors.sensor = s,
             Pick::ModuleInterval(m, s) => module(cfg, m).into_iter().for_each(|c| c.interval_s = s),
+            Pick::Style(m, s) => module(cfg, m).into_iter().for_each(|c| c.style = s),
+            Pick::TempUnit(u) => cfg.temp_unit = u,
         },
+        Edit::Color(m, i) => module(cfg, *m).into_iter().for_each(|c| c.color = Some(*i)),
         Edit::Move(m, up) => move_module(cfg, *m, *up),
     }
 }
@@ -55,7 +58,7 @@ fn move_module(cfg: &mut Config, m: Module, up: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use busy_core::{Anchor, NetInterface, SensorPick};
+    use busy_core::{Anchor, CellStyle, NetInterface, SensorPick, TempUnit};
 
     fn order(cfg: &Config) -> Vec<Module> {
         cfg.modules.iter().map(|c| c.module).collect()
@@ -71,6 +74,9 @@ mod tests {
         apply(&mut cfg, &Edit::Pick(Pick::Interface(NetInterface::Named("Wi-Fi".into()))));
         apply(&mut cfg, &Edit::Pick(Pick::Sensor(SensorPick::Gpu)));
         apply(&mut cfg, &Edit::Pick(Pick::ModuleInterval(Module::Gpu, Some(5))));
+        apply(&mut cfg, &Edit::Pick(Pick::Style(Module::Memory, CellStyle::Graph)));
+        apply(&mut cfg, &Edit::Pick(Pick::TempUnit(TempUnit::Fahrenheit)));
+        apply(&mut cfg, &Edit::Color(Module::Cpu, 4));
         assert!(cfg.module(Module::Disk).unwrap().taskbar);
         assert!(!cfg.module(Module::Cpu).unwrap().show_label);
         assert!(!cfg.module(Module::Processes).unwrap().flyout);
@@ -78,6 +84,9 @@ mod tests {
         assert_eq!(cfg.options.network.interface, NetInterface::Named("Wi-Fi".into()));
         assert_eq!(cfg.options.sensors.sensor, SensorPick::Gpu);
         assert_eq!(cfg.module(Module::Gpu).unwrap().interval_s, Some(5));
+        assert_eq!(cfg.module(Module::Memory).unwrap().style, CellStyle::Graph);
+        assert_eq!(cfg.temp_unit, TempUnit::Fahrenheit);
+        assert_eq!(cfg.module(Module::Cpu).unwrap().color_index(), 4);
     }
 
     #[test]
