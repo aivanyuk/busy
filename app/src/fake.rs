@@ -150,6 +150,7 @@ impl Source for Fake {
                             ipv4: vec!["192.168.1.23".into()],
                             link_speed_bps: 2_500_000_000,
                             connected: true,
+                            ..Default::default()
                         },
                         NetIf {
                             name: "Wi-Fi".into(),
@@ -158,6 +159,7 @@ impl Source for Fake {
                             ipv4: vec!["10.0.0.57".into()],
                             link_speed_bps: 866_000_000,
                             connected: true,
+                            ..Default::default()
                         },
                     ],
                 });

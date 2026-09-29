@@ -171,6 +171,17 @@ pub struct NetIf {
     pub ipv4: Vec<String>,
     pub link_speed_bps: u64,
     pub connected: bool,
+    pub kind: NetKind,
+}
+
+/// Medium of a network interface, for picking the flyout's interface.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NetKind {
+    /// Physical Ethernet NIC. Virtual Ethernet (Hyper-V vEthernet, TAP) is `Other`.
+    Ethernet,
+    Wifi,
+    #[default]
+    Other,
 }
 
 #[derive(Clone, Debug, Default)]

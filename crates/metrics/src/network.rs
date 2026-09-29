@@ -9,7 +9,7 @@
 //! (~tens of µs each).
 
 use crate::util::{Clock, Every};
-use busy_core::{Module, NetIf, NetInfo, Snapshot, Source};
+use busy_core::{Module, NetIf, NetInfo, NetKind, Snapshot, Source};
 use busy_win::from_wide;
 use std::collections::{HashMap, HashSet};
 use std::net::Ipv4Addr;
@@ -44,6 +44,7 @@ struct Row {
     speed: u64,
     flags: u8,
     connected: bool,
+    kind: NetKind,
 }
 
 impl Source for Network {
@@ -100,6 +101,7 @@ impl Source for Network {
                     ipv4,
                     link_speed_bps: r.speed,
                     connected: r.connected,
+                    kind: r.kind,
                     name: r.name,
                 })
             })
@@ -117,14 +119,25 @@ impl Source for Network {
 
 fn row(r: &MIB_IF_ROW2) -> Row {
     let speed = r.ReceiveLinkSpeed.max(r.TransmitLinkSpeed);
+    let flags = r.InterfaceAndOperStatusFlags._bitfield;
     Row {
         luid: unsafe { r.InterfaceLuid.Value },
         name: from_wide(&r.Alias),
         rx: r.InOctets,
         tx: r.OutOctets,
         speed: if speed == u64::MAX { 0 } else { speed },
-        flags: r.InterfaceAndOperStatusFlags._bitfield,
+        flags,
         connected: r.OperStatus == IfOperStatusUp && r.MediaConnectState == MediaConnectStateConnected,
+        kind: kind(r.Type, flags),
+    }
+}
+
+/// Hyper-V vEthernet and TAP adapters are IF_TYPE_ETHERNET_CSMACD too; only hardware NICs count as Ethernet.
+fn kind(if_type: u32, flags: u8) -> NetKind {
+    match if_type {
+        IF_TYPE_IEEE80211 => NetKind::Wifi,
+        IF_TYPE_ETHERNET_CSMACD if flags & HARDWARE != 0 => NetKind::Ethernet,
+        _ => NetKind::Other,
     }
 }
 
@@ -166,4 +179,18 @@ fn ipv4_addrs() -> HashMap<u64, Vec<String>> {
     }
     unsafe { FreeMibTable(t.cast()) };
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn interface_kinds() {
+        assert_eq!(kind(IF_TYPE_IEEE80211, HARDWARE), NetKind::Wifi);
+        assert_eq!(kind(IF_TYPE_ETHERNET_CSMACD, HARDWARE | CONNECTOR), NetKind::Ethernet);
+        assert_eq!(kind(IF_TYPE_ETHERNET_CSMACD, 0), NetKind::Other);
+        assert_eq!(kind(IF_TYPE_SOFTWARE_LOOPBACK, HARDWARE), NetKind::Other);
+        assert_eq!(kind(IF_TYPE_PROP_VIRTUAL, 0), NetKind::Other);
+    }
 }
