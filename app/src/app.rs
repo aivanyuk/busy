@@ -14,7 +14,7 @@ use crate::taskbar::Taskbar;
 use crate::theme::Theme;
 use crate::win::{self, Event, register_class};
 use crate::worker::Worker;
-use busy_core::{Anchor, Config, Module, Snapshot};
+use busy_core::{Anchor, Config, Module, Snapshot, ThemeMode};
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
@@ -26,6 +26,7 @@ const WM_APP_SNAPSHOT: u32 = WM_APP + 1;
 const WM_APP_RENDER: u32 = WM_APP + 2;
 const WM_APP_CONFIG: u32 = WM_APP + 3;
 const WM_APP_FLYOUT_DEACTIVATED: u32 = WM_APP + 4;
+const WM_APP_THEME: u32 = WM_APP + 5;
 
 const TIMER_WATCH: usize = 1;
 const ID_SETTINGS: u32 = 1;
@@ -38,6 +39,8 @@ static MAIN: AtomicIsize = AtomicIsize::new(0);
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
 /// Config handed over from another thread / the settings window, applied on WM_APP_CONFIG.
 static PENDING: Mutex<Option<Config>> = Mutex::new(None);
+/// Theme resolved by the theme reader, applied on WM_APP_THEME.
+static RESOLVED: Mutex<Option<Theme>> = Mutex::new(None);
 
 thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
@@ -48,6 +51,8 @@ struct App {
     cfg: Config,
     sampler: Sampler,
     writer: Worker<Config>,
+    /// Reads the theme's registry values off the UI thread.
+    theme_reader: Worker<ThemeMode>,
     hist: History,
     snap: Snapshot,
     theme: Theme,
@@ -115,6 +120,10 @@ pub fn run(open_flyout: bool) -> Result<()> {
         sampler: Sampler::start(Params::new(&cfg), main, WM_APP_SNAPSHOT),
         writer: Worker::start("busy-config", |cfg: Config| {
             let _ = cfg.save();
+        }),
+        theme_reader: Worker::start("busy-theme", |mode| {
+            *lock(&RESOLVED) = Some(Theme::resolve(mode));
+            post(WM_APP_THEME);
         }),
         hist: History::new(capacity(cfg.history_secs, cfg.interval_ms)),
         snap: Snapshot::default(),
@@ -186,6 +195,11 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             WM_APP_CONFIG => {
                 if let Some(cfg) = lock(&PENDING).take() {
                     with(|a| a.apply_config(cfg, true));
+                }
+            }
+            WM_APP_THEME => {
+                if let Some(t) = lock(&RESOLVED).take() {
+                    with(|a| a.set_theme(t));
                 }
             }
             WM_APP_FLYOUT_DEACTIVATED => {
@@ -279,8 +293,13 @@ impl App {
         self.render_all();
     }
 
+    /// Re-reads the theme on the theme reader; `set_theme` applies the result.
     fn refresh_theme(&mut self) {
-        self.theme = Theme::resolve(self.cfg.theme);
+        self.theme_reader.submit(self.cfg.theme);
+    }
+
+    fn set_theme(&mut self, theme: Theme) {
+        self.theme = theme;
         if let Some(f) = &mut self.flyout {
             f.apply_theme(&self.theme);
         }
@@ -329,9 +348,8 @@ impl App {
         }
         if old.theme != self.cfg.theme {
             self.refresh_theme();
-        } else {
-            self.render_all();
         }
+        self.render_all();
         if save {
             self.writer.submit(self.cfg.clone());
         }
