@@ -61,7 +61,7 @@ config writer thread ◀── latest Config ───────────�
 
 - One `Snapshot` kept across ticks; each source fills only its part (`Snapshot::clear` names it), and a module is cleared and refilled when it is due, at `Config::module_interval_ms`. The UI gets a copy plus the set of modules refreshed since it last took one, and pushes history only for those. Sources are ordered: the GPU source runs before the Sensors source (they share state via `Rc<RefCell<_>>`, which is why `Source` has no `Send` bound).
 - Sources are constructed **on** the sampler thread after `CoInitializeEx(COINIT_MULTITHREADED)` and never leave it.
-- Sources skipped when `Config::is_active(module, flyout_open)` is false: a module is sampled for its taskbar cell, and for its flyout section only while the flyout is open.
+- Sources skipped when `Config::is_active(module, open)` is false: a module is sampled for its taskbar cell, and otherwise only while the open flyout shows it, as its own module or as data it borrows (`Module::flyout_needs`: processes and temperatures).
 - Settings reach sources only as `SourceOptions` (`Config::source_options()`), carried in `sampler::Params`: the sampler calls `Source::configure` on every source before the first tick and whenever the options change, on the sampler thread. Sources never see the `Config`.
 - Rates are computed inside sources from deltas; the first sample may have zero rates.
 - A config from another thread (the settings window's `on_apply`) is parked in a latest-wins slot and applied on `WM_APP_CONFIG`.

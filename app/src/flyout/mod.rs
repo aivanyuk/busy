@@ -167,10 +167,6 @@ impl Flyout {
         // Otherwise the press that deactivated (and hid) the flyout was on the widget itself: stay closed.
     }
 
-    pub fn is_visible(&self) -> bool {
-        self.visible
-    }
-
     /// The module whose flyout is open.
     pub fn open_module(&self) -> Option<Module> {
         self.module.filter(|_| self.visible)

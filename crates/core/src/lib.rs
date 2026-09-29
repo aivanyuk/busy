@@ -47,6 +47,16 @@ impl Module {
         Module::Processes,
     ];
 
+    /// Modules whose data this module's flyout shows besides its own (design `fly()`): top processes for CPU,
+    /// Memory and Disk (GPU's per-process list comes from the GPU source), temperatures for CPU and Disk.
+    pub fn flyout_needs(self) -> &'static [Module] {
+        match self {
+            Module::Cpu | Module::Disk => &[Module::Processes, Module::Sensors],
+            Module::Memory => &[Module::Processes],
+            _ => &[],
+        }
+    }
+
     /// Position in `Module::ALL`, for per-module tables (`[T; Module::ALL.len()]`).
     pub const fn index(self) -> usize {
         self as usize

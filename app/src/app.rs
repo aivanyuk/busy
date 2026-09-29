@@ -132,7 +132,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
     let flyout = Flyout::create(&gfx, main, &theme);
     let app = App {
         main,
-        sampler: Sampler::start(Params::new(&cfg, false, false), main, WM_APP_SNAPSHOT),
+        sampler: Sampler::start(Params::new(&cfg, None, false), main, WM_APP_SNAPSHOT),
         writer: Worker::start("busy-config", |cfg: Config| {
             let _ = cfg.save();
         }),
@@ -383,11 +383,11 @@ impl App {
         self.sync_active();
     }
 
-    /// Tells the sampler what is visible now: flyout-only modules only while the flyout is open, and nothing
+    /// Tells the sampler what is visible now: the taskbar cells, plus what the open flyout shows, and nothing
     /// while the session is locked or the display is off.
     fn sync_sampler(&self) {
-        let flyout_open = self.flyout.as_ref().is_some_and(Flyout::is_visible);
-        self.sampler.set_params(Params::new(&self.cfg, flyout_open, self.locked || self.display_off));
+        let open = self.flyout.as_ref().and_then(Flyout::open_module);
+        self.sampler.set_params(Params::new(&self.cfg, open, self.locked || self.display_off));
     }
 
     /// The cell the flyout was opened from shows `--active` while it is open; redrawn only when that changes.
