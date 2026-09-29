@@ -1,6 +1,6 @@
 # busy-settings
 
-`crates/settings` — modeless native settings window + autostart. Files: `lib.rs` (API), `window.rs` (layout, events, dark painting), `autostart.rs`, `dark.rs`.
+`crates/settings` — modeless native settings window + autostart. Files: `lib.rs` (API), `autostart.rs`, `dark.rs` (theme resolution, dark palette), and `window/`, one concern per file: `mod.rs` (`Ui` state, create/open), `controls.rs` (IDs, creation, control helpers), `layout.rs` (font, positions, DPI), `paint.rs` (theme application, dark owner-draw), `commands.rs` (`WM_COMMAND`/`WM_NOTIFY`, module list editors), `config.rs` (fill from / collect to `Config`, Apply), `wndproc.rs` (window procedure).
 
 Standalone check: `cargo run -p busy-settings --example demo` (set `BUSY_FORCE_DARK=1` / `0` to force a theme).
 
