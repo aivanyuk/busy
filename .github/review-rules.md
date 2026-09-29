@@ -139,7 +139,7 @@ Authority: `docs/areas/core.md` § Source contract and § Snapshot semantics wor
 | G1 | `busy_sensors::sources()` returns `[Gpu, Sensors]` in that order; the two share `Rc<RefCell<Shared>>`, and the Sensors source reads what the GPU source wrote this tick. | `sensors/src/lib.rs`, source order |
 | G2 | DXGI enumeration skips software and Microsoft (0x1414) adapters; NVML loads only when an NVIDIA adapter exists; NVML/ADL devices are matched to DXGI adapters by PCI bus/device from D3DKMT. | `gpu.rs`, `nvml.rs`, `adl.rs`, adapter matching |
 | G3 | `snap.sensors` precedence is LHM → HWiNFO → NVML/ADL/WDDM, the vendor readings only when neither tool is present; LHM/HWiNFO fill missing GPU temp/hotspot/fan, matched by GPU name. GPU fan % is a `SensorKind::Load` reading named "GPU Fan". | Sensors merge logic |
-| G4 | LHM WMI connects lazily, retries every 30 s, and throttles a query over 15 ms to every 3 s; HWiNFO's view is copied whole, then parsed with bounds checks (U3). | `lhm.rs`, `hwinfo.rs` |
+| G4 | LHM WMI connects lazily, retries every 30 s, and throttles a query over 15 ms to every 3 s; HWiNFO's view stays mapped and its header-declared extent is copied, then parsed with bounds checks (U3); a dead or frozen mapping is dropped and reopened. | `lhm.rs`, `hwinfo.rs` |
 | G5 | A backend the area doc marks **untested** (ADL on AMD, LHM running, HWiNFO running, battery) is changed with the PR saying on what hardware it ran, or that it did not; the marker is not dropped without that evidence. | Change to `adl.rs`, `lhm.rs`, `hwinfo.rs`, `battery.rs`, or to an "Untested" line |
 
 Authority: `docs/areas/sensors.md` § Backends, § Security rules, § Gotchas; `docs/areas/core.md`
