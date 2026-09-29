@@ -115,7 +115,6 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 | The settings window reads and writes autostart, and reads the app theme, on the UI thread. | Threads: no registry in a handler |
 | Flyout-only modules are sampled with the flyout closed; nothing pauses on lock or display off. | Performance: sample only what is visible |
 | HWiNFO reopens and copies its mapping every tick; processes, GPU, disk and network rebuild their maps every tick. | Performance: reuse buffers |
-| The flyout repaints on every mouse move. | Performance: redraw only on change |
 | About 2 `SAFETY` comments for about 200 `unsafe` blocks. | Security: `SAFETY` comments |
 | No process-wide DLL search restriction. | Security: DLL search |
 | `BUSY_FAKE` and `--open-flyout` work in release builds. | Security: debug hooks |
