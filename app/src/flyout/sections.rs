@@ -171,7 +171,12 @@ impl Painter<'_> {
                 let vc = pinned.filter(|s| s.kind == SensorKind::Temperature).map_or(t.text, |s| t.temp(s.value));
                 self.header("Sensors", &v, vc);
                 if snap.sensors.is_empty() {
-                    self.hint("No sensors available. Run LibreHardwareMonitor or HWiNFO (with shared memory enabled) for CPU temperatures.");
+                    self.hint(if ctx.cfg.opt_in.third_party_sensors {
+                        "No sensors available. Run LibreHardwareMonitor or HWiNFO (with shared memory enabled) for CPU temperatures."
+                    } else {
+                        // No UI for opt-ins until the Phase 4 settings window (Advanced page).
+                        "No sensors available. Reading LibreHardwareMonitor / HWiNFO is off; enable opt_in.third_party_sensors in config.json for CPU temperatures."
+                    });
                     return;
                 }
                 let mut groups: Vec<&str> = Vec::new();

@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use busy_core::{GpuInfo, Module, SensorKind, SensorReading, Snapshot, Source};
+use busy_core::{GpuInfo, Module, SensorKind, SensorReading, Snapshot, Source, SourceOptions};
 
 /// Called on the sampler thread after `CoInitializeEx(COINIT_MULTITHREADED)`.
 pub fn sources() -> Vec<Box<dyn Source>> {
@@ -36,13 +36,20 @@ pub(crate) fn ansi(b: &[u8]) -> String {
 
 struct SensorsSource {
     shared: Rc<RefCell<Shared>>,
+    /// Only exists while `third_party_sensors` is on, so nothing can touch LHM/HWiNFO otherwise; dropping it
+    /// releases the WMI connection.
+    tools: Option<ThirdParty>,
+}
+
+/// Readers of data published by other programs the user installed.
+struct ThirdParty {
     lhm: lhm::Lhm,
     hwinfo: hwinfo::HwInfo,
 }
 
 impl SensorsSource {
     fn new(shared: Rc<RefCell<Shared>>) -> Self {
-        Self { shared, lhm: lhm::Lhm::new(), hwinfo: hwinfo::HwInfo::new() }
+        Self { shared, tools: None }
     }
 }
 
@@ -51,11 +58,23 @@ impl Source for SensorsSource {
         Module::Sensors
     }
 
+    fn configure(&mut self, opts: SourceOptions) {
+        match (opts.third_party_sensors, self.tools.is_some()) {
+            // Construction is free: LHM connects lazily and HWiNFO is opened on read.
+            (true, false) => self.tools = Some(ThirdParty { lhm: lhm::Lhm::new(), hwinfo: hwinfo::HwInfo::new() }),
+            (false, true) => self.tools = None,
+            _ => {}
+        }
+    }
+
     fn sample(&mut self, snap: &mut Snapshot) {
         // One third-party source only (avoids duplicates); LHM preferred.
-        let mut out = self.lhm.read();
-        if out.is_empty() {
-            out = self.hwinfo.read();
+        let mut out = Vec::new();
+        if let Some(t) = &mut self.tools {
+            out = t.lhm.read();
+            if out.is_empty() {
+                out = t.hwinfo.read();
+            }
         }
         if out.is_empty() {
             let sh = self.shared.borrow();
@@ -94,5 +113,22 @@ fn fill_gpus(gpus: &mut [GpuInfo], rs: &[SensorReading]) {
         if g.fan_rpm.is_none() {
             g.fan_rpm = mine().find(|r| r.kind == SensorKind::Fan).map(|r| r.value as u32);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn third_party_tools_exist_only_while_opted_in() {
+        let mut s = SensorsSource::new(Rc::default());
+        assert!(s.tools.is_none());
+        s.configure(SourceOptions::default());
+        assert!(s.tools.is_none());
+        s.configure(SourceOptions { third_party_sensors: true });
+        assert!(s.tools.is_some());
+        s.configure(SourceOptions { third_party_sensors: false });
+        assert!(s.tools.is_none());
     }
 }
