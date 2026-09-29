@@ -9,7 +9,6 @@ use crate::history::History;
 use crate::menu::{self, Command};
 use crate::render::Gfx;
 use crate::sampler::{Params, Sampler};
-use crate::select::taskbar_sensor;
 use crate::sync::lock;
 use crate::taskbar::Taskbar;
 use crate::theme::Theme;
@@ -311,8 +310,7 @@ impl App {
 
     fn on_snapshot(&mut self) {
         let Some((snap, fresh)) = self.sampler.take() else { return };
-        let sensor = taskbar_sensor(&snap, &self.cfg).map(|s| s.value);
-        self.hist.push(&snap, &fresh, sensor);
+        self.hist.push(&snap, &fresh, &self.cfg);
         self.snap = snap;
         self.render_all();
         if std::mem::take(&mut self.open_flyout)

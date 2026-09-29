@@ -1,8 +1,9 @@
 //! Human-readable formatting of metric values.
 
-use busy_core::{SensorKind, TempUnit};
+use busy_core::{RateUnit, SensorKind, TempUnit};
 
 const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
+const BIT_UNITS: [&str; 6] = ["b", "Kb", "Mb", "Gb", "Tb", "Pb"];
 
 /// Scales `v` by 1024 until it is below 1000; returns (value, unit index).
 fn scale(mut v: f64, mut i: usize) -> (f64, usize) {
@@ -28,12 +29,27 @@ pub fn bytes(b: u64) -> String {
 
 /// Transfer rate, never below KB/s to keep the width stable: `"0 KB/s"`, `"350 KB/s"`, `"1.2 MB/s"`.
 pub fn rate(bps: f64) -> String {
-    let kb = bps.max(0.0) / 1024.0;
-    if kb < 0.05 {
-        return "0 KB/s".into();
+    rate_in(bps, RateUnit::Bytes)
+}
+
+/// `rate` in bytes or bits per second (`"2.4 Mb/s"`), scaled by 1024 either way as in the design.
+pub fn rate_in(bps: f64, unit: RateUnit) -> String {
+    let (v, units) = match unit {
+        RateUnit::Bytes => (bps, &UNITS),
+        RateUnit::Bits => (bps * 8.0, &BIT_UNITS),
+    };
+    let k = v.max(0.0) / 1024.0;
+    if k < 0.05 {
+        return format!("0 {}/s", units[1]);
     }
-    let (v, i) = scale(kb, 1);
-    format!("{} {}/s", num(v), UNITS[i])
+    let (v, i) = scale(k, 1);
+    format!("{} {}/s", num(v), units[i])
+}
+
+/// Time left as `h:mm` (design `remaining(short)`): `4500` -> `"1:15"`.
+pub fn hours_minutes(secs: u32) -> String {
+    let m = secs.div_ceil(60);
+    format!("{}:{:02}", m / 60, m % 60)
 }
 
 pub fn pct(v: f32) -> String {
@@ -112,6 +128,12 @@ mod tests {
         assert_eq!(rate(350.0 * 1024.0), "350 KB/s");
         assert_eq!(rate(1.25 * 1024.0 * 1024.0), "1.2 MB/s");
         assert_eq!(rate(12.0 * 1024.0), "12.0 KB/s");
+        assert_eq!(rate_in(0.0, RateUnit::Bits), "0 Kb/s");
+        assert_eq!(rate_in(350.0 * 1024.0, RateUnit::Bits), "2.7 Mb/s");
+        assert_eq!(rate_in(64.0, RateUnit::Bits), "0.5 Kb/s");
+        assert_eq!(hours_minutes(4500), "1:15");
+        assert_eq!(hours_minutes(59), "0:01");
+        assert_eq!(hours_minutes(36_000), "10:00");
     }
 
     #[test]
