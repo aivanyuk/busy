@@ -8,7 +8,7 @@ use crate::flyout::Flyout;
 use crate::history::{History, capacity};
 use crate::persist::Writer;
 use crate::render::Gfx;
-use crate::sampler::Sampler;
+use crate::sampler::{Params, Sampler};
 use crate::select::pinned_sensor;
 use crate::taskbar::Taskbar;
 use crate::theme::Theme;
@@ -111,7 +111,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
     let flyout = Flyout::create(&gfx, main, &theme);
     let app = App {
         main,
-        sampler: Sampler::start(cfg.clone(), main, WM_APP_SNAPSHOT),
+        sampler: Sampler::start(Params::new(&cfg), main, WM_APP_SNAPSHOT),
         writer: Writer::start("busy-config", |cfg: Config| {
             let _ = cfg.save();
         }),
@@ -321,7 +321,7 @@ impl App {
             return;
         }
         let old = std::mem::replace(&mut self.cfg, cfg);
-        self.sampler.set_config(&self.cfg);
+        self.sampler.set_params(Params::new(&self.cfg));
         let cap = capacity(self.cfg.history_secs, self.cfg.interval_ms);
         if cap != capacity(old.history_secs, old.interval_ms) {
             self.hist.set_capacity(cap);
