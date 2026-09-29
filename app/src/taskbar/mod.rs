@@ -4,10 +4,12 @@ mod cells;
 mod explorer;
 mod styles;
 mod surface;
+mod tip;
 
 use cells::Cell;
 use styles::{CELL_H, Fonts};
 use surface::Surface;
+use tip::Tip;
 
 use crate::ctx::Ctx;
 use crate::render::{Canvas, Gfx, Rect};
@@ -78,6 +80,9 @@ pub struct Taskbar {
     hover: Option<Module>,
     /// The cell whose flyout is open.
     active: Option<Module>,
+    tip: Option<Tip>,
+    /// Each drawn cell's tooltip text, from the last layout.
+    tips: Vec<(Module, String)>,
 }
 
 impl Taskbar {
@@ -129,6 +134,8 @@ impl Taskbar {
                 drawn: None,
                 hover: None,
                 active: None,
+                tip: Tip::create(hwnd),
+                tips: Vec::new(),
             })
         }
     }
@@ -149,7 +156,19 @@ impl Taskbar {
 
     /// Records the cell under the pointer (drawn as `--hover`); true if that changed and a redraw is due.
     pub fn set_hover(&mut self, hover: Option<Module>) -> bool {
-        std::mem::replace(&mut self.hover, hover) != hover
+        let changed = std::mem::replace(&mut self.hover, hover) != hover;
+        if changed {
+            self.sync_tip();
+        }
+        changed
+    }
+
+    /// Shows the hovered cell's text in the tooltip (design `title`), none between cells.
+    fn sync_tip(&mut self) {
+        let text = self.hover.and_then(|m| self.tips.iter().find(|t| t.0 == m)).map_or("", |t| t.1.as_str());
+        if let Some(tip) = &mut self.tip {
+            tip.set(text);
+        }
     }
 
     /// Records the cell whose flyout is open (drawn as `--active`); true if that changed and a redraw is due.
@@ -205,6 +224,9 @@ impl Taskbar {
             widths.pop();
             cells.pop();
         }
+        self.tips.clear();
+        self.tips.extend(cells.iter().map(|c| (c.module, c.tip())));
+        self.sync_tip();
         HITS.with_borrow_mut(|hits| {
             hits.clear();
             let mut x = 0.0;
@@ -321,6 +343,7 @@ impl Taskbar {
     }
 
     pub fn destroy(&mut self) {
+        self.tip = None;
         self.surf = None;
         unsafe {
             if IsWindow(Some(self.hwnd)).as_bool() {
