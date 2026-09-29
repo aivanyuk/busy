@@ -5,6 +5,8 @@ use crate::fmt;
 use crate::history::Series;
 use crate::render::{Align, Canvas, Rect};
 use crate::theme::{Color, Theme};
+use crate::tone;
+use busy_core::ModuleCfg;
 use windows::Win32::Graphics::DirectWrite::IDWriteTextFormat;
 
 pub(super) struct Fonts {
@@ -148,7 +150,7 @@ impl Painter<'_> {
         self.text(&label, &self.f.small, lr, t.fg, Align::Center);
     }
 
-    pub(super) fn cores(&mut self, v: &[f32]) {
+    pub(super) fn cores(&mut self, v: &[f32], mc: &ModuleCfg) {
         if v.is_empty() {
             return;
         }
@@ -161,7 +163,7 @@ impl Painter<'_> {
                 cv.vbar(
                     Rect::new(self.x + i as f32 * (bw + gap), self.y, bw, 22.0),
                     p / 100.0,
-                    t.level(t.accent, p),
+                    t.color(tone::fill(mc, p)),
                     t.track,
                 );
             }

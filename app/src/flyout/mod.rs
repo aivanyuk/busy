@@ -268,7 +268,7 @@ impl Flyout {
                 p.separator();
             }
             first = false;
-            p.section(mc.module);
+            p.section(mc);
         }
         if first {
             p.sub("No modules enabled for the flyout.");
