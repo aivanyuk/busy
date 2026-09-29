@@ -14,7 +14,7 @@ use busy_core::Source;
 pub fn sources() -> Vec<Box<dyn Source>> {
     vec![
         Box::new(cpu::Cpu::new()),
-        Box::new(memory::Memory),
+        Box::new(memory::Memory::new()),
         Box::new(disk::Disk::new()),
         Box::new(network::Network::default()),
         Box::new(battery::Battery::default()),
