@@ -110,7 +110,6 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 
 | Gap | Rule |
 |---|---|
-| `crates/settings/src/window.rs` is 977 lines and mixes the window procedure, layout and control state. | Layering: one concern per file |
 | The PDH wrapper exists twice (`busy-metrics` `pdh.rs`, `busy-sensors` `gpu.rs`); `gpu.rs` and `hwinfo.rs` close handles by hand. | Layering: one implementation |
 | The settings window reads and writes autostart, and reads the app theme, on the UI thread. | Threads: no registry in a handler |
 | Flyout-only modules are sampled with the flyout closed; nothing pauses on lock or display off. | Performance: sample only what is visible |
