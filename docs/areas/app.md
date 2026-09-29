@@ -30,7 +30,7 @@ Verified on Windows 11 build 26200.9457 (25H2), 3840×2160 @ 200 %, centered tas
 
 ## Flyout
 
-`WS_POPUP` tool window, topmost, rounded corners, acrylic (`DWMSBT_TRANSIENTWINDOW`), dark-mode attribute, frame extended over the client area; drawn with `ID2D1HwndRenderTarget` (premultiplied) plus a translucent tint; solid fallback if the backdrop attribute fails (Win10). Height fits content, clamped to the work area, wheel scrolling with indicator; redraws per snapshot. Closes on Esc, re-click and focus loss; a 250 ms guard after deactivation handles the click-toggle race.
+`WS_POPUP` tool window, topmost, rounded corners, acrylic (`DWMSBT_TRANSIENTWINDOW`), dark-mode attribute, frame extended over the client area; drawn with `ID2D1HwndRenderTarget` (premultiplied) plus a translucent tint; solid fallback if the backdrop attribute fails (Win10). Height fits content, clamped to the work area, wheel scrolling with indicator; redraws per snapshot. A render lays out once, while painting: only when that layout's height differs from the window's does it resize and paint again (the first frame after a height change is painted twice, which is rare). `SetWindowPos` runs only when the window rect changed; opening measures first so the first frame is painted at its final size. Closes on Esc, re-click and focus loss; a 250 ms guard after deactivation handles the click-toggle race.
 
 ## Theme
 
