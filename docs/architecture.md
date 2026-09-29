@@ -113,7 +113,6 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 | `crates/settings/src/window.rs` is 977 lines and mixes the window procedure, layout and control state. | Layering: one concern per file |
 | The PDH wrapper exists twice (`busy-metrics` `pdh.rs`, `busy-sensors` `gpu.rs`); `gpu.rs` and `hwinfo.rs` close handles by hand. | Layering: one implementation |
 | The settings window reads and writes autostart, and reads the app theme, on the UI thread. | Threads: no registry in a handler |
-| Nothing pauses on lock or display off. | Performance: sample only what is visible |
 | HWiNFO reopens and copies its mapping every tick; processes, GPU, disk and network rebuild their maps every tick. | Performance: reuse buffers |
 | About 2 `SAFETY` comments for about 200 `unsafe` blocks. | Security: `SAFETY` comments |
 | No process-wide DLL search restriction. | Security: DLL search |
