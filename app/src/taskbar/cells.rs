@@ -115,7 +115,7 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
                     ..base("BAT", Val::One(v.clone()), &["100%⚡"], v)
                 }
             }),
-            Module::Sensors => select::pinned_sensor(snap, ctx.cfg).map(|s| {
+            Module::Sensors => select::taskbar_sensor(snap, ctx.cfg).map(|s| {
                 let v = fmt::sensor(s.value, s.kind, ctx.cfg.temp_unit);
                 let is_temp = s.kind == busy_core::SensorKind::Temperature;
                 let max = if is_temp { 100.0 } else { nice_max(hist.sensor.max()) };

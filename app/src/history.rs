@@ -91,7 +91,7 @@ impl History {
         fixed.into_iter().chain(self.gpus.iter_mut()).for_each(|s| s.set_cap(cap));
     }
 
-    /// Appends one sample per metric present in `snap`. `sensor` is the resolved pinned-sensor value.
+    /// Appends one sample per metric present in `snap`. `sensor` is the value of `select::taskbar_sensor`.
     pub fn push(&mut self, snap: &Snapshot, sensor: Option<f32>) {
         if let Some(c) = &snap.cpu {
             self.cpu.push(c.total);
