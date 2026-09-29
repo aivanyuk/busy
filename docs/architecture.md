@@ -75,7 +75,7 @@ Every thread the app starts is listed here.
 | UI | **Never** — input queue is attached to explorer's taskbar thread via cross-process parenting | windows, D2D resources, `Config`, history |
 | Sampler | Yes (PDH, WMI, NtQuerySystemInformation) | all `Source`s, COM MTA |
 | Config writer | Yes (file I/O) | the one `config.json` writer; writes the latest submitted `Config`, older pending ones are dropped |
-| Theme reader | Yes (registry) | resolves `Theme` (light/dark, accent) on theme broadcasts and config changes, posts it back |
+| Theme reader | Yes (registry) | resolves `Theme` (light or dark, from `SystemUsesLightTheme`) on theme broadcasts and config changes, posts it back |
 | Settings registry (one per open settings window) | Yes (registry) | reads autostart and `AppsUseLightTheme`, writes autostart, posts results to the window; ends with the window, never joined |
 | Debug dump (debug builds, per render) | Yes (file I/O) | one `taskbar.bmp` write |
 

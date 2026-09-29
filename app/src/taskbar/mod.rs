@@ -194,7 +194,7 @@ impl Taskbar {
             );
         }
         #[cfg(debug_assertions)]
-        surface::debug_dump(surf, ctx.theme.dark);
+        surface::debug_dump(surf, ctx.theme.tb);
     }
 
     fn place(&mut self, anchor: Anchor, (edge, _): (i32, i32), w: i32, h: i32, client: &RECT) {

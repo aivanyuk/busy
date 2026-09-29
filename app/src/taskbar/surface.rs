@@ -1,5 +1,7 @@
 //! The 32-bpp DIB the widget is drawn into before `UpdateLayeredWindow`.
 
+#[cfg(debug_assertions)]
+use crate::theme::Color;
 use windows::Win32::Graphics::Gdi::*;
 
 /// 32-bpp top-down DIB selected into a memory DC.
@@ -50,13 +52,14 @@ impl Drop for Surface {
     }
 }
 
-/// Debug builds: `BUSY_DUMP=<dir>` writes the widget (composited over a taskbar-ish color) to `taskbar.bmp`.
+/// Debug builds: `BUSY_DUMP=<dir>` writes the widget (composited over the `--tb` color) to `taskbar.bmp`.
 #[cfg(debug_assertions)]
-pub(super) fn debug_dump(s: &Surface, dark: bool) {
+pub(super) fn debug_dump(s: &Surface, tb: Color) {
     let Some(dir) = std::env::var_os("BUSY_DUMP") else { return };
     let (w, h) = (s.w as usize, s.h as usize);
     let px = unsafe { std::slice::from_raw_parts(s.bits, w * h * 4) };
-    let bg: [f32; 3] = if dark { [32.0, 32.0, 32.0] } else { [238.0, 238.0, 238.0] };
+    // Opaque `--tb`: close to what the widget sits on.
+    let bg = [tb.b, tb.g, tb.r].map(|c| c * 255.0);
     let mut out = Vec::with_capacity(54 + w * h * 4);
     let file_len = (54 + w * h * 4) as u32;
     out.extend_from_slice(b"BM");
