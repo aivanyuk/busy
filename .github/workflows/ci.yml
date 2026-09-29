@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Read-only token: the job only checks out, builds and uploads an artifact.
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -12,15 +16,19 @@ jobs:
   check:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      # Third-party actions are pinned by commit SHA; the comment names the tag it resolved from.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # rustup installs the toolchain pinned in rust-toolchain.toml on first use.
       - run: rustup show active-toolchain
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      # A CI tool, not a crate dependency. rust-cache keeps ~/.cargo/bin, so a cache hit skips the build.
+      - run: cargo install cargo-audit --version 0.22.2 --locked
+      - run: cargo audit
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
       - run: cargo build --workspace --release --locked
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: busy-${{ github.sha }}
           path: target/release/busy.exe

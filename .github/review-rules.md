@@ -265,6 +265,7 @@ A tool or CI (`.github/workflows/ci.yml`, on `windows-latest`, for every PR and 
   build `cargo build --workspace --release --locked`. The smoke tests run on a runner without a GPU
   or battery, so hardware-dependent paths are not exercised there (G5, Q4).
 - `Cargo.lock` in step with the manifests — `--locked`. A *new package* in it is still D1.
+- Known vulnerabilities in `Cargo.lock` — `cargo audit` against the RustSec advisory database.
 - The toolchain version — `rust-toolchain.toml`, which CI installs.
 - A non-exhaustive `match` after a new `Module` variant — the compiler. `Module::ALL`, `label()` and
   `Config::default()` are still A5.
