@@ -32,7 +32,7 @@ Inside the `busy` app crate, modules form layers too. A module may use the ones 
 | Router | `app.rs` | Owns the `App` state; the **only** module that turns events into state changes. |
 | Windows | `taskbar/`, `flyout/`, `menu.rs` | Own an HWND (or a popup menu) and its GPU resources; draw from a read-only `Ctx`; report input as `win::Event`s, or return the menu's choice as a `menu::Command`. |
 | Workers | `sampler.rs`, `worker.rs` | Threads with a small, typed hand-off to the router. |
-| Support | `win.rs`, `ctx.rs`, `render.rs`, `theme.rs` | Window-class and message plumbing, render context, D2D/DWrite helpers, palette. |
+| Support | `win.rs`, `ctx.rs`, `render.rs`, `theme.rs`, `launch.rs` | Window-class and message plumbing, render context, D2D/DWrite helpers, palette, starting other programs. |
 | Pure logic | `select.rs`, `tone.rs`, `fmt.rs`, `history.rs` | No Win32; unit-tested. |
 
 Rules:
@@ -76,6 +76,7 @@ Every thread the app starts is listed here.
 | Sampler | Yes (PDH, WMI, NtQuerySystemInformation) | all `Source`s, COM MTA |
 | Config writer | Yes (file I/O) | the one `config.json` writer; writes the latest submitted `Config`, older pending ones are dropped |
 | Theme reader | Yes (registry) | resolves `Theme` (light or dark, from `SystemUsesLightTheme`) on theme broadcasts and config changes, posts it back |
+| Launcher | Yes (shell) | starts Task Manager for the flyout's "Open Task Manager" (`launch::task_manager`: `ShellExecuteW` with the System32 path, in its own STA) |
 | Settings registry (one per open settings window) | Yes (registry) | reads autostart and `AppsUseLightTheme`, writes autostart, posts results to the window; ends with the window, never joined |
 | Debug dump (debug builds, per render) | Yes (file I/O) | one `taskbar.bmp` write |
 

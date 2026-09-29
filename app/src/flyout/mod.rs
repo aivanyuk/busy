@@ -38,10 +38,18 @@ enum Hover {
     Sample { graph: usize, k: usize },
 }
 
+/// What a click on the flyout asks the router to do.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Action {
+    TaskManager,
+    /// Open Settings at this module.
+    Settings(Module),
+}
+
 /// What a layout pass produced.
 struct Layout {
     height: f32,
-    hits: Vec<(Rect, usize)>,
+    hits: Vec<(Rect, Action)>,
     graphs: Vec<GraphHit>,
 }
 
@@ -66,7 +74,7 @@ pub struct Flyout {
     mouse: Option<(f32, f32)>,
     /// `hover_at(mouse)` as of the last paint.
     hover: Hover,
-    hits: Vec<(Rect, usize)>,
+    hits: Vec<(Rect, Action)>,
     graphs: Vec<GraphHit>,
 }
 
@@ -324,7 +332,7 @@ impl Flyout {
         };
         let d = modules::detail(ctx, mc);
         let drawn = draw::draw(&d, cv, ctx.gfx, ctx.theme, &self.fonts, self.scroll, self.mouse);
-        Layout { height: drawn.height, hits: Vec::new(), graphs: drawn.graphs }
+        Layout { height: drawn.height, hits: drawn.hits, graphs: drawn.graphs }
     }
 
     pub fn on_mouse(&mut self, ctx: &Ctx, pos: Option<(f32, f32)>) {
@@ -340,8 +348,11 @@ impl Flyout {
         self.render(ctx);
     }
 
-    /// The layout has no click targets yet (the Processes tabs were the only ones).
-    pub fn on_click(&mut self, _ctx: &Ctx, _x: f32, _y: f32) {}
+    /// The footer button under a click, if any.
+    pub fn on_click(&self, x: f32, y: f32) -> Option<Action> {
+        let (x, y) = (x / self.scale(), y / self.scale());
+        self.hits.iter().find(|(r, _)| r.contains(x, y)).map(|&(_, a)| a)
+    }
 }
 
 impl Drop for Flyout {

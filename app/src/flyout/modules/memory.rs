@@ -2,15 +2,15 @@ use super::super::detail::{Chart, Detail, Value, series_span};
 use crate::ctx::Ctx;
 use crate::fmt;
 use crate::tone::{self, SECOND};
-use busy_core::ModuleCfg;
+use busy_core::{Module, ModuleCfg};
 
 /// Design `fly('mem')`: memory in use over time, the composition of physical memory (in use, modified,
 /// standby, free), commit and kernel pools, and the processes using the most.
 pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
-    let Some(m) = ctx.snap.memory.as_ref().filter(|m| m.total > 0) else { return Detail::waiting("Memory") };
+    let Some(m) = ctx.snap.memory.as_ref().filter(|m| m.total > 0) else { return Detail::waiting(Module::Memory) };
     let (t, hist) = (ctx.theme, ctx.hist);
     let (color, second) = (t.color(tone::module(mc)), t.color(SECOND));
-    let mut d = Detail::new("Memory");
+    let mut d = Detail::new(Module::Memory);
     d.sub = match m.hardware_reserved {
         Some(r) => format!("{} installed", fmt::bytes(m.total + r)),
         None => format!("{} usable", fmt::bytes(m.total)),

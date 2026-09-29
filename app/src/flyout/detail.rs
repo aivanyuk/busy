@@ -5,9 +5,11 @@
 use crate::fmt;
 use crate::history::Series;
 use crate::theme::Color;
-use busy_core::{RateUnit, SensorKind, TempUnit};
+use busy_core::{Module, RateUnit, SensorKind, TempUnit};
 
 pub(super) struct Detail<'a> {
+    /// Whose flyout it is (the footer's settings button).
+    pub(super) module: Module,
     pub(super) title: &'static str,
     /// Hardware line under the title.
     pub(super) sub: String,
@@ -71,9 +73,10 @@ impl Value {
 }
 
 impl<'a> Detail<'a> {
-    pub(super) fn new(title: &'static str) -> Self {
+    pub(super) fn new(module: Module) -> Self {
         Self {
-            title,
+            module,
+            title: module.label(),
             sub: String::new(),
             big: String::new(),
             big_label: String::new(),
@@ -91,8 +94,8 @@ impl<'a> Detail<'a> {
     }
 
     /// A module whose first sample hasn't arrived.
-    pub(super) fn waiting(title: &'static str) -> Self {
-        Self { note: Some("Waiting for data…".into()), ..Self::new(title) }
+    pub(super) fn waiting(module: Module) -> Self {
+        Self { note: Some("Waiting for data…".into()), ..Self::new(module) }
     }
 
     /// Adds a stat row when there is a value.

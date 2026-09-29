@@ -3,7 +3,7 @@
 //! and the registry worker.
 
 use crate::dark;
-use busy_core::{Config, ModuleCfg};
+use busy_core::{Config, Module, ModuleCfg};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use windows::Win32::Foundation::*;
@@ -42,7 +42,7 @@ pub fn hwnd() -> Option<HWND> {
     UI.with_borrow(|u| u.as_ref().map(|u| u.hwnd))
 }
 
-pub fn open(cfg: &Config, on_apply: Box<dyn Fn(Config)>) {
+pub fn open(cfg: &Config, on_apply: Box<dyn Fn(Config)>, page: Option<Module>) {
     if let Some(u) = ui() {
         unsafe {
             if IsIconic(u.hwnd).as_bool() {
@@ -50,9 +50,15 @@ pub fn open(cfg: &Config, on_apply: Box<dyn Fn(Config)>) {
             }
             let _ = SetForegroundWindow(u.hwnd);
         }
-        return;
+    } else {
+        let _ = create(cfg, on_apply);
     }
-    let _ = create(cfg, on_apply);
+    if let (Some(u), Some(m)) = (ui(), page) {
+        let row = u.modules.borrow().iter().position(|c| c.module == m);
+        if let Some(i) = row {
+            u.select(i);
+        }
+    }
 }
 
 struct Ui {

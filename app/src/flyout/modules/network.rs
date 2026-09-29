@@ -3,7 +3,7 @@ use crate::ctx::Ctx;
 use crate::render::nice_max;
 use crate::tone::{self, SECOND};
 use crate::{fmt, select};
-use busy_core::{ModuleCfg, NetKind};
+use busy_core::{Module, ModuleCfg, NetKind};
 
 /// Design `fly('net')`: download and upload of the chosen interface (`options.network.interface`, as on the
 /// cell) in the chosen units, and what that interface is. No process list: per-process network needs the ETW
@@ -11,13 +11,13 @@ use busy_core::{ModuleCfg, NetKind};
 pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
     let (snap, cfg) = (ctx.snap, ctx.cfg);
     let (Some(n), Some((rx, tx))) = (&snap.net, select::net_rates(snap, cfg)) else {
-        return Detail::waiting("Network");
+        return Detail::waiting(Module::Network);
     };
     let (t, hist, units) = (ctx.theme, ctx.hist, cfg.options.network.units);
     let (color, second) = (t.color(tone::module(mc)), t.color(SECOND));
     let rate = |bps: f64| fmt::rate_in(bps, units);
     let nif = select::net_interface(snap, cfg);
-    let mut d = Detail::new("Network");
+    let mut d = Detail::new(Module::Network);
     if let Some(i) = nif {
         d.sub = match (i.kind, &i.wifi) {
             (NetKind::Wifi, Some(w)) if !w.ssid.is_empty() => format!("Wi‑Fi · {}", w.ssid),

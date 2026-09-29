@@ -2,15 +2,15 @@ use super::super::detail::{Chart, Detail, Value, series_span};
 use crate::ctx::Ctx;
 use crate::tone::{self, SECOND};
 use crate::{fmt, select};
-use busy_core::ModuleCfg;
+use busy_core::{Module, ModuleCfg};
 
 /// Design `fly('gpu')`: the GPU the taskbar cell shows (the busiest), its utilization over time, the busiest
 /// engines, memory, sensors, driver and DirectX level, and the processes using it.
 pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
-    let Some((i, g)) = select::busiest_gpu(ctx.snap) else { return Detail::waiting("GPU") };
+    let Some((i, g)) = select::busiest_gpu(ctx.snap) else { return Detail::waiting(Module::Gpu) };
     let (t, hist, unit) = (ctx.theme, ctx.hist, ctx.cfg.temp_unit);
     let (color, second) = (t.color(tone::module(mc)), t.color(SECOND));
-    let mut d = Detail::new("GPU");
+    let mut d = Detail::new(Module::Gpu);
     d.sub = g.name.clone();
     if ctx.snap.gpus.len() > 1 {
         d.sub = format!("{} · busiest of {}", d.sub, ctx.snap.gpus.len());

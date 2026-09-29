@@ -23,7 +23,7 @@ pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
         Module::Battery => battery::detail(ctx, mc),
         Module::Sensors => sensors::detail(ctx, mc),
         // No cell, so never opened; its lists are part of the CPU, Memory and Disk flyouts.
-        Module::Processes => Detail::new("Processes"),
+        Module::Processes => Detail::new(Module::Processes),
     }
 }
 

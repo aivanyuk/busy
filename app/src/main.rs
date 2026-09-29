@@ -9,6 +9,7 @@ mod fake;
 mod flyout;
 mod fmt;
 mod history;
+mod launch;
 mod menu;
 mod render;
 mod sampler;
