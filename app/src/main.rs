@@ -12,6 +12,7 @@ mod persist;
 mod render;
 mod sampler;
 mod select;
+mod sync;
 mod taskbar;
 mod theme;
 mod win;
