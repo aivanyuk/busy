@@ -35,6 +35,8 @@ pub struct Taskbar {
     placed: RECT,
     dpi: u32,
     hover: bool,
+    /// Its flyout is open.
+    active: bool,
 }
 
 impl Taskbar {
@@ -81,7 +83,17 @@ impl Taskbar {
                 let _ = DestroyWindow(hwnd);
                 return None;
             };
-            Some(Self { hwnd, tray, rt, fonts, surf: None, placed: RECT::default(), dpi: 0, hover: false })
+            Some(Self {
+                hwnd,
+                tray,
+                rt,
+                fonts,
+                surf: None,
+                placed: RECT::default(),
+                dpi: 0,
+                hover: false,
+                active: false,
+            })
         }
     }
 
@@ -102,6 +114,11 @@ impl Taskbar {
     /// Records whether the pointer is over the widget; true if that changed and a redraw is due.
     pub fn set_hover(&mut self, hover: bool) -> bool {
         std::mem::replace(&mut self.hover, hover) != hover
+    }
+
+    /// Records whether the flyout is open (drawn as `--active`); true if that changed and a redraw is due.
+    pub fn set_active(&mut self, active: bool) -> bool {
+        std::mem::replace(&mut self.active, active) != active
     }
 
     pub fn screen_rect(&self) -> RECT {
@@ -161,8 +178,9 @@ impl Taskbar {
             self.rt.Clear(Some(&D2D1_COLOR_F { r: 0.0, g: 0.0, b: 0.0, a: 1.0 / 255.0 }));
         }
         if let Ok(cv) = Canvas::new(&self.rt, ctx.gfx) {
-            if self.hover {
-                cv.round(Rect::new(1.0, 4.0, w - 2.0, h - 8.0), 4.0, ctx.theme.hover);
+            let bg = if self.active { Some(ctx.theme.active) } else { self.hover.then_some(ctx.theme.hover) };
+            if let Some(bg) = bg {
+                cv.round(Rect::new(1.0, 4.0, w - 2.0, h - 8.0), 4.0, bg);
             }
             let mut x = PAD;
             for (c, cw) in cells.iter().zip(&widths) {
