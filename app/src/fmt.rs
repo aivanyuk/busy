@@ -46,6 +46,21 @@ pub fn rate_in(bps: f64, unit: RateUnit) -> String {
     format!("{} {}/s", num(v), units[i])
 }
 
+/// Link speed of a network adapter: `"2.5 Gbps"`, `"866 Mbps"`.
+pub fn link_speed(bps: u64) -> String {
+    if bps >= 1_000_000_000 { format!("{} Gbps", bps as f64 / 1e9) } else { format!("{} Mbps", bps / 1_000_000) }
+}
+
+/// Wi-Fi band of a channel's center frequency: `"2.4 GHz"`, `"5 GHz"`, `"6 GHz"`.
+pub fn wifi_band(mhz: u32) -> String {
+    match mhz {
+        ..3000 => "2.4 GHz",
+        3000..5925 => "5 GHz",
+        _ => "6 GHz",
+    }
+    .into()
+}
+
 /// Time left as `h:mm` (design `remaining(short)`): `4500` -> `"1:15"`.
 pub fn hours_minutes(secs: u32) -> String {
     let m = secs.div_ceil(60);
@@ -142,6 +157,8 @@ mod tests {
         assert_eq!(rate_in(350.0 * 1024.0, RateUnit::Bits), "2.7 Mb/s");
         assert_eq!(rate_in(64.0, RateUnit::Bits), "0.5 Kb/s");
         assert_eq!(hours_minutes(4500), "1:15");
+        assert_eq!((link_speed(2_500_000_000), link_speed(866_000_000)), ("2.5 Gbps".into(), "866 Mbps".into()));
+        assert_eq!([2437, 5180, 6115].map(wifi_band), ["2.4 GHz", "5 GHz", "6 GHz"]);
         assert_eq!(hours_minutes(59), "0:01");
         assert_eq!(hours_minutes(36_000), "10:00");
     }

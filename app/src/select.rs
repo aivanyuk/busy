@@ -1,6 +1,8 @@
 //! Choices of what to show, made from a snapshot and the config. Pure logic, no Win32.
 
-use busy_core::{Config, GpuInfo, NetInterface, NetKind, SensorKind, SensorPick, SensorReading, Snapshot, VolumeInfo};
+use busy_core::{
+    Config, GpuInfo, NetIf, NetInterface, NetKind, SensorKind, SensorPick, SensorReading, Snapshot, VolumeInfo,
+};
 
 /// Most bars the CPU "Cores" bar style draws (design: 8).
 const CORE_BARS: usize = 8;
@@ -59,7 +61,7 @@ pub(crate) fn disk_volume<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a Vo
 /// totals for `Auto`, else the sum over the matching interfaces (0 when none matches, e.g. Wi-Fi off).
 pub(crate) fn net_rates(snap: &Snapshot, cfg: &Config) -> Option<(f64, f64)> {
     let n = snap.net.as_ref()?;
-    let sum = |pick: &dyn Fn(&busy_core::NetIf) -> bool| {
+    let sum = |pick: &dyn Fn(&NetIf) -> bool| {
         n.interfaces.iter().filter(|i| pick(i)).fold((0.0, 0.0), |(rx, tx), i| (rx + i.rx_bps, tx + i.tx_bps))
     };
     Some(match &cfg.options.network.interface {
@@ -82,6 +84,22 @@ pub(crate) fn busy_engines(engines: &[(String, f32)]) -> Vec<(&str, f32)> {
     let mut v: Vec<(&str, f32)> = engines.iter().map(|(n, p)| (n.as_str(), *p)).collect();
     v.sort_by(|a, b| b.1.total_cmp(&a.1));
     v.into_iter().enumerate().filter(|(i, e)| *i == 0 || e.1 >= 1.0).take(3).map(|(_, e)| e).collect()
+}
+
+/// The interface the Network flyout describes: the one `options.network.interface` names, else the first
+/// connected one of the chosen kind; for `Auto` the connected physical interface moving the most data.
+pub(crate) fn net_interface<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a NetIf> {
+    let n = snap.net.as_ref()?;
+    let up = || n.interfaces.iter().filter(|i| i.connected);
+    match &cfg.options.network.interface {
+        NetInterface::Named(name) => n.interfaces.iter().find(|i| &i.name == name),
+        NetInterface::WiFi => up().find(|i| i.kind == NetKind::Wifi),
+        NetInterface::Ethernet => up().find(|i| i.kind == NetKind::Ethernet),
+        NetInterface::Auto => up()
+            .filter(|i| i.kind != NetKind::Other)
+            .max_by(|a, b| (a.rx_bps + a.tx_bps).total_cmp(&(b.rx_bps + b.tx_bps)))
+            .or_else(|| up().next()),
+    }
 }
 
 /// The CPU "Cores" bars: at most `CORE_BARS`, each the mean of an equal run of logical processors (pairs on a
@@ -231,6 +249,38 @@ mod tests {
         assert_eq!(rates(NetInterface::Named("vEthernet".into())), Some((50.0, 5.0)));
         assert_eq!(rates(NetInterface::Named("gone".into())), Some((0.0, 0.0)));
         assert_eq!(net_rates(&Snapshot::default(), &Config::default()), None);
+    }
+
+    #[test]
+    fn net_interface_follows_the_option() {
+        let nif = |name: &str, kind, rx, connected| NetIf {
+            name: name.into(),
+            kind,
+            rx_bps: rx,
+            connected,
+            ..NetIf::default()
+        };
+        let s = Snapshot {
+            net: Some(NetInfo {
+                interfaces: vec![
+                    nif("vEthernet", NetKind::Other, 900.0, true),
+                    nif("Ethernet", NetKind::Ethernet, 10.0, true),
+                    nif("Wi-Fi", NetKind::Wifi, 50.0, true),
+                    nif("Ethernet 2", NetKind::Ethernet, 0.0, false),
+                ],
+                ..NetInfo::default()
+            }),
+            ..Snapshot::default()
+        };
+        let mut cfg = Config::default();
+        let mut name = |i| {
+            cfg.options.network.interface = i;
+            super::net_interface(&s, &cfg).map(|i| i.name.clone())
+        };
+        assert_eq!(name(NetInterface::Auto).as_deref(), Some("Wi-Fi"));
+        assert_eq!(name(NetInterface::Ethernet).as_deref(), Some("Ethernet"));
+        assert_eq!(name(NetInterface::Named("Ethernet 2".into())).as_deref(), Some("Ethernet 2"));
+        assert_eq!(name(NetInterface::Named("gone".into())), None);
     }
 
     #[test]

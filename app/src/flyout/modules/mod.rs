@@ -1,8 +1,10 @@
 //! One file per module: what its flyout shows (design `fly()`), as a `Detail`.
 
 mod cpu;
+mod disk;
 mod gpu;
 mod memory;
+mod network;
 
 use super::detail::Detail;
 use crate::ctx::Ctx;
@@ -14,6 +16,8 @@ pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Detail<'a>> {
         Module::Cpu => Some(cpu::detail(ctx, mc)),
         Module::Memory => Some(memory::detail(ctx, mc)),
         Module::Gpu => Some(gpu::detail(ctx, mc)),
+        Module::Disk => Some(disk::detail(ctx, mc)),
+        Module::Network => Some(network::detail(ctx, mc)),
         _ => None,
     }
 }
