@@ -149,6 +149,10 @@ impl Flyout {
         // Otherwise the press that deactivated (and hid) the flyout was on the widget itself: stay closed.
     }
 
+    pub fn is_open(&self) -> bool {
+        self.visible
+    }
+
     pub fn is_foreground(&self) -> bool {
         unsafe { GetForegroundWindow() == self.hwnd }
     }
