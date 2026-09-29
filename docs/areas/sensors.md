@@ -2,7 +2,11 @@
 
 `crates/sensors` — `sources()` returns `[Gpu, Sensors]` (in that order; they share `Rc<RefCell<Shared>>`). Files: `gpu.rs` (DXGI + PDH through `busy_win::pdh` + D3DKMT), `nvml.rs`, `adl.rs`, `lhm.rs` (WMI), `hwinfo.rs` (shared memory), `lib.rs` (System32 DLL loader, sensors merge logic).
 
-Live check: `cargo run -p busy-sensors --example dump_sensors`.
+Live check: `cargo run -p busy-sensors --example dump_sensors` (add `-- --third-party` to also read LHM/HWiNFO).
+
+## Opt-in: third-party sensor tools
+
+LibreHardwareMonitor (WMI) and HWiNFO (shared memory) are read only when `SourceOptions::third_party_sensors` (from `Config.opt_in.third_party_sensors`) is on — default **off**: they publish data from another program the user installed. `SensorsSource::configure` creates their readers when it turns on and drops them (releasing the WMI connection) when it turns off; while off, neither the WMI namespace nor the shared-memory section is opened. NVML, ADL and D3DKMT are first-party driver APIs and stay on. Off by default means no CPU temperatures, fans or CPU power on most machines — the Sensors module shows only the GPU vendor readings.
 
 ## Backends
 
@@ -13,10 +17,10 @@ Live check: `cargo run -p busy-sensors --example dump_sensors`.
 | D3DKMT (`D3DKMTQueryAdapterInfo`) | PCI location, temp, fan RPM, mem clock | Task Manager's source; no DLL, any WDDM 2.5+ driver. Labelled "WDDM". Used to match NVML/ADL devices to DXGI adapters by PCI bus/device. |
 | NVML (`nvml.dll`) | temp, fan %, power, clocks | Loaded only if an NVIDIA adapter exists. No hotspot (not public). |
 | ADL (`atiadlxx.dll`) | edge/hotspot temp, fan, power, clocks (Overdrive8, fallback OverdriveN) | **Untested on real AMD hardware.** |
-| LibreHardwareMonitor / OpenHardwareMonitor WMI | all sensors incl. CPU temps | `root\LibreHardwareMonitor` then `root\OpenHardwareMonitor`. Lazy connect, retry every 30 s; queries >15 ms throttled to every 3 s. **Untested with LHM running.** |
-| HWiNFO `Global\HWiNFO_SENS_SM2` | all sensors | Requires "Shared Memory Support" enabled in HWiNFO. Whole view copied then parsed with bounds checks. **Untested with HWiNFO running.** |
+| LibreHardwareMonitor / OpenHardwareMonitor WMI (opt-in) | all sensors incl. CPU temps | `root\LibreHardwareMonitor` then `root\OpenHardwareMonitor`. Lazy connect, retry every 30 s; queries >15 ms throttled to every 3 s. **Untested with LHM running.** |
+| HWiNFO `Global\HWiNFO_SENS_SM2` (opt-in) | all sensors | Requires "Shared Memory Support" enabled in HWiNFO. Whole view copied then parsed with bounds checks. **Untested with HWiNFO running.** |
 
-Precedence for `snap.sensors`: LHM → HWiNFO → NVML/ADL/WDDM readings (the latter only when neither tool is present, to avoid duplicates). LHM/HWiNFO also fill missing GPU temp/hotspot/fan, matched by GPU name.
+Precedence for `snap.sensors`: LHM → HWiNFO → NVML/ADL/WDDM readings (the latter only when neither tool is opted in and present, to avoid duplicates). LHM/HWiNFO also fill missing GPU temp/hotspot/fan, matched by GPU name — only when opted in.
 
 ## Security rules
 

@@ -1,13 +1,18 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 use std::time::{Duration, Instant};
 
-use busy_core::Snapshot;
+use busy_core::{Snapshot, SourceOptions};
 use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx};
 
 fn main() {
     unsafe { CoInitializeEx(None, COINIT_MULTITHREADED).ok().expect("CoInitializeEx") };
     let t = Instant::now();
     let mut sources = busy_sensors::sources();
+    // `--third-party`: also read LibreHardwareMonitor / HWiNFO (opt-in in the app).
+    let opts = SourceOptions { third_party_sensors: std::env::args().any(|a| a == "--third-party") };
+    for s in &mut sources {
+        s.configure(opts);
+    }
     println!("construct: {:?}", t.elapsed());
     let mut snap = Snapshot::default();
     for i in 0..5 {

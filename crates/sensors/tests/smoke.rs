@@ -1,6 +1,6 @@
 //! Runs both sources against the real machine. Hardware-dependent fields are only range-checked.
 
-use busy_core::{Module, Snapshot};
+use busy_core::{Module, Snapshot, SourceOptions};
 use std::time::Duration;
 use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx};
 
@@ -11,10 +11,16 @@ fn sources_sample_without_panicking() {
     let modules: Vec<Module> = sources.iter().map(|s| s.module()).collect();
     assert_eq!(modules, [Module::Gpu, Module::Sensors]);
 
+    // Defaults first (third-party tools off), then opted in: both paths must run clean.
+    let mut opts = SourceOptions::default();
     let mut snap = Snapshot::default();
-    for _ in 0..2 {
+    for i in 0..4 {
+        if i == 2 {
+            opts.third_party_sensors = true;
+        }
         snap = Snapshot::default();
         for s in &mut sources {
+            s.configure(opts);
             s.sample(&mut snap);
         }
         std::thread::sleep(Duration::from_millis(300));
