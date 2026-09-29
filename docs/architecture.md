@@ -5,12 +5,13 @@
 | Crate | Path | Role |
 |---|---|---|
 | `busy-core` | `crates/core` | Shared types (`Snapshot`, `*Info`), `Source` trait, `Module`, `Config` (+ JSON persistence). No Win32. |
+| `busy-win` | `crates/win` | Win32 plumbing used by more than one crate: wide strings, registry reads, the System32-only `Dll` loader. |
 | `busy-metrics` | `crates/metrics` | Collectors: CPU, memory, disk, network, battery, top processes. |
 | `busy-sensors` | `crates/sensors` | GPU (DXGI/PDH/D3DKMT/NVML/ADL) and temperature/fan sensors (LHM WMI, HWiNFO shared memory). |
 | `busy-settings` | `crates/settings` | Modeless native settings window, autostart registry. |
 | `busy` | `app` | Binary: sampler thread, history, taskbar widget, flyout, theme. |
 
-Dependency direction: `busy` → {`busy-metrics`, `busy-sensors`, `busy-settings`} → `busy-core`. Collector and UI crates never depend on each other; everything they share goes through `busy-core`.
+Dependency direction: `busy` → {`busy-metrics`, `busy-sensors`, `busy-settings`} → {`busy-core`, `busy-win`}. Collector and UI crates never depend on each other; data they share goes through `busy-core`, Win32 helpers through `busy-win`.
 
 ## Layering
 
@@ -19,7 +20,7 @@ Each crate may depend only on the crates in its row, and exposes only what its r
 | Crate | May depend on | Exposes |
 |---|---|---|
 | `busy-core` | `serde`, `serde_json` | Data types, `Source`, `Module`, `Config`. No Win32, no threads; its only I/O is `Config::load`/`save`. |
-| `busy-win` | `windows` | Win32 plumbing shared by more than one crate: wide strings, registry reads, owned handles, the System32 DLL loader, the PDH wrapper. No `busy-*` dependency and no policy (it never decides *what* to read). |
+| `busy-win` | `windows` | Win32 plumbing shared by more than one crate: wide strings, registry reads, the System32 DLL loader, the PDH wrapper. No `busy-*` dependency and no policy (it never decides *what* to read). |
 | `busy-metrics`, `busy-sensors` | `busy-core`, `busy-win` | `sources()` only (plus examples and tests). |
 | `busy-settings` | `busy-core`, `busy-win` | `open`, `is_open`, `is_dialog_message`, `autostart`. |
 | `busy` | all of the above | The binary. |
@@ -39,7 +40,7 @@ Rules:
 - **Lower layers never name higher ones.** Window modules do not `use crate::app`: input goes up as a `win::Event` to the handler the router registered, or as a message posted to the main window. Only the router calls into more than one window.
 - **No `pub` fields on a window-owning struct.** Its HWND, visibility and hover state change only through its methods, so the invariants (z-order, hide timestamps, repaint on change) live in one place.
 - **Domain decisions live in pure modules.** Choosing what to show (the pinned sensor, the busiest GPU) is in `select.rs` or `busy-core`, with tests, not in the router or a window procedure.
-- **One implementation of each Win32 helper.** Wide-string conversion, registry reads, handle RAII, DLL loading and the PDH wrapper exist once, in `busy-win`. A new `encode_utf16().chain(..)`, `RegGetValueW`, `PdhOpenQueryW`, `LoadLibraryExW` or bare `CloseHandle` elsewhere is a duplicate.
+- **One implementation of each Win32 helper.** Wide-string conversion, registry reads, DLL loading and the PDH wrapper exist once, in `busy-win`; kernel handles are held in `windows::core::Owned`. A new `encode_utf16().chain(..)`, `RegGetValueW`, `PdhOpenQueryW`, `LoadLibraryExW` or bare `CloseHandle` elsewhere is a duplicate.
 - **One concern per file, 500 lines at most.** A file that passes 500 lines, or that combines a window procedure with layout and painting, is split in the PR that grows it.
 - **Workers get only what they use.** The sampler receives `sampler::Params` (interval and active modules), not the whole `Config`.
 - **Items in private modules are `pub(crate)` or private**, never plain `pub`, so the crate's real surface is its `lib.rs`.
