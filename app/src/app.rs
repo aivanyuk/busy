@@ -10,6 +10,7 @@ use crate::persist::Writer;
 use crate::render::Gfx;
 use crate::sampler::{Params, Sampler};
 use crate::select::pinned_sensor;
+use crate::sync::lock;
 use crate::taskbar::Taskbar;
 use crate::theme::Theme;
 use crate::win::{self, Event, register_class};
@@ -73,7 +74,7 @@ fn post(msg: u32) {
 
 /// Hands a new config to the UI thread (safe from any thread).
 pub fn submit_config(cfg: Config) {
-    *crate::sampler::lock(&PENDING) = Some(cfg);
+    *lock(&PENDING) = Some(cfg);
     post(WM_APP_CONFIG);
 }
 
@@ -183,7 +184,7 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                 with(App::render_all);
             }
             WM_APP_CONFIG => {
-                if let Some(cfg) = crate::sampler::lock(&PENDING).take() {
+                if let Some(cfg) = lock(&PENDING).take() {
                     with(|a| a.apply_config(cfg, true));
                 }
             }

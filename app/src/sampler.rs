@@ -1,7 +1,8 @@
 //! Background sampling thread. Sources are created and driven only on this thread.
 
+use crate::sync::lock;
 use busy_core::{Config, Module, Snapshot, Source};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
@@ -134,11 +135,6 @@ fn run(shared: Arc<Shared>, hwnd: isize, msg: u32) {
     if com {
         unsafe { CoUninitialize() };
     }
-}
-
-/// Poison-tolerant lock: a panicking source must not take the UI down with it.
-pub fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 #[cfg(test)]
