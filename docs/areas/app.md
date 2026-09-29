@@ -44,6 +44,10 @@ Taskbar follows `SystemUsesLightTheme` (not `AppsUseLightTheme`) unless `Config.
 - Flyout border: `DWMWA_BORDER_COLOR` = `fly_line` blended over `fly` (COLORREF has no alpha; ignored before Win11).
 - Labels `fg3`; bar and sparkline tracks `track`; flyout chart background `well` with `grid` lines; selected Processes tab `accent` / `on_accent`; the flyout paints the translucent `fly` over its acrylic backdrop (opaque `fly` without one).
 
+## Typography
+
+Segoe UI Variable Text (fallback Segoe UI). Numbers use tabular figures (design `tabular-nums`): `Gfx` creates one `IDWriteTypography` with `DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES` at startup, and every measurement plus every drawn string containing a digit goes through `Gfx::layout`, an `IDWriteTextLayout` carrying it (`DrawText` can't carry typography, hence `DrawTextLayout`). Without it Segoe UI Variable's digits are proportional ("1111" is 20 DIPs, "8888" 27 at 12 px), so values changing every second jitter. Strings without digits (constant labels) still go through `DrawText`, which needs no layout of ours. Formats stay cached per window. Measured (release, i9-10900KF, 13.5 px): create + measure a layout 10.6 µs with the typography against 6.5 µs without; a taskbar render measures and draws a few dozen strings, so tens of µs per render.
+
 ## Integration points
 
 - Sources: `sampler.rs` `build_sources()` — `busy_metrics::sources()` then `busy_sensors::sources()` (GPU before Sensors).

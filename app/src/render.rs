@@ -12,6 +12,9 @@ pub struct Gfx {
     pub d2d: ID2D1Factory,
     dw: IDWriteFactory,
     family: HSTRING,
+    /// Tabular figures (OpenType `tnum`, design `font-variant-numeric: tabular-nums`): equal-width digits, so
+    /// changing values don't jitter. Created once; applied to every layout, where it only affects digits.
+    typography: IDWriteTypography,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -63,7 +66,12 @@ impl Gfx {
             };
             let variable = HSTRING::from("Segoe UI Variable Text");
             let family = if has(&variable) { variable } else { HSTRING::from("Segoe UI") };
-            Ok(Self { d2d, dw, family })
+            let typography = dw.CreateTypography()?;
+            typography.AddFontFeature(DWRITE_FONT_FEATURE {
+                nameTag: DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES,
+                parameter: 1,
+            })?;
+            Ok(Self { d2d, dw, family, typography })
         }
     }
 
@@ -105,27 +113,39 @@ impl Gfx {
 
     /// (width, height) of `s` laid out within `max_w`.
     pub fn metrics(&self, f: &IDWriteTextFormat, s: &str, max_w: f32) -> (f32, f32) {
+        let Some(layout) = self.layout(f, s, max_w, 10_000.0) else { return (0.0, 0.0) };
+        let mut m = DWRITE_TEXT_METRICS::default();
+        // SAFETY: `m` is a valid out-pointer for the call.
+        if unsafe { layout.GetMetrics(&mut m) }.is_err() {
+            return (0.0, 0.0);
+        }
+        (m.widthIncludingTrailingWhitespace.ceil(), m.height.ceil())
+    }
+
+    /// Text layout with tabular figures; measuring and drawing text with digits both go through it, so widths
+    /// match what is drawn.
+    fn layout(&self, f: &IDWriteTextFormat, s: &str, max_w: f32, max_h: f32) -> Option<IDWriteTextLayout> {
+        let text = utf16(s);
+        let all = DWRITE_TEXT_RANGE { startPosition: 0, length: text.len() as u32 };
+        // SAFETY: `text` outlives the call (DirectWrite copies it); `f` and the typography are live COM objects.
         unsafe {
-            let Ok(layout) = self.dw.CreateTextLayout(&utf16(s), f, max_w, 10_000.0) else { return (0.0, 0.0) };
-            let mut m = DWRITE_TEXT_METRICS::default();
-            if layout.GetMetrics(&mut m).is_err() {
-                return (0.0, 0.0);
-            }
-            (m.widthIncludingTrailingWhitespace.ceil(), m.height.ceil())
+            let layout = self.dw.CreateTextLayout(&text, f, max_w, max_h).ok()?;
+            let _ = layout.SetTypography(&self.typography, all);
+            Some(layout)
         }
     }
 }
 
 pub struct Canvas<'a> {
     pub rt: &'a ID2D1RenderTarget,
-    factory: &'a ID2D1Factory,
+    gfx: &'a Gfx,
     brush: ID2D1SolidColorBrush,
 }
 
 impl<'a> Canvas<'a> {
     pub fn new(rt: &'a ID2D1RenderTarget, gfx: &'a Gfx) -> Result<Self> {
         let brush = unsafe { rt.CreateSolidColorBrush(&Color::default(), None)? };
-        Ok(Self { rt, factory: &gfx.d2d, brush })
+        Ok(Self { rt, gfx, brush })
     }
 
     fn brush(&self, c: Color) -> &ID2D1SolidColorBrush {
@@ -158,16 +178,28 @@ impl<'a> Canvas<'a> {
             Align::Center => DWRITE_TEXT_ALIGNMENT_CENTER,
             Align::Right => DWRITE_TEXT_ALIGNMENT_TRAILING,
         };
+        // Typography needs a text layout, and `tnum` only changes digits: text without any (the constant labels)
+        // is drawn as before, so only values pay for a layout per draw.
+        if !s.bytes().any(|b| b.is_ascii_digit()) {
+            // SAFETY: the format, render target and brush are live COM objects; the string outlives the call.
+            unsafe {
+                let _ = f.SetTextAlignment(a);
+                self.rt.DrawText(
+                    &utf16(s),
+                    f,
+                    &r.d2d(),
+                    self.brush(c),
+                    D2D1_DRAW_TEXT_OPTIONS_NONE,
+                    DWRITE_MEASURING_MODE_NATURAL,
+                );
+            }
+            return;
+        }
+        let Some(layout) = self.gfx.layout(f, s, r.w.max(0.0), r.h.max(0.0)) else { return };
+        // SAFETY: the layout, render target and brush are live COM objects.
         unsafe {
-            let _ = f.SetTextAlignment(a);
-            self.rt.DrawText(
-                &utf16(s),
-                f,
-                &r.d2d(),
-                self.brush(c),
-                D2D1_DRAW_TEXT_OPTIONS_NONE,
-                DWRITE_MEASURING_MODE_NATURAL,
-            );
+            let _ = layout.SetTextAlignment(a);
+            self.rt.DrawTextLayout(point(r.x, r.y), &layout, self.brush(c), D2D1_DRAW_TEXT_OPTIONS_NONE);
         }
     }
 
@@ -212,7 +244,7 @@ impl<'a> Canvas<'a> {
         let x = |i: usize| r.right() - (n - 1 - i) as f32 * step;
         let y = |i: usize| r.bottom() - (s.get(i) / max).clamp(0.0, 1.0) * r.h;
         let (Ok(area), Ok(stroke)) =
-            (unsafe { self.factory.CreatePathGeometry() }, unsafe { self.factory.CreatePathGeometry() })
+            (unsafe { self.gfx.d2d.CreatePathGeometry() }, unsafe { self.gfx.d2d.CreatePathGeometry() })
         else {
             return;
         };
@@ -263,7 +295,9 @@ mod tests {
     #[test]
     fn fonts() {
         let g = super::Gfx::new().unwrap();
-        g.format(12.0, true).unwrap();
+        let f = g.format(12.0, true).unwrap();
         g.wrapping(12.0).unwrap();
+        // Tabular figures: every digit has the same advance (proportional: "1111" is narrower).
+        assert_eq!(g.text_width(&f, "1111"), g.text_width(&f, "8888"));
     }
 }
