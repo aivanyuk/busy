@@ -12,7 +12,7 @@
 
 **Types:** `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `build` (Cargo, manifest, toolchain), `ci`, `chore`.
 
-**Scopes** = area: `core`, `metrics`, `sensors`, `settings`, `app`, `docs`, `ci`. Omit the scope for workspace-wide changes.
+**Scopes** = area: `core`, `win`, `metrics`, `sensors`, `settings`, `app`, `docs`, `ci`. Omit the scope for workspace-wide changes.
 
 Examples:
 
