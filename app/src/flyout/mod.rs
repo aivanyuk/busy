@@ -1,9 +1,13 @@
 //! Detail flyout: a borderless tool window with a DWM backdrop, drawn with Direct2D.
 
+mod detail;
+mod draw;
+mod modules;
 mod painter;
 mod sections;
 
-use painter::{Fonts, GraphHit, Painter};
+use draw::GraphHit;
+use painter::{Fonts, Painter};
 
 use crate::ctx::Ctx;
 use crate::render::{Canvas, Gfx, Rect};
@@ -49,6 +53,8 @@ pub struct Flyout {
     hwnd: HWND,
     rt: Option<ID2D1HwndRenderTarget>,
     fonts: Fonts,
+    /// Fonts of the design's detailed layout (`draw.rs`).
+    detail_fonts: draw::Fonts,
     visible: bool,
     /// Tick of the last hide caused by deactivation (see `toggle`).
     deactivated_at: u64,
@@ -84,6 +90,7 @@ impl Flyout {
             })
         })()
         .ok()?;
+        let detail_fonts = draw::Fonts::new(gfx).ok()?;
         let hwnd = unsafe {
             CreateWindowExW(
                 WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
@@ -105,6 +112,7 @@ impl Flyout {
             hwnd,
             rt: None,
             fonts,
+            detail_fonts,
             visible: false,
             deactivated_at: 0,
             module: None,
@@ -330,6 +338,11 @@ impl Flyout {
     }
 
     fn layout(&self, ctx: &Ctx, cv: Option<&Canvas>) -> Layout {
+        let mc = self.module.and_then(|m| ctx.cfg.module(m));
+        if let Some(d) = mc.and_then(|mc| modules::detail(ctx, mc)) {
+            let drawn = draw::draw(&d, cv, ctx.gfx, ctx.theme, &self.detail_fonts, self.scroll, self.mouse);
+            return Layout { height: drawn.height, hits: Vec::new(), graphs: drawn.graphs };
+        }
         let mut p = Painter {
             cv,
             ctx,
@@ -342,7 +355,7 @@ impl Flyout {
             graphs: Vec::new(),
             tab: self.tab,
         };
-        if let Some(mc) = self.module.and_then(|m| ctx.cfg.module(m)) {
+        if let Some(mc) = mc {
             p.section(mc);
         }
         Layout { height: p.y + self.scroll + PAD - 4.0, hits: p.hits, graphs: p.graphs }

@@ -147,7 +147,7 @@ impl Cell<'_> {
                 // Design: 1 px clear of the top and bottom edges.
                 let inner = g.inset(0.0, 1.0);
                 for (i, (s, col)) in lines.iter().enumerate() {
-                    cv.graph(inner, s, *max, *col, if i == 0 { 0.3 } else { 0.0 }, GRAPH_SPAN);
+                    cv.graph(inner, s, *max, *col, if i == 0 { 0.3 } else { 0.0 }, 1.2, GRAPH_SPAN);
                 }
             }
             Body::Bar { bars, bar_w, value, color } => {

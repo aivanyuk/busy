@@ -1,12 +1,11 @@
 //! The flyout's layout primitives: a vertical cursor that measures (no canvas) or measures and draws.
 
+use super::draw::GraphHit;
 use crate::ctx::Ctx;
 use crate::fmt;
 use crate::history::Series;
 use crate::render::{Align, Canvas, Rect};
 use crate::theme::{Color, Theme};
-use crate::tone;
-use busy_core::ModuleCfg;
 use windows::Win32::Graphics::DirectWrite::IDWriteTextFormat;
 
 pub(super) struct Fonts {
@@ -15,24 +14,6 @@ pub(super) struct Fonts {
     pub(super) bold: IDWriteTextFormat,
     pub(super) small: IDWriteTextFormat,
     pub(super) hint: IDWriteTextFormat,
-}
-
-/// A history graph as laid out, for mapping the pointer to a sample without painting.
-#[derive(Clone, Copy)]
-pub(super) struct GraphHit {
-    pub(super) r: Rect,
-    inner: Rect,
-    cap: usize,
-    len: usize,
-}
-
-impl GraphHit {
-    /// Samples back from the newest one to the sample nearest `x`, if that sample exists.
-    pub(super) fn sample_at(&self, x: f32) -> Option<usize> {
-        let step = self.inner.w / (self.cap.max(2) - 1) as f32;
-        let k = ((self.inner.right() - x) / step).round().max(0.0) as usize;
-        (k < self.len).then_some(k)
-    }
 }
 
 pub(super) struct Painter<'a> {
@@ -122,7 +103,7 @@ impl Painter<'_> {
         let r = Rect::new(self.x, self.y, self.w, h);
         self.y += h + 8.0;
         let inner = r.inset(1.0, 2.0);
-        let hit = series.first().map(|(s0, _)| GraphHit { r, inner, cap: s0.cap(), len: s0.len() });
+        let hit = series.first().map(|(s0, _)| GraphHit::new(r, inner, s0.cap(), s0.len()));
         self.graphs.extend(hit);
         let Some(cv) = self.cv else { return };
         let t = self.t();
@@ -132,14 +113,14 @@ impl Painter<'_> {
             cv.hline(r.x + 4.0, r.right() - 4.0, y, t.grid);
         }
         for (s, c) in series {
-            cv.graph(inner, s, max, *c, if series.len() > 1 { 0.16 } else { 0.28 }, s.cap());
+            cv.graph(inner, s, max, *c, if series.len() > 1 { 0.16 } else { 0.28 }, 1.25, s.cap());
         }
         if let Some(l) = max_label {
             self.text(&l, &self.f.small, Rect::new(r.x + 6.0, r.y + 2.0, r.w - 12.0, 14.0), t.fg3, Align::Right);
         }
         let Some((mx, my)) = self.mouse.filter(|&(x, y)| r.contains(x, y)) else { return };
         let Some((hit, k)) = hit.and_then(|h| Some((h, h.sample_at(mx)?))) else { return };
-        let x = inner.right() - k as f32 * inner.w / (hit.cap.max(2) - 1) as f32;
+        let x = hit.x_of(k);
         cv.vline(x, r.y + 2.0, r.bottom() - 2.0, t.fg2);
         let secs = k as u64 * series.first().map_or(0, |(s, _)| s.interval_ms()) as u64 / 1000;
         let mut label = series
@@ -157,27 +138,6 @@ impl Painter<'_> {
         let lr = Rect::new(lx.clamp(r.x, r.right() - lw), my.clamp(r.y + 2.0, r.bottom() - 20.0) - 9.0, lw, 18.0);
         cv.round(lr, 4.0, Color { a: 0.95, ..t.fly });
         self.text(&label, &self.f.small, lr, t.fg, Align::Center);
-    }
-
-    pub(super) fn cores(&mut self, v: &[f32], mc: &ModuleCfg) {
-        if v.is_empty() {
-            return;
-        }
-        let n = v.len() as f32;
-        let gap = if v.len() > 32 { 1.0 } else { 2.0 };
-        let bw = ((self.w - gap * (n - 1.0)) / n).min(16.0);
-        if let Some(cv) = self.cv {
-            let t = self.t();
-            for (i, &p) in v.iter().enumerate() {
-                cv.vbar(
-                    Rect::new(self.x + i as f32 * (bw + gap), self.y, bw, 22.0),
-                    p / 100.0,
-                    t.color(tone::fill(mc, p)),
-                    t.track,
-                );
-            }
-        }
-        self.y += 30.0;
     }
 
     pub(super) fn tabs(&mut self, names: &[&str]) {
@@ -241,23 +201,5 @@ impl Painter<'_> {
     pub(super) fn missing(&mut self, title: &str) {
         self.header(title, "", self.t().fg);
         self.sub("Waiting for data…");
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::GraphHit;
-    use crate::render::Rect;
-
-    #[test]
-    fn sample_at_counts_back_from_the_newest_sample() {
-        let r = Rect::new(0.0, 0.0, 102.0, 40.0);
-        // One DIP per sample: inner is 100 wide and spans 101 samples.
-        let g = GraphHit { r, inner: r.inset(1.0, 2.0), cap: 101, len: 50 };
-        assert_eq!(g.sample_at(101.0), Some(0));
-        assert_eq!(g.sample_at(105.0), Some(0));
-        assert_eq!(g.sample_at(90.4), Some(11));
-        assert_eq!(g.sample_at(52.0), Some(49));
-        assert_eq!(g.sample_at(51.0), None);
     }
 }

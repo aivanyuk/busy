@@ -56,6 +56,16 @@ pub fn pct(v: f32) -> String {
     format!("{:.0}%", v.clamp(0.0, 100.0))
 }
 
+/// One decimal, for per-process shares: `"12.3%"`.
+pub fn pct1(v: f32) -> String {
+    format!("{:.1}%", v.clamp(0.0, 100.0))
+}
+
+/// Task Manager's up time: `"3:04:05:06"` (days:hours:minutes:seconds).
+pub fn uptime(secs: u64) -> String {
+    format!("{}:{:02}:{:02}:{:02}", secs / 86400, secs / 3600 % 24, secs / 60 % 60, secs % 60)
+}
+
 /// `59` -> `"59s"`, `3720` -> `"1h 2m"`, `90000` -> `"1d 1h"`.
 pub fn duration(secs: u64) -> String {
     let (d, h, m, s) = (secs / 86400, secs / 3600 % 24, secs / 60 % 60, secs % 60);
@@ -144,6 +154,8 @@ mod tests {
         assert_eq!(duration(3720), "1h 2m");
         assert_eq!(duration(90000), "1d 1h");
         assert_eq!(duration(600), "10m");
+        assert_eq!(pct1(12.345), "12.3%");
+        assert_eq!(uptime(3 * 86400 + 4 * 3600 + 5 * 60 + 6), "3:04:05:06");
         assert_eq!(temp(100.0, TempUnit::Celsius), "100°C");
         assert_eq!(temp(100.0, TempUnit::Fahrenheit), "212°F");
         assert_eq!(mhz(3600), "3.60 GHz");

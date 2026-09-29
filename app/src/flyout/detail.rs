@@ -1,0 +1,115 @@
+//! What one module's flyout shows, in the design's detailed layout (`isDetailed`, design `fly()`). The modules
+//! under `modules/` fill it from a `Ctx`; `draw.rs` lays it out and paints it. Rows without data are left out,
+//! never faked.
+
+use crate::fmt;
+use crate::history::Series;
+use crate::theme::Color;
+
+pub(super) struct Detail<'a> {
+    pub(super) title: &'static str,
+    /// Hardware line under the title.
+    pub(super) sub: String,
+    /// The headline value and what it is, right of the title.
+    pub(super) big: String,
+    pub(super) big_label: String,
+    pub(super) chart: Option<Chart<'a>>,
+    /// Composition bar: (share, color); shares are relative.
+    pub(super) seg: Vec<(f32, Color)>,
+    /// (label, value, swatch color).
+    pub(super) legend: Vec<(String, String, Color)>,
+    /// Per-logical-processor load 0..=100 and color.
+    pub(super) cores: Vec<(f32, Color)>,
+    /// Two-column (key, value) grid.
+    pub(super) stats: Vec<(String, String)>,
+    pub(super) procs_title: &'static str,
+    /// (process name, value), busiest first.
+    pub(super) procs: Vec<(String, String)>,
+    /// A paragraph under the header, e.g. why a module has nothing to show.
+    pub(super) note: Option<String>,
+}
+
+/// The history chart: the first line is filled (area .22), later ones are lines only.
+pub(super) struct Chart<'a> {
+    pub(super) lines: Vec<(&'a Series, Color)>,
+    pub(super) max: f32,
+    /// Below-left: the time the chart spans.
+    pub(super) span: String,
+    /// Below-right: the scale ("0–100%", "Peak 3.2 MB/s").
+    pub(super) max_label: String,
+    /// How the hover readout formats a sample.
+    pub(super) value: Value,
+}
+
+/// Formatting of chart samples for the hover readout.
+#[derive(Clone, Copy)]
+pub(super) enum Value {
+    Pct,
+}
+
+impl Value {
+    pub(super) fn format(self, v: f32) -> String {
+        match self {
+            Value::Pct => fmt::pct(v),
+        }
+    }
+}
+
+impl<'a> Detail<'a> {
+    pub(super) fn new(title: &'static str) -> Self {
+        Self {
+            title,
+            sub: String::new(),
+            big: String::new(),
+            big_label: String::new(),
+            chart: None,
+            seg: Vec::new(),
+            legend: Vec::new(),
+            cores: Vec::new(),
+            stats: Vec::new(),
+            procs_title: "Top processes",
+            procs: Vec::new(),
+            note: None,
+        }
+    }
+
+    /// A module whose first sample hasn't arrived.
+    pub(super) fn waiting(title: &'static str) -> Self {
+        Self { note: Some("Waiting for data…".into()), ..Self::new(title) }
+    }
+
+    /// Adds a stat row when there is a value.
+    pub(super) fn stat(&mut self, key: &str, value: Option<String>) {
+        if let Some(v) = value {
+            self.stats.push((key.into(), v));
+        }
+    }
+}
+
+/// Design `span`: "Last 60 seconds" up to two minutes, then minutes.
+pub(super) fn span(secs: u64) -> String {
+    if secs < 120 { format!("Last {secs} seconds") } else { format!("Last {} minutes", secs / 60) }
+}
+
+/// The time a series spans when full.
+pub(super) fn series_span(s: &Series) -> String {
+    span(s.cap() as u64 * s.interval_ms() as u64 / 1000)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spans() {
+        assert_eq!(span(60), "Last 60 seconds");
+        assert_eq!(span(120), "Last 2 minutes");
+        assert_eq!(span(3600), "Last 60 minutes");
+        assert_eq!(series_span(&Series::new(120, 1000)), "Last 2 minutes");
+    }
+
+    #[test]
+    fn values_format_like_the_cells() {
+        assert_eq!(Value::Pct.format(42.4), "42%");
+    }
+}
