@@ -9,8 +9,9 @@ fn main() {
     let t = Instant::now();
     let mut sources = busy_sensors::sources();
     println!("construct: {:?}", t.elapsed());
+    let n: u32 = std::env::args().nth(1).and_then(|a| a.parse().ok()).unwrap_or(5);
     let mut snap = Snapshot::default();
-    for i in 0..5 {
+    for i in 0..n {
         snap = Snapshot::default();
         for s in &mut sources {
             let t = Instant::now();
