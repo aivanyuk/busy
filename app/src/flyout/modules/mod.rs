@@ -1,6 +1,8 @@
 //! One file per module: what its flyout shows (design `fly()`), as a `Detail`.
 
 mod cpu;
+mod gpu;
+mod memory;
 
 use super::detail::Detail;
 use crate::ctx::Ctx;
@@ -10,6 +12,8 @@ use busy_core::{Module, ModuleCfg, ProcEntry, TOP_N};
 pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Detail<'a>> {
     match mc.module {
         Module::Cpu => Some(cpu::detail(ctx, mc)),
+        Module::Memory => Some(memory::detail(ctx, mc)),
+        Module::Gpu => Some(gpu::detail(ctx, mc)),
         _ => None,
     }
 }
