@@ -6,6 +6,7 @@
 use crate::flyout::{Action, Flyout};
 use crate::launch;
 use crate::menu::{self, Command};
+use crate::presence;
 use crate::sampler::{Params, Sampler};
 use crate::sync::lock;
 use crate::taskbar::Taskbar;
@@ -20,13 +21,6 @@ use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use windows::Win32::Foundation::*;
-use windows::Win32::System::Power::{
-    HPOWERNOTIFY, POWERBROADCAST_SETTING, RegisterPowerSettingNotification, UnregisterPowerSettingNotification,
-};
-use windows::Win32::System::RemoteDesktop::{
-    NOTIFY_FOR_THIS_SESSION, WTSRegisterSessionNotification, WTSUnRegisterSessionNotification,
-};
-use windows::Win32::System::SystemServices::GUID_CONSOLE_DISPLAY_STATE;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{PCWSTR, Result, w};
 
@@ -39,8 +33,6 @@ const WM_APP_THEME: u32 = WM_APP + 5;
 const TIMER_WATCH: usize = 1;
 
 static MAIN: AtomicIsize = AtomicIsize::new(0);
-/// `RegisterPowerSettingNotification` handle for the display state, unregistered with the main window.
-static DISPLAY_NOTIFY: AtomicIsize = AtomicIsize::new(0);
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
 /// Config handed over from another thread / the settings window, applied on WM_APP_CONFIG.
 static PENDING: Mutex<Option<Config>> = Mutex::new(None);
@@ -123,14 +115,9 @@ pub fn run(open_flyout: bool) -> Result<()> {
         // Lets the broadcast through UIPI if we happen to run elevated.
         let _ = ChangeWindowMessageFilterEx(main, msg, MSGFLT_ALLOW, None);
         SetTimer(Some(main), TIMER_WATCH, 1000, None);
-        // Lock/unlock and display on/off pause the sampler. Registration sends the current display state at once.
-        let _ = WTSRegisterSessionNotification(main, NOTIFY_FOR_THIS_SESSION);
-        if let Ok(h) =
-            RegisterPowerSettingNotification(HANDLE(main.0), &GUID_CONSOLE_DISPLAY_STATE, DEVICE_NOTIFY_WINDOW_HANDLE)
-        {
-            DISPLAY_NOTIFY.store(h.0, Ordering::Relaxed);
-        }
     }
+    // Lock/unlock and display on/off pause the sampler.
+    presence::register(main);
     let theme = Theme::resolve(cfg.theme);
     let flyout = Flyout::create(&gfx, main, &theme);
     let app = App {
@@ -259,7 +246,7 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             }
             WM_POWERBROADCAST => {
                 if wp.0 as u32 == PBT_POWERSETTINGCHANGE
-                    && let Some(on) = display_state(lp)
+                    && let Some(on) = presence::display_state(lp)
                 {
                     with(|a| {
                         a.display_off = !on;
@@ -278,11 +265,7 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                 // The unregister calls are RPCs to system services: our child of explorer's taskbar goes first,
                 // so a slow one can't stall the taskbar's input queue.
                 with(App::drop_windows);
-                let _ = WTSUnRegisterSessionNotification(hwnd);
-                let notify = DISPLAY_NOTIFY.swap(0, Ordering::Relaxed);
-                if notify != 0 {
-                    let _ = UnregisterPowerSettingNotification(HPOWERNOTIFY(notify));
-                }
+                presence::unregister(hwnd);
                 PostQuitMessage(0);
             }
             m if m == TASKBAR_CREATED.load(Ordering::Relaxed) => {
@@ -458,24 +441,6 @@ impl App {
             }
         }
         self.apply_config(cfg, true);
-    }
-}
-
-/// Whether a `PBT_POWERSETTINGCHANGE` for `GUID_CONSOLE_DISPLAY_STATE` says the display is on (dimmed counts
-/// as on); `None` for any other setting.
-fn display_state(lp: LPARAM) -> Option<bool> {
-    let p = lp.0 as *const POWERBROADCAST_SETTING;
-    if p.is_null() {
-        return None;
-    }
-    // SAFETY: for PBT_POWERSETTINGCHANGE the system passes a POWERBROADCAST_SETTING valid for this message,
-    // with `DataLength` bytes of data from `Data`; the length is checked before the unaligned read.
-    unsafe {
-        let s = &*p;
-        if s.PowerSetting != GUID_CONSOLE_DISPLAY_STATE || (s.DataLength as usize) < size_of::<u32>() {
-            return None;
-        }
-        Some(std::ptr::addr_of!(s.Data).cast::<u32>().read_unaligned() != 0)
     }
 }
 
