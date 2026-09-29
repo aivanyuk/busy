@@ -38,6 +38,8 @@ pub struct Flyout {
     dpi: u32,
     anchor: RECT,
     anchor_side: Anchor,
+    /// Window rect last passed to `SetWindowPos`.
+    placed: RECT,
     scroll: f32,
     view_h: f32,
     content_h: f32,
@@ -86,6 +88,7 @@ impl Flyout {
             dpi: 96,
             anchor: RECT::default(),
             anchor_side: Anchor::NearTray,
+            placed: RECT::default(),
             scroll: 0.0,
             view_h: 0.0,
             content_h: 0.0,
@@ -136,6 +139,8 @@ impl Flyout {
         if let Some(rt) = &self.rt {
             unsafe { rt.SetDpi(dpi as f32, dpi as f32) };
         }
+        // Sized before the first paint: the anchor, DPI or content may have changed while hidden.
+        self.resize(self.layout(ctx, None).0);
         self.render(ctx);
         unsafe {
             let _ = ShowWindow(self.hwnd, SW_SHOW);
@@ -157,8 +162,15 @@ impl Flyout {
         }
     }
 
-    /// Sizes the window to its content (clamped to the work area) and positions it next to the widget.
-    fn place(&mut self, content_h: f32) {
+    /// Sizes the window to `content_h` (clamped to the work area) and positions it next to the widget.
+    fn resize(&mut self, content_h: f32) {
+        self.content_h = content_h;
+        self.place();
+        self.scroll = self.scroll.clamp(0.0, (content_h - self.view_h).max(0.0));
+    }
+
+    /// Moves the window only when its rect changed.
+    fn place(&mut self) {
         let s = self.scale();
         let mut mi = MONITORINFO { cbSize: size_of::<MONITORINFO>() as u32, ..Default::default() };
         unsafe {
@@ -167,7 +179,7 @@ impl Flyout {
         let wa = mi.rcWork;
         let m = (MARGIN * s).round() as i32;
         let w = (WIDTH * s).round() as i32;
-        let h = ((content_h * s).ceil() as i32).min(wa.bottom - wa.top - 2 * m).max(1);
+        let h = ((self.content_h * s).ceil() as i32).min(wa.bottom - wa.top - 2 * m).max(1);
         self.view_h = h as f32 / s;
         let x = match self.anchor_side {
             Anchor::NearTray => self.anchor.right - w,
@@ -176,27 +188,29 @@ impl Flyout {
         .clamp(wa.left + m, (wa.right - m - w).max(wa.left + m));
         let below_center = self.anchor.top > (wa.top + wa.bottom) / 2;
         let y = if below_center { wa.bottom - m - h } else { wa.top + m };
-        unsafe {
-            let _ = SetWindowPos(self.hwnd, Some(HWND_TOPMOST), x, y, w, h, SWP_NOACTIVATE);
+        let want = RECT { left: x, top: y, right: x + w, bottom: y + h };
+        if std::mem::replace(&mut self.placed, want) != want {
+            unsafe {
+                let _ = SetWindowPos(self.hwnd, Some(HWND_TOPMOST), x, y, w, h, SWP_NOACTIVATE);
+            }
         }
     }
 
+    /// Paints, laying out once; only if that layout's height differs from the window's does it resize and
+    /// paint again.
     pub fn render(&mut self, ctx: &Ctx) {
         if !self.visible {
             return;
         }
-        let (content_h, _) = self.layout(ctx, None);
-        self.content_h = content_h;
-        self.place(content_h);
-        self.scroll = self.scroll.clamp(0.0, (self.content_h - self.view_h).max(0.0));
-        self.paint(ctx);
+        let content_h = self.paint(ctx);
+        if (content_h - self.content_h).abs() >= 0.5 {
+            self.resize(content_h);
+            self.paint(ctx);
+        }
     }
 
-    /// Redraws without re-measuring (mouse/scroll feedback).
-    pub fn paint(&mut self, ctx: &Ctx) {
-        if !self.visible {
-            return;
-        }
+    /// Draws at the current size and scroll; returns the content height its layout measured.
+    fn paint(&mut self, ctx: &Ctx) -> f32 {
         let mut rc = RECT::default();
         unsafe {
             let _ = GetClientRect(self.hwnd, &mut rc);
@@ -223,7 +237,7 @@ impl Flyout {
                 unsafe { rt.SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE) };
             }
         }
-        let Some(rt) = self.rt.clone() else { return };
+        let Some(rt) = self.rt.clone() else { return self.content_h };
         unsafe {
             if rt.GetPixelSize() != size {
                 let _ = rt.Resize(&size);
@@ -236,21 +250,23 @@ impl Flyout {
                 t.background
             }));
         }
-        let hits = Canvas::new(&rt, ctx.gfx).ok().map(|cv| {
-            let (_, hits) = self.layout(ctx, Some(&cv));
+        let laid = Canvas::new(&rt, ctx.gfx).ok().map(|cv| {
+            let laid = self.layout(ctx, Some(&cv));
             if self.content_h > self.view_h + 0.5 {
                 let track = self.view_h - 8.0;
                 let thumb = (track * self.view_h / self.content_h).max(24.0);
                 let y = 4.0 + (track - thumb) * self.scroll / (self.content_h - self.view_h);
                 cv.round(Rect::new(WIDTH - 6.0, y, 3.0, thumb), 1.5, ctx.theme.tertiary);
             }
-            hits
+            laid
         });
-        self.hits = hits.unwrap_or_default();
         let r = unsafe { rt.EndDraw(None, None) };
         if r == Err(D2DERR_RECREATE_TARGET.into()) {
             self.rt = None;
         }
+        let (content_h, hits) = laid.unwrap_or((self.content_h, Vec::new()));
+        self.hits = hits;
+        content_h
     }
 
     fn layout(&self, ctx: &Ctx, cv: Option<&Canvas>) -> (f32, Vec<(Rect, usize)>) {
@@ -281,20 +297,21 @@ impl Flyout {
 
     pub fn on_mouse(&mut self, ctx: &Ctx, pos: Option<(f32, f32)>) {
         self.mouse = pos.map(|(x, y)| (x / self.scale(), y / self.scale()));
-        self.paint(ctx);
+        self.render(ctx);
     }
 
     pub fn on_wheel(&mut self, ctx: &Ctx, delta: i16) {
         let max = (self.content_h - self.view_h).max(0.0);
         self.scroll = (self.scroll - delta as f32 / 120.0 * 48.0).clamp(0.0, max);
-        self.paint(ctx);
+        self.render(ctx);
     }
 
     pub fn on_click(&mut self, ctx: &Ctx, x: f32, y: f32) {
         let (x, y) = (x / self.scale(), y / self.scale());
         if let Some(&(_, tab)) = self.hits.iter().find(|(r, _)| r.contains(x, y)) {
             self.tab = tab;
-            self.paint(ctx);
+            // A tab can list fewer rows than the last one: re-measure.
+            self.render(ctx);
         }
     }
 }
