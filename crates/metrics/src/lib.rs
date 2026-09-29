@@ -7,6 +7,7 @@ mod memory;
 mod network;
 mod processes;
 mod util;
+mod wifi;
 
 use busy_core::Source;
 

@@ -1,6 +1,6 @@
 //! Runs every source against the real machine: no panics, sane ranges.
 
-use busy_core::{Module, Snapshot};
+use busy_core::{Module, NetKind, Snapshot};
 use std::time::Duration;
 use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx};
 
@@ -43,6 +43,13 @@ fn sources_sample_without_panicking() {
     assert!(snap.volumes.iter().filter(|v| v.is_system).count() <= 1);
     for v in &snap.volumes {
         assert!(v.disk_index.is_none_or(|i| snap.disks.iter().any(|d| d.index == Some(i))), "{v:?}");
+    }
+    let net = snap.net.expect("net");
+    for i in &net.interfaces {
+        let Some(w) = &i.wifi else { continue };
+        assert!(i.connected && i.kind == NetKind::Wifi, "{i:?}");
+        assert!(w.signal_pct <= 100 && w.rssi_dbm.is_none_or(|r| (-120..=0).contains(&r)), "{i:?}");
+        assert!(w.channel_mhz.is_none_or(|f| (2400..=7200).contains(&f)), "{i:?}");
     }
     assert!(!snap.top.by_mem.is_empty());
     assert!(snap.top.by_cpu.iter().all(|p| (0.0..=100.0).contains(&p.cpu_pct)));
