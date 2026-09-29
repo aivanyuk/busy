@@ -1,6 +1,6 @@
-use crate::pdh::{Counter, NOCAP100, Query};
 use crate::util::perf_info;
 use busy_core::{CpuInfo, Module, Snapshot, Source};
+use busy_win::pdh::{Counter, PDH_FMT_NOCAP100, Query};
 use busy_win::{reg_dword, reg_string};
 use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SystemProcessorPerformanceInformation};
 use windows::Win32::System::Power::{CallNtPowerInformation, PROCESSOR_POWER_INFORMATION, ProcessorInformation};
@@ -136,9 +136,10 @@ impl Pdh {
             return None;
         }
         // Utility counters exceed 100 under turbo: clamp the total like Task Manager, split user/kernel by raw ratio.
-        let raw = self.total.value(NOCAP100)?.max(0.0);
+        let raw = self.total.value(PDH_FMT_NOCAP100)?.max(0.0);
         let total = raw.min(100.0);
-        let share = if raw > 0.0 { (self.kernel.value(NOCAP100).unwrap_or(0.0) / raw).clamp(0.0, 1.0) } else { 0.0 };
+        let share =
+            if raw > 0.0 { (self.kernel.value(PDH_FMT_NOCAP100).unwrap_or(0.0) / raw).clamp(0.0, 1.0) } else { 0.0 };
         let (total, kernel) = (total as f32, (total * share) as f32);
         // Instances are "group,index" plus "g,_Total"/"_Total"; the array re-expands as cores come and go.
         let mut cores: Vec<_> = self
@@ -156,7 +157,7 @@ impl Pdh {
             user: total - kernel,
             kernel,
             per_core: cores.into_iter().map(|c| c.1).collect(),
-            perf_pct: self.perf.and_then(|c| c.value(NOCAP100)),
+            perf_pct: self.perf.and_then(|c| c.value(PDH_FMT_NOCAP100)),
         })
     }
 }

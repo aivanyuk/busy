@@ -5,7 +5,6 @@ mod cpu;
 mod disk;
 mod memory;
 mod network;
-mod pdh;
 mod processes;
 mod util;
 

@@ -1,6 +1,6 @@
 # busy-metrics
 
-`crates/metrics` — `sources()` returns CPU, Memory, Disk, Network, Battery, Processes. Files: `cpu.rs`, `memory.rs`, `disk.rs`, `network.rs`, `battery.rs`, `processes.rs`, shared `pdh.rs` (PDH query wrapper), `util.rs`.
+`crates/metrics` — `sources()` returns CPU, Memory, Disk, Network, Battery, Processes. Files: `cpu.rs`, `memory.rs`, `disk.rs`, `network.rs`, `battery.rs`, `processes.rs`, `util.rs`; PDH goes through `busy_win::pdh`.
 
 Live check: `cargo run -p busy-metrics --example dump_metrics [samples]`.
 
