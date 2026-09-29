@@ -17,6 +17,24 @@ pub(super) struct Fonts {
     pub(super) hint: IDWriteTextFormat,
 }
 
+/// A history graph as laid out, for mapping the pointer to a sample without painting.
+#[derive(Clone, Copy)]
+pub(super) struct GraphHit {
+    pub(super) r: Rect,
+    inner: Rect,
+    cap: usize,
+    len: usize,
+}
+
+impl GraphHit {
+    /// Samples back from the newest one to the sample nearest `x`, if that sample exists.
+    pub(super) fn sample_at(&self, x: f32) -> Option<usize> {
+        let step = self.inner.w / (self.cap.max(2) - 1) as f32;
+        let k = ((self.inner.right() - x) / step).round().max(0.0) as usize;
+        (k < self.len).then_some(k)
+    }
+}
+
 pub(super) struct Painter<'a> {
     pub(super) cv: Option<&'a Canvas<'a>>,
     pub(super) ctx: &'a Ctx<'a>,
@@ -26,6 +44,7 @@ pub(super) struct Painter<'a> {
     pub(super) y: f32,
     pub(super) mouse: Option<(f32, f32)>,
     pub(super) hits: Vec<(Rect, usize)>,
+    pub(super) graphs: Vec<GraphHit>,
     pub(super) tab: usize,
 }
 
@@ -110,6 +129,9 @@ impl Painter<'_> {
     pub(super) fn graph(&mut self, series: &[(&Series, Color)], max: f32, h: f32, fv: Fmt, max_label: Option<String>) {
         let r = Rect::new(self.x, self.y, self.w, h);
         self.y += h + 8.0;
+        let inner = r.inset(1.0, 2.0);
+        let hit = series.first().map(|(s0, _)| GraphHit { r, inner, cap: s0.cap(), len: s0.len() });
+        self.graphs.extend(hit);
         let Some(cv) = self.cv else { return };
         let t = self.t();
         cv.round(r, 4.0, t.well);
@@ -117,7 +139,6 @@ impl Painter<'_> {
             let y = (r.y + r.h * f).round();
             cv.hline(r.x + 4.0, r.right() - 4.0, y, t.grid);
         }
-        let inner = r.inset(1.0, 2.0);
         for (s, c) in series {
             cv.graph(inner, s, max, *c, if series.len() > 1 { 0.16 } else { 0.28 }, s.cap());
         }
@@ -125,13 +146,8 @@ impl Painter<'_> {
             self.text(&l, &self.f.small, Rect::new(r.x + 6.0, r.y + 2.0, r.w - 12.0, 14.0), t.fg3, Align::Right);
         }
         let Some((mx, my)) = self.mouse.filter(|&(x, y)| r.contains(x, y)) else { return };
-        let Some((s0, _)) = series.first() else { return };
-        let step = inner.w / (s0.cap().max(2) - 1) as f32;
-        let k = ((inner.right() - mx) / step).round().max(0.0) as usize;
-        if k >= s0.len() {
-            return;
-        }
-        let x = inner.right() - k as f32 * step;
+        let Some((hit, k)) = hit.and_then(|h| Some((h, h.sample_at(mx)?))) else { return };
+        let x = inner.right() - k as f32 * inner.w / (hit.cap.max(2) - 1) as f32;
         cv.vline(x, r.y + 2.0, r.bottom() - 2.0, t.fg2);
         let secs = k as u64 * self.ctx.cfg.interval_ms as u64 / 1000;
         let mut label = series
@@ -144,7 +160,8 @@ impl Painter<'_> {
             label = format!("{label}  · {} ago", fmt::duration(secs));
         }
         let lw = self.ctx.gfx.text_width(&self.f.small, &label) + 12.0;
-        let lx = if mx > r.x + r.w / 2.0 { x - lw - 4.0 } else { x + 4.0 };
+        // Placed from the sample, not the pointer: the readout repaints only when the sample changes.
+        let lx = if x > r.x + r.w / 2.0 { x - lw - 4.0 } else { x + 4.0 };
         let lr = Rect::new(lx.clamp(r.x, r.right() - lw), my.clamp(r.y + 2.0, r.bottom() - 20.0) - 9.0, lw, 18.0);
         cv.round(lr, 4.0, Color { a: 0.95, ..t.fly });
         self.text(&label, &self.f.small, lr, t.fg, Align::Center);
@@ -232,5 +249,23 @@ impl Painter<'_> {
     pub(super) fn missing(&mut self, title: &str) {
         self.header(title, "", self.t().fg);
         self.sub("Waiting for data…");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::GraphHit;
+    use crate::render::Rect;
+
+    #[test]
+    fn sample_at_counts_back_from_the_newest_sample() {
+        let r = Rect::new(0.0, 0.0, 102.0, 40.0);
+        // One DIP per sample: inner is 100 wide and spans 101 samples.
+        let g = GraphHit { r, inner: r.inset(1.0, 2.0), cap: 101, len: 50 };
+        assert_eq!(g.sample_at(101.0), Some(0));
+        assert_eq!(g.sample_at(105.0), Some(0));
+        assert_eq!(g.sample_at(90.4), Some(11));
+        assert_eq!(g.sample_at(52.0), Some(49));
+        assert_eq!(g.sample_at(51.0), None);
     }
 }

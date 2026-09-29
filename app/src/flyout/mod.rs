@@ -3,7 +3,7 @@
 mod painter;
 mod sections;
 
-use painter::{Fonts, Painter};
+use painter::{Fonts, GraphHit, Painter};
 
 use crate::ctx::Ctx;
 use crate::render::{Canvas, Gfx, Rect};
@@ -27,6 +27,24 @@ const WIDTH: f32 = 360.0;
 const PAD: f32 = 16.0;
 const MARGIN: f32 = 12.0;
 
+/// What the pointer is over, as far as painting is concerned: a pointer move repaints only when it changes.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+enum Hover {
+    #[default]
+    Nothing,
+    /// Index into `hits`.
+    Hit(usize),
+    /// Sample `k` back from the newest in graph `graph`.
+    Sample { graph: usize, k: usize },
+}
+
+/// What a layout pass produced.
+struct Layout {
+    height: f32,
+    hits: Vec<(Rect, usize)>,
+    graphs: Vec<GraphHit>,
+}
+
 pub struct Flyout {
     hwnd: HWND,
     rt: Option<ID2D1HwndRenderTarget>,
@@ -44,8 +62,11 @@ pub struct Flyout {
     view_h: f32,
     content_h: f32,
     mouse: Option<(f32, f32)>,
+    /// `hover_at(mouse)` as of the last paint.
+    hover: Hover,
     tab: usize,
     hits: Vec<(Rect, usize)>,
+    graphs: Vec<GraphHit>,
 }
 
 impl Flyout {
@@ -93,8 +114,10 @@ impl Flyout {
             view_h: 0.0,
             content_h: 0.0,
             mouse: None,
+            hover: Hover::Nothing,
             tab: 0,
             hits: Vec::new(),
+            graphs: Vec::new(),
         };
         f.apply_theme(theme);
         Some(f)
@@ -151,7 +174,7 @@ impl Flyout {
             unsafe { rt.SetDpi(dpi as f32, dpi as f32) };
         }
         // Sized before the first paint: the anchor, DPI or content may have changed while hidden.
-        self.resize(self.layout(ctx, None).0);
+        self.resize(self.layout(ctx, None).height);
         self.render(ctx);
         unsafe {
             let _ = ShowWindow(self.hwnd, SW_SHOW);
@@ -165,6 +188,7 @@ impl Flyout {
         }
         self.visible = false;
         self.mouse = None;
+        self.hover = Hover::Nothing;
         if deactivated {
             self.deactivated_at = unsafe { GetTickCount64() };
         }
@@ -272,12 +296,27 @@ impl Flyout {
         if r == Err(D2DERR_RECREATE_TARGET.into()) {
             self.rt = None;
         }
-        let (content_h, hits) = laid.unwrap_or((self.content_h, Vec::new()));
-        self.hits = hits;
-        content_h
+        let Some(laid) = laid else { return self.content_h };
+        self.hits = laid.hits;
+        self.graphs = laid.graphs;
+        self.hover = self.hover_at(self.mouse);
+        laid.height
     }
 
-    fn layout(&self, ctx: &Ctx, cv: Option<&Canvas>) -> (f32, Vec<(Rect, usize)>) {
+    fn hover_at(&self, mouse: Option<(f32, f32)>) -> Hover {
+        let Some((x, y)) = mouse else { return Hover::Nothing };
+        if let Some(i) = self.hits.iter().position(|(r, _)| r.contains(x, y)) {
+            return Hover::Hit(i);
+        }
+        self.graphs
+            .iter()
+            .enumerate()
+            .find(|(_, g)| g.r.contains(x, y))
+            .and_then(|(graph, g)| Some(Hover::Sample { graph, k: g.sample_at(x)? }))
+            .unwrap_or_default()
+    }
+
+    fn layout(&self, ctx: &Ctx, cv: Option<&Canvas>) -> Layout {
         let mut p = Painter {
             cv,
             ctx,
@@ -287,6 +326,7 @@ impl Flyout {
             y: PAD - self.scroll,
             mouse: self.mouse,
             hits: Vec::new(),
+            graphs: Vec::new(),
             tab: self.tab,
         };
         let mut first = true;
@@ -300,12 +340,14 @@ impl Flyout {
         if first {
             p.sub("No modules enabled for the flyout.");
         }
-        (p.y + self.scroll + PAD - 4.0, p.hits)
+        Layout { height: p.y + self.scroll + PAD - 4.0, hits: p.hits, graphs: p.graphs }
     }
 
     pub fn on_mouse(&mut self, ctx: &Ctx, pos: Option<(f32, f32)>) {
         self.mouse = pos.map(|(x, y)| (x / self.scale(), y / self.scale()));
-        self.render(ctx);
+        if self.hover_at(self.mouse) != self.hover {
+            self.render(ctx);
+        }
     }
 
     pub fn on_wheel(&mut self, ctx: &Ctx, delta: i16) {
