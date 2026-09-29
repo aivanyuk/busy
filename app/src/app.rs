@@ -6,6 +6,7 @@
 use crate::ctx::Ctx;
 use crate::flyout::Flyout;
 use crate::history::{History, capacity};
+use crate::menu::{self, Command};
 use crate::render::Gfx;
 use crate::sampler::{Params, Sampler};
 use crate::select::taskbar_sensor;
@@ -14,7 +15,7 @@ use crate::taskbar::Taskbar;
 use crate::theme::Theme;
 use crate::win::{self, Event, register_class};
 use crate::worker::Worker;
-use busy_core::{Anchor, Config, Module, Snapshot, ThemeMode};
+use busy_core::{Config, Snapshot, ThemeMode};
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
@@ -29,11 +30,6 @@ const WM_APP_FLYOUT_DEACTIVATED: u32 = WM_APP + 4;
 const WM_APP_THEME: u32 = WM_APP + 5;
 
 const TIMER_WATCH: usize = 1;
-const ID_SETTINGS: u32 = 1;
-const ID_EXIT: u32 = 2;
-const ID_ANCHOR_TRAY: u32 = 3;
-const ID_ANCHOR_LEFT: u32 = 4;
-const ID_TOGGLE: u32 = 100;
 
 static MAIN: AtomicIsize = AtomicIsize::new(0);
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
@@ -372,20 +368,17 @@ impl App {
         busy_settings::open(self.main, &self.cfg, Box::new(submit_config));
     }
 
-    fn on_command(&mut self, id: u32) {
+    fn on_command(&mut self, cmd: Command) {
         let mut cfg = self.cfg.clone();
-        match id {
-            ID_SETTINGS => return self.open_settings(),
-            ID_EXIT => return post_close(),
-            ID_ANCHOR_TRAY => cfg.anchor = Anchor::NearTray,
-            ID_ANCHOR_LEFT => cfg.anchor = Anchor::Left,
-            id if (ID_TOGGLE..ID_TOGGLE + Module::ALL.len() as u32).contains(&id) => {
-                let m = Module::ALL[(id - ID_TOGGLE) as usize];
+        match cmd {
+            Command::Settings => return self.open_settings(),
+            Command::Exit => return post_close(),
+            Command::Anchor(anchor) => cfg.anchor = anchor,
+            Command::Toggle(m) => {
                 if let Some(mc) = cfg.modules.iter_mut().find(|c| c.module == m) {
                     mc.taskbar = !mc.taskbar;
                 }
             }
-            _ => return,
         }
         self.apply_config(cfg, true);
     }
@@ -397,7 +390,7 @@ fn post_close() {
     }
 }
 
-/// Shows the widget's context menu. Runs outside the app borrow: TrackPopupMenu spins a modal loop.
+/// Shows the widget's context menu. Runs outside the app borrow: `menu::show` spins a modal loop.
 fn context_menu() {
     let Some(cfg) = with(|a| {
         a.hide_flyout();
@@ -405,57 +398,7 @@ fn context_menu() {
     }) else {
         return;
     };
-    let main = main_hwnd();
-    unsafe {
-        let (Ok(menu), Ok(sub_mods), Ok(sub_pos)) = (CreatePopupMenu(), CreatePopupMenu(), CreatePopupMenu()) else {
-            return;
-        };
-        let checked = |b: bool| if b { MF_CHECKED } else { MF_UNCHECKED };
-        for mc in cfg.modules.iter().filter(|mc| !mc.module.allowed_styles().is_empty()) {
-            let idx = Module::ALL.iter().position(|m| *m == mc.module).unwrap_or(0) as u32;
-            let label = busy_win::wide(mc.module.label());
-            let _ = AppendMenuW(
-                sub_mods,
-                MF_STRING | checked(mc.taskbar),
-                (ID_TOGGLE + idx) as usize,
-                PCWSTR(label.as_ptr()),
-            );
-        }
-        let _ = AppendMenuW(
-            sub_pos,
-            MF_STRING | checked(cfg.anchor == Anchor::NearTray),
-            ID_ANCHOR_TRAY as usize,
-            w!("Next to notification area"),
-        );
-        let _ = AppendMenuW(
-            sub_pos,
-            MF_STRING | checked(cfg.anchor == Anchor::Left),
-            ID_ANCHOR_LEFT as usize,
-            w!("Left edge"),
-        );
-        let _ = AppendMenuW(menu, MF_STRING, ID_SETTINGS as usize, w!("Settings…"));
-        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
-        let _ = AppendMenuW(menu, MF_POPUP, sub_mods.0 as usize, w!("Show on taskbar"));
-        let _ = AppendMenuW(menu, MF_POPUP, sub_pos.0 as usize, w!("Position"));
-        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
-        let _ = AppendMenuW(menu, MF_STRING, ID_EXIT as usize, w!("Exit"));
-        let mut pt = POINT::default();
-        let _ = GetCursorPos(&mut pt);
-        // Required so the menu closes when clicking elsewhere.
-        let _ = SetForegroundWindow(main);
-        let cmd = TrackPopupMenu(
-            menu,
-            TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_BOTTOMALIGN | TPM_RIGHTALIGN,
-            pt.x,
-            pt.y,
-            None,
-            main,
-            None,
-        );
-        let _ = PostMessageW(Some(main), WM_NULL, WPARAM(0), LPARAM(0));
-        let _ = DestroyMenu(menu);
-        if cmd.0 > 0 {
-            with(|a| a.on_command(cmd.0 as u32));
-        }
+    if let Some(cmd) = menu::show(main_hwnd(), &cfg) {
+        with(|a| a.on_command(cmd));
     }
 }
