@@ -1,10 +1,11 @@
 use crate::text::wide;
+use windows::Win32::Globalization::{CP_UTF8, WideCharToMultiByte};
 use windows::Win32::System::Performance::{
     PDH_CSTATUS_NEW_DATA, PDH_CSTATUS_VALID_DATA, PDH_FMT, PDH_FMT_COUNTERVALUE, PDH_FMT_DOUBLE, PDH_FMT_LARGE,
     PDH_HCOUNTER, PDH_HQUERY, PDH_MORE_DATA, PdhAddEnglishCounterW, PdhCollectQueryData, PdhGetFormattedCounterArrayW,
     PdhGetFormattedCounterValue, PdhGetRawCounterArrayW, PdhOpenQueryW,
 };
-use windows::core::{Owned, PCWSTR};
+use windows::core::{Owned, PCSTR, PCWSTR};
 
 /// Not exposed by the `windows` crate (pdh.h).
 pub const PDH_FMT_NOCAP100: u32 = 0x8000;
@@ -23,12 +24,15 @@ pub struct Query(Owned<PDH_HQUERY>);
 #[derive(Clone, Copy)]
 pub struct Counter(PDH_HCOUNTER);
 
-/// Item buffer for wildcard reads, kept by the caller across samples so it is not reallocated each tick.
+/// Buffers for wildcard reads, kept by the caller across samples so they are not reallocated each tick.
 #[derive(Default)]
-pub struct ArrayBuf(
+pub struct ArrayBuf {
     // u64 backing keeps the item array 8-byte aligned; instance names point into the same buffer.
-    Vec<u64>,
-);
+    items: Vec<u64>,
+    /// UTF-8 of the current instance's name, decoded into the same allocation for every instance (the GPU
+    /// source reads ~600 engine instances a tick). Only grows.
+    name: Vec<u8>,
+}
 
 impl Query {
     pub fn open() -> Option<Self> {
@@ -68,14 +72,18 @@ impl Counter {
     /// Calls `f(instance, value)` for each instance of a wildcard counter with valid data. False if the array
     /// could not be read.
     pub fn each_double(self, flags: u32, buf: &mut ArrayBuf, mut f: impl FnMut(&str, f64)) -> bool {
+        let ArrayBuf { items, name } = buf;
         // SAFETY: PDH_FMT_DOUBLE selects the `doubleValue` member.
-        self.each(PDH_FMT(PDH_FMT_DOUBLE.0 | flags), buf, |n, v| f(&n, unsafe { v.Anonymous.doubleValue }))
+        self.each(PDH_FMT(PDH_FMT_DOUBLE.0 | flags), items, |w, v| {
+            f(decode(w, name), unsafe { v.Anonymous.doubleValue });
+        })
     }
 
     /// [`Self::each_double`] for a counter read as `i64` (byte counts).
     pub fn each_large(self, buf: &mut ArrayBuf, mut f: impl FnMut(&str, i64)) -> bool {
+        let ArrayBuf { items, name } = buf;
         // SAFETY: PDH_FMT_LARGE selects the `largeValue` member.
-        self.each(PDH_FMT_LARGE, buf, |n, v| f(&n, unsafe { v.Anonymous.largeValue }))
+        self.each(PDH_FMT_LARGE, items, |w, v| f(decode(w, name), unsafe { v.Anonymous.largeValue }))
     }
 
     /// Values of a wildcard counter as (instance, value), allocated per call.
@@ -83,44 +91,44 @@ impl Counter {
         let mut out = Vec::new();
         let fmt = PDH_FMT(PDH_FMT_DOUBLE.0 | flags);
         // SAFETY: PDH_FMT_DOUBLE selects the `doubleValue` member.
-        self.each(fmt, &mut ArrayBuf::default(), |n, v| out.push((n, unsafe { v.Anonymous.doubleValue })))
-            .then_some(out)
+        self.each(fmt, &mut Vec::new(), |w, v| out.push((owned(w), unsafe { v.Anonymous.doubleValue }))).then_some(out)
     }
 
     /// Raw `FirstValue` of each instance of a wildcard counter with valid data, without formatting. For a rate
     /// counter of type PERF_COUNTER_BULK_COUNT (e.g. `Disk Read Bytes/sec`) that is the running count since boot.
     pub fn each_raw(self, buf: &mut ArrayBuf, mut f: impl FnMut(&str, i64)) -> bool {
         // SAFETY: `fill` passes either no buffer (size query) or one of `*size` writable, 8-byte aligned bytes.
-        let items = fill(buf, |size, count, p| unsafe { PdhGetRawCounterArrayW(self.0, size, count, p) });
+        let items = fill(&mut buf.items, |size, count, p| unsafe { PdhGetRawCounterArrayW(self.0, size, count, p) });
         let Some(items) = items else { return false };
         for it in items.iter().filter(|it| valid(it.RawValue.CStatus)) {
             // SAFETY: `szName` is a NUL-terminated string PDH wrote into the same, still unmodified buffer.
-            f(&decode(unsafe { it.szName.as_wide() }), it.RawValue.FirstValue);
+            f(decode(unsafe { it.szName.as_wide() }, &mut buf.name), it.RawValue.FirstValue);
         }
         true
     }
 
-    fn each(self, fmt: PDH_FMT, buf: &mut ArrayBuf, mut f: impl FnMut(String, &PDH_FMT_COUNTERVALUE)) -> bool {
+    /// Calls `f(instance, value)` with the undecoded instance name.
+    fn each(self, fmt: PDH_FMT, items: &mut Vec<u64>, mut f: impl FnMut(&[u16], &PDH_FMT_COUNTERVALUE)) -> bool {
         // SAFETY: `fill` passes either no buffer (size query) or one of `*size` writable, 8-byte aligned bytes.
-        let items = fill(buf, |size, count, p| unsafe { PdhGetFormattedCounterArrayW(self.0, fmt, size, count, p) });
-        let Some(items) = items else { return false };
+        let call =
+            |size: &mut u32, count: &mut u32, p| unsafe { PdhGetFormattedCounterArrayW(self.0, fmt, size, count, p) };
+        let Some(items) = fill(items, call) else { return false };
         for it in items.iter().filter(|it| valid(it.FmtValue.CStatus)) {
             // SAFETY: `szName` is a NUL-terminated string PDH wrote into the same, still unmodified buffer.
-            f(decode(unsafe { it.szName.as_wide() }), &it.FmtValue);
+            f(unsafe { it.szName.as_wide() }, &it.FmtValue);
         }
         true
     }
 }
 
-/// Runs a two-call PDH array API — `call(size, count, None)` for the size, then with a buffer — into `buf`, and
+/// Runs a two-call PDH array API — `call(size, count, None)` for the size, then with a buffer — into `items`, and
 /// returns the items it wrote.
-fn fill<T>(buf: &mut ArrayBuf, mut call: impl FnMut(&mut u32, &mut u32, Option<*mut T>) -> u32) -> Option<&[T]> {
+fn fill<T>(items: &mut Vec<u64>, mut call: impl FnMut(&mut u32, &mut u32, Option<*mut T>) -> u32) -> Option<&[T]> {
     const { assert!(align_of::<T>() <= 8) };
     let (mut size, mut count) = (0u32, 0u32);
     if call(&mut size, &mut count, None) != PDH_MORE_DATA {
         return None;
     }
-    let items = &mut buf.0;
     items.resize(items.len().max((size as usize).div_ceil(8)), 0);
     let cap = items.len() * 8;
     let ptr = items.as_mut_ptr().cast::<T>();
@@ -128,14 +136,30 @@ fn fill<T>(buf: &mut ArrayBuf, mut call: impl FnMut(&mut u32, &mut u32, Option<*
         return None;
     }
     // SAFETY: PDH wrote `count` items at the start of the buffer, which holds them (checked above); the slice
-    // borrows `buf`, so the instance names the items point to stay valid and unmodified while it lives.
+    // borrows `items`, so the instance names the items point to stay valid and unmodified while it lives.
     Some(unsafe { std::slice::from_raw_parts(ptr, count as usize) })
 }
 
-/// `from_utf16` first: `from_utf16_lossy` (and a hand-written decode loop) is compiled at our opt-level and cost
-/// the GPU source (~600 engine instances) 1.5–2 ms a tick in debug builds.
-fn decode(w: &[u16]) -> String {
+/// `from_utf16` first: `from_utf16_lossy` is compiled at our opt-level and cost the GPU source (~600 engine
+/// instances) 1.5–2 ms a tick in debug builds.
+fn owned(w: &[u16]) -> String {
     String::from_utf16(w).unwrap_or_else(|_| String::from_utf16_lossy(w))
+}
+
+/// Decodes `w` into `out`, which only grows, and returns it as text; invalid UTF-16 becomes U+FFFD. Converted by
+/// `WideCharToMultiByte`, not in Rust: `char::decode_utf16` and `from_utf16_lossy` are compiled at our opt-level,
+/// and in debug builds decoding into a reused `String` that way made the GPU source (~600 engine instances)
+/// about 4 ms a tick slower.
+fn decode<'a>(w: &[u16], out: &'a mut Vec<u8>) -> &'a str {
+    // One UTF-16 unit is at most 3 UTF-8 bytes (a surrogate pair, two units, is 4).
+    let need = w.len().saturating_mul(3);
+    if out.len() < need {
+        out.resize(need, 0);
+    }
+    // SAFETY: `w` and `out` are valid slices whose lengths the wrapper passes; no default char (not allowed for
+    // UTF-8). An empty `w` or a failure returns 0.
+    let n = unsafe { WideCharToMultiByte(CP_UTF8, 0, w, Some(out), PCSTR::null(), None) };
+    out.get(..usize::try_from(n).unwrap_or(0)).and_then(|b| std::str::from_utf8(b).ok()).unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -150,6 +174,21 @@ mod tests {
         for s in [PDH_CSTATUS_INVALID_DATA, PDH_CALC_NEGATIVE_VALUE, PDH_NO_DATA, 2] {
             assert!(!valid(s), "{s:#x}");
         }
+    }
+
+    #[test]
+    fn decodes_into_the_reused_buffer() {
+        let w = |s: &str| s.encode_utf16().collect::<Vec<_>>();
+        let long = "pid_1234_luid_0x00000000_0x0001607C_phys_0_eng_0_engtype_3D";
+        let mut out = Vec::new();
+        assert_eq!(decode(&w(long), &mut out), long);
+        let cap = out.capacity();
+        for s in ["0 C:", "_Total", "\u{e4} \u{20ac}\u{1d11e}", ""] {
+            assert_eq!(decode(&w(s), &mut out), s);
+        }
+        // A lone surrogate is replaced, not dropped with the rest of the name.
+        assert_eq!(decode(&[0x61, 0xD800, 0x62], &mut out), "a\u{fffd}b");
+        assert_eq!(out.capacity(), cap);
     }
 
     #[test]
