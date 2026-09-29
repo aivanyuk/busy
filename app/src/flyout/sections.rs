@@ -53,7 +53,7 @@ impl Painter<'_> {
                 self.row_kv(
                     "Committed",
                     &format!("{} / {}", fmt::bytes(mem.commit_used), fmt::bytes(mem.commit_limit)),
-                    t.text,
+                    t.fg,
                 );
             }
             Module::Gpu => {
@@ -67,7 +67,7 @@ impl Painter<'_> {
                         self.gap(6.0);
                     }
                     let r = Rect::new(self.x, self.y, self.w, 18.0);
-                    self.text(&g.name, &self.f.bold, Rect { w: r.w - 50.0, ..r }, t.text, Align::Left);
+                    self.text(&g.name, &self.f.bold, Rect { w: r.w - 50.0, ..r }, t.fg, Align::Left);
                     self.text(&fmt::pct(g.util_pct), &self.f.bold, r, t.level(t.gpu, g.util_pct), Align::Right);
                     self.y += 22.0;
                     if let Some(s) = hist.gpus.get(i) {
@@ -77,7 +77,7 @@ impl Painter<'_> {
                         self.row_kv(
                             "Dedicated memory",
                             &format!("{} / {}", fmt::bytes(g.vram_used), fmt::bytes(g.vram_total)),
-                            t.text,
+                            t.fg,
                         );
                         self.bar(g.vram_used as f32 / g.vram_total as f32, t.gpu);
                     }
@@ -113,14 +113,14 @@ impl Painter<'_> {
             }
             Module::Network => {
                 let Some(n) = &snap.net else { return self.missing("Network") };
-                self.header("Network", "", t.text);
+                self.header("Network", "", t.fg);
                 self.rates(("↓", n.rx_bps, t.rx), ("↑", n.tx_bps, t.tx));
                 let max = nice_max(hist.net_rx.max().max(hist.net_tx.max()));
                 self.graph(&[(&hist.net_rx, t.rx), (&hist.net_tx, t.tx)], max, 56.0, rate, Some(fmt::rate(max as f64)));
                 self.kv(&[("Received", fmt::bytes(n.rx_total)), ("Sent", fmt::bytes(n.tx_total))]);
                 for i in n.interfaces.iter().filter(|i| i.connected) {
                     self.gap(4.0);
-                    self.row(&i.name, &format!("↓ {}   ↑ {}", fmt::rate(i.rx_bps), fmt::rate(i.tx_bps)), t.secondary);
+                    self.row(&i.name, &format!("↓ {}   ↑ {}", fmt::rate(i.rx_bps), fmt::rate(i.tx_bps)), t.fg2);
                     let mut info = i.ipv4.join(", ");
                     if i.link_speed_bps > 0 {
                         let speed = match i.link_speed_bps {
@@ -142,16 +142,12 @@ impl Painter<'_> {
                     snap.disks.iter().map(|d| d.read_bps).sum::<f64>(),
                     snap.disks.iter().map(|d| d.write_bps).sum::<f64>(),
                 );
-                self.header("Disk", "", t.text);
+                self.header("Disk", "", t.fg);
                 self.rates(("R", r, t.rx), ("W", w, t.tx));
                 let max = nice_max(hist.disk_r.max().max(hist.disk_w.max()));
                 self.graph(&[(&hist.disk_r, t.rx), (&hist.disk_w, t.tx)], max, 48.0, rate, Some(fmt::rate(max as f64)));
                 for d in &snap.disks {
-                    self.row(
-                        &d.name,
-                        &format!("R {}   W {}", fmt::rate(d.read_bps), fmt::rate(d.write_bps)),
-                        t.secondary,
-                    );
+                    self.row(&d.name, &format!("R {}   W {}", fmt::rate(d.read_bps), fmt::rate(d.write_bps)), t.fg2);
                     self.meter("Active", d.active_pct, t.accent);
                 }
                 if !snap.volumes.is_empty() {
@@ -160,7 +156,7 @@ impl Painter<'_> {
                 for v in &snap.volumes {
                     let used = v.total.saturating_sub(v.free);
                     let name = if v.label.is_empty() { v.mount.clone() } else { format!("{} {}", v.mount, v.label) };
-                    self.row(&name, &format!("{} free of {}", fmt::bytes(v.free), fmt::bytes(v.total)), t.secondary);
+                    self.row(&name, &format!("{} free of {}", fmt::bytes(v.free), fmt::bytes(v.total)), t.fg2);
                     let frac = if v.total > 0 { used as f32 / v.total as f32 } else { 0.0 };
                     self.bar(frac, t.level(t.accent, frac * 100.0));
                 }
@@ -168,7 +164,7 @@ impl Painter<'_> {
             Module::Sensors => {
                 let pinned = select::taskbar_sensor(snap, ctx.cfg);
                 let v = pinned.map(|s| fmt::sensor(s.value, s.kind, unit)).unwrap_or_default();
-                let vc = pinned.filter(|s| s.kind == SensorKind::Temperature).map_or(t.text, |s| t.temp(s.value));
+                let vc = pinned.filter(|s| s.kind == SensorKind::Temperature).map_or(t.fg, |s| t.temp(s.value));
                 self.header("Sensors", &v, vc);
                 if snap.sensors.is_empty() {
                     self.hint(if ctx.cfg.opt_in.third_party_sensors {
@@ -188,7 +184,7 @@ impl Painter<'_> {
                 for g in groups {
                     self.group(g);
                     for s in snap.sensors.iter().filter(|s| s.hardware == g) {
-                        let c = if s.kind == SensorKind::Temperature { t.temp(s.value) } else { t.text };
+                        let c = if s.kind == SensorKind::Temperature { t.temp(s.value) } else { t.fg };
                         self.row_kv(&s.name, &fmt::sensor(s.value, s.kind, unit), c);
                     }
                 }
@@ -220,7 +216,7 @@ impl Painter<'_> {
                 self.kv(&kv);
             }
             Module::Processes => {
-                self.header("Processes", "", t.text);
+                self.header("Processes", "", t.fg);
                 self.tabs(&TABS);
                 let top = &snap.top;
                 let (list, val): (&[ProcEntry], fn(&ProcEntry) -> String) = match self.tab {
@@ -233,7 +229,7 @@ impl Painter<'_> {
                     self.sub("No data");
                 }
                 for p in list.iter().take(busy_core::TOP_N) {
-                    self.row(&p.name, &val(p), t.text);
+                    self.row(&p.name, &val(p), t.fg);
                 }
             }
         }

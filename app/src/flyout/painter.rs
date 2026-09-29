@@ -42,19 +42,19 @@ impl Painter<'_> {
 
     pub(super) fn header(&mut self, title: &str, value: &str, c: Color) {
         let r = Rect::new(self.x, self.y, self.w, 22.0);
-        self.text(title, &self.f.title, r, self.t().text, Align::Left);
+        self.text(title, &self.f.title, r, self.t().fg, Align::Left);
         self.text(value, &self.f.title, r, c, Align::Right);
         self.y += 24.0;
     }
 
     pub(super) fn sub(&mut self, s: &str) {
-        self.text(s, &self.f.small, Rect::new(self.x, self.y, self.w, 16.0), self.t().secondary, Align::Left);
+        self.text(s, &self.f.small, Rect::new(self.x, self.y, self.w, 16.0), self.t().fg2, Align::Left);
         self.y += 18.0;
     }
 
     pub(super) fn group(&mut self, s: &str) {
         self.y += 4.0;
-        self.text(s, &self.f.bold, Rect::new(self.x, self.y, self.w, 18.0), self.t().text, Align::Left);
+        self.text(s, &self.f.bold, Rect::new(self.x, self.y, self.w, 18.0), self.t().fg, Align::Left);
         self.y += 19.0;
     }
 
@@ -65,7 +65,7 @@ impl Painter<'_> {
     pub(super) fn separator(&mut self) {
         self.y += 12.0;
         if let Some(cv) = self.cv {
-            cv.fill(Rect::new(self.x, self.y, self.w, 1.0), self.t().separator);
+            cv.fill(Rect::new(self.x, self.y, self.w, 1.0), self.t().line);
         }
         self.y += 13.0;
     }
@@ -75,8 +75,8 @@ impl Painter<'_> {
         let cw = (self.w - 20.0) / 2.0;
         for (i, (k, v)) in items.iter().enumerate() {
             let r = Rect::new(self.x + (i % 2) as f32 * (cw + 20.0), self.y, cw, 19.0);
-            self.text(k, &self.f.body, r, self.t().secondary, Align::Left);
-            self.text(v, &self.f.body, r, self.t().text, Align::Right);
+            self.text(k, &self.f.body, r, self.t().fg2, Align::Left);
+            self.text(v, &self.f.body, r, self.t().fg, Align::Right);
             if i % 2 == 1 || i + 1 == items.len() {
                 self.y += 19.0;
             }
@@ -86,7 +86,7 @@ impl Painter<'_> {
     pub(super) fn row(&mut self, left: &str, right: &str, rc: Color) {
         let r = Rect::new(self.x, self.y, self.w, 20.0);
         let rw = self.ctx.gfx.text_width(&self.f.body, right);
-        self.text(left, &self.f.body, Rect { w: (self.w - rw - 8.0).max(0.0), ..r }, self.t().text, Align::Left);
+        self.text(left, &self.f.body, Rect { w: (self.w - rw - 8.0).max(0.0), ..r }, self.t().fg, Align::Left);
         self.text(right, &self.f.body, r, rc, Align::Right);
         self.y += 20.0;
     }
@@ -100,7 +100,7 @@ impl Painter<'_> {
 
     pub(super) fn hint(&mut self, s: &str) {
         let (_, h) = self.ctx.gfx.metrics(&self.f.hint, s, self.w);
-        self.text(s, &self.f.hint, Rect::new(self.x, self.y, self.w, h), self.t().secondary, Align::Left);
+        self.text(s, &self.f.hint, Rect::new(self.x, self.y, self.w, h), self.t().fg2, Align::Left);
         self.y += h + 4.0;
     }
 
@@ -113,14 +113,14 @@ impl Painter<'_> {
         cv.round(r, 4.0, t.track);
         for f in [0.25, 0.5, 0.75] {
             let y = (r.y + r.h * f).round();
-            cv.hline(r.x + 4.0, r.right() - 4.0, y, alpha(t.separator, 0.7));
+            cv.hline(r.x + 4.0, r.right() - 4.0, y, alpha(t.line, 0.7));
         }
         let inner = r.inset(1.0, 2.0);
         for (s, c) in series {
             cv.graph(inner, s, max, *c, if series.len() > 1 { 0.16 } else { 0.28 }, s.cap());
         }
         if let Some(l) = max_label {
-            self.text(&l, &self.f.small, Rect::new(r.x + 6.0, r.y + 2.0, r.w - 12.0, 14.0), t.tertiary, Align::Right);
+            self.text(&l, &self.f.small, Rect::new(r.x + 6.0, r.y + 2.0, r.w - 12.0, 14.0), t.fg3, Align::Right);
         }
         let Some((mx, my)) = self.mouse.filter(|&(x, y)| r.contains(x, y)) else { return };
         let Some((s0, _)) = series.first() else { return };
@@ -130,7 +130,7 @@ impl Painter<'_> {
             return;
         }
         let x = inner.right() - k as f32 * step;
-        cv.vline(x, r.y + 2.0, r.bottom() - 2.0, t.secondary);
+        cv.vline(x, r.y + 2.0, r.bottom() - 2.0, t.fg2);
         let secs = k as u64 * self.ctx.cfg.interval_ms as u64 / 1000;
         let mut label = series
             .iter()
@@ -144,8 +144,8 @@ impl Painter<'_> {
         let lw = self.ctx.gfx.text_width(&self.f.small, &label) + 12.0;
         let lx = if mx > r.x + r.w / 2.0 { x - lw - 4.0 } else { x + 4.0 };
         let lr = Rect::new(lx.clamp(r.x, r.right() - lw), my.clamp(r.y + 2.0, r.bottom() - 20.0) - 9.0, lw, 18.0);
-        cv.round(lr, 4.0, if t.dark { alpha(t.background, 0.92) } else { alpha(crate::theme::rgb(0xFFFFFF), 0.95) });
-        self.text(&label, &self.f.small, lr, t.text, Align::Center);
+        cv.round(lr, 4.0, if t.dark { alpha(t.fly, 0.92) } else { alpha(crate::theme::rgb(0xFFFFFF), 0.95) });
+        self.text(&label, &self.f.small, lr, t.fg, Align::Center);
     }
 
     pub(super) fn cores(&mut self, v: &[f32]) {
@@ -186,7 +186,7 @@ impl Painter<'_> {
                 }
             }
             let f = if i == self.tab { &self.f.bold } else { &self.f.body };
-            self.text(name, f, tr, if i == self.tab { t.text } else { t.secondary }, Align::Center);
+            self.text(name, f, tr, if i == self.tab { t.fg } else { t.fg2 }, Align::Center);
             self.hits.push((tr, i));
         }
         self.y += 30.0;
@@ -195,8 +195,8 @@ impl Painter<'_> {
     pub(super) fn meter(&mut self, label: &str, p: f32, c: Color) {
         let r = Rect::new(self.x, self.y, self.w, 18.0);
         let t = *self.t();
-        self.text(label, &self.f.small, Rect { w: 60.0, ..r }, t.secondary, Align::Left);
-        self.text(&fmt::pct(p), &self.f.small, r, t.secondary, Align::Right);
+        self.text(label, &self.f.small, Rect { w: 60.0, ..r }, t.fg2, Align::Left);
+        self.text(&fmt::pct(p), &self.f.small, r, t.fg2, Align::Right);
         if let Some(cv) = self.cv {
             cv.hbar(Rect::new(self.x + 60.0, self.y + 6.5, self.w - 100.0, 5.0), p / 100.0, c, t.track);
         }
@@ -205,7 +205,7 @@ impl Painter<'_> {
 
     pub(super) fn row_kv(&mut self, left: &str, right: &str, rc: Color) {
         let r = Rect::new(self.x, self.y, self.w, 19.0);
-        self.text(left, &self.f.body, Rect { w: r.w - 80.0, ..r }, self.t().secondary, Align::Left);
+        self.text(left, &self.f.body, Rect { w: r.w - 80.0, ..r }, self.t().fg2, Align::Left);
         self.text(right, &self.f.body, r, rc, Align::Right);
         self.y += 19.0;
     }
@@ -220,7 +220,7 @@ impl Painter<'_> {
                 &fmt::rate(v),
                 &self.f.bold,
                 Rect::new(x + 14.0, self.y, half - 14.0, 20.0),
-                self.t().text,
+                self.t().fg,
                 Align::Left,
             );
         }
@@ -228,7 +228,7 @@ impl Painter<'_> {
     }
 
     pub(super) fn missing(&mut self, title: &str) {
-        self.header(title, "", self.t().text);
+        self.header(title, "", self.t().fg);
         self.sub("Waiting for data…");
     }
 }

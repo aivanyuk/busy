@@ -24,14 +24,14 @@ pub fn alpha(c: Color, a: f32) -> Color {
 #[derive(Clone, Copy, Debug)]
 pub struct Theme {
     pub dark: bool,
-    pub text: Color,
-    pub secondary: Color,
-    pub tertiary: Color,
+    pub fg: Color,
+    pub fg2: Color,
+    pub fg3: Color,
     /// Solid flyout background when no system backdrop is available.
-    pub background: Color,
+    pub fly: Color,
     /// Subtle card/track fill (graph backgrounds, empty bar parts).
     pub track: Color,
-    pub separator: Color,
+    pub line: Color,
     pub hover: Color,
     pub accent: Color,
     pub mem: Color,
@@ -61,12 +61,12 @@ impl Theme {
         if dark {
             Self {
                 dark,
-                text: rgb(0xFFFFFF),
-                secondary: rgba(0xFFFFFF, 0.62),
-                tertiary: rgba(0xFFFFFF, 0.40),
-                background: rgb(0x202020),
+                fg: rgb(0xFFFFFF),
+                fg2: rgba(0xFFFFFF, 0.62),
+                fg3: rgba(0xFFFFFF, 0.40),
+                fly: rgb(0x202020),
                 track: rgba(0xFFFFFF, 0.07),
-                separator: rgba(0xFFFFFF, 0.09),
+                line: rgba(0xFFFFFF, 0.09),
                 hover: rgba(0xFFFFFF, 0.08),
                 accent,
                 mem: rgb(0x6CCB5F),
@@ -80,12 +80,12 @@ impl Theme {
         } else {
             Self {
                 dark,
-                text: rgba(0x000000, 0.90),
-                secondary: rgba(0x000000, 0.60),
-                tertiary: rgba(0x000000, 0.42),
-                background: rgb(0xF3F3F3),
+                fg: rgba(0x000000, 0.90),
+                fg2: rgba(0x000000, 0.60),
+                fg3: rgba(0x000000, 0.42),
+                fly: rgb(0xF3F3F3),
                 track: rgba(0x000000, 0.06),
-                separator: rgba(0x000000, 0.08),
+                line: rgba(0x000000, 0.08),
                 hover: rgba(0x000000, 0.06),
                 accent,
                 mem: rgb(0x0F7B0F),
@@ -112,7 +112,7 @@ impl Theme {
         match c {
             c if c >= 90.0 => self.crit,
             c if c >= 75.0 => self.warn,
-            _ => self.text,
+            _ => self.fg,
         }
     }
 }

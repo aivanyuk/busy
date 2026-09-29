@@ -230,11 +230,7 @@ impl Flyout {
             }
             rt.BeginDraw();
             let t = ctx.theme;
-            rt.Clear(Some(&if self.backdrop {
-                alpha(t.background, if t.dark { 0.5 } else { 0.4 })
-            } else {
-                t.background
-            }));
+            rt.Clear(Some(&if self.backdrop { alpha(t.fly, if t.dark { 0.5 } else { 0.4 }) } else { t.fly }));
         }
         let hits = Canvas::new(&rt, ctx.gfx).ok().map(|cv| {
             let (_, hits) = self.layout(ctx, Some(&cv));
@@ -242,7 +238,7 @@ impl Flyout {
                 let track = self.view_h - 8.0;
                 let thumb = (track * self.view_h / self.content_h).max(24.0);
                 let y = 4.0 + (track - thumb) * self.scroll / (self.content_h - self.view_h);
-                cv.round(Rect::new(WIDTH - 6.0, y, 3.0, thumb), 1.5, ctx.theme.tertiary);
+                cv.round(Rect::new(WIDTH - 6.0, y, 3.0, thumb), 1.5, ctx.theme.fg3);
             }
             hits
         });
