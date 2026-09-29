@@ -20,6 +20,8 @@ use windows::core::{Interface, Owned, PWSTR};
 use crate::{Shared, adl::Adl, dx, nvml::Nvml, reading};
 
 const REENUM: Duration = Duration::from_secs(60);
+/// Distinct engine type names kept (drivers report a handful: 3D, Copy, VideoDecode, …).
+const MAX_ENGINE_TYPES: usize = 32;
 
 /// Sensor-ish GPU values, from one backend.
 #[derive(Default, Clone, Copy)]
@@ -265,6 +267,45 @@ pub struct GpuSource {
     adl: Option<Adl>,
     names: HashMap<u32, String>,
     buf: ArrayBuf,
+    scratch: Scratch,
+}
+
+/// Per-sample containers, cleared and refilled every tick so their allocations are reused.
+#[derive(Default)]
+struct Scratch {
+    /// (luid, eng) -> (sum over pids, index into `types`, `usize::MAX` for none)
+    engines: HashMap<(u64, u32), (f64, usize)>,
+    /// (pid, luid, eng) -> sum
+    procs: HashMap<(u32, u64, u32), f64>,
+    dedicated: HashMap<u64, u64>,
+    shared: HashMap<u64, u64>,
+    per_pid: HashMap<u32, f64>,
+    top: Vec<(u32, f64)>,
+    /// Engine type names seen so far; never cleared, at most `MAX_ENGINE_TYPES`.
+    types: Vec<String>,
+}
+
+impl Scratch {
+    fn clear(&mut self) {
+        self.engines.clear();
+        self.procs.clear();
+        self.dedicated.clear();
+        self.shared.clear();
+        self.per_pid.clear();
+        self.top.clear();
+    }
+}
+
+/// Index of engine type `ty` in `types`, adding it while there is room.
+fn engine_type(types: &mut Vec<String>, ty: &str) -> usize {
+    match types.iter().position(|t| t == ty) {
+        Some(i) => i,
+        None if types.len() < MAX_ENGINE_TYPES => {
+            types.push(ty.to_owned());
+            types.len() - 1
+        }
+        None => usize::MAX,
+    }
 }
 
 impl GpuSource {
@@ -278,6 +319,7 @@ impl GpuSource {
             adl: None,
             names: HashMap::new(),
             buf: ArrayBuf::default(),
+            scratch: Scratch::default(),
         }
     }
 
@@ -326,11 +368,8 @@ impl Source for GpuSource {
             self.refresh();
         }
 
-        // (luid, eng) -> (sum over pids, engtype); (pid, luid, eng) -> sum
-        let mut engines: HashMap<(u64, u32), (f64, String)> = HashMap::new();
-        let mut procs: HashMap<(u32, u64, u32), f64> = HashMap::new();
-        let mut dedicated: HashMap<u64, u64> = HashMap::new();
-        let mut shared_mem: HashMap<u64, u64> = HashMap::new();
+        self.scratch.clear();
+        let Scratch { engines, procs, dedicated, shared: shared_mem, per_pid, top, types } = &mut self.scratch;
         if let Some(p) = &self.pdh
             && p.q.collect()
         {
@@ -344,12 +383,12 @@ impl Source for GpuSource {
                 };
                 let e = engines.entry((luid, eng)).or_insert_with(|| {
                     let ty = name.find("_engtype_").map_or("", |i| &name[i + 9..]);
-                    (0.0, ty.to_owned())
+                    (0.0, engine_type(types, ty))
                 });
                 e.0 += v;
                 *procs.entry((pid, luid, eng)).or_default() += v;
             });
-            for (c, map) in [(p.dedicated, &mut dedicated), (p.shared, &mut shared_mem)] {
+            for (c, map) in [(p.dedicated, &mut *dedicated), (p.shared, &mut *shared_mem)] {
                 c.each_large(&mut self.buf, |name, v| {
                     if let Some(luid) = parse_luid(name) {
                         *map.entry(luid).or_default() += v.max(0) as u64;
@@ -373,20 +412,18 @@ impl Source for GpuSource {
                     feature_level: a.feature_level,
                     ..Default::default()
                 };
-                let mut types: Vec<(String, f32)> = Vec::new();
-                for ((_, _), (sum, ty)) in engines.iter().filter(|((l, _), _)| *l == a.luid) {
+                let mut by_type: Vec<(String, f32)> = Vec::new();
+                for ((_, _), (sum, t)) in engines.iter().filter(|((l, _), _)| *l == a.luid) {
                     let v = sum.clamp(0.0, 100.0) as f32;
                     g.util_pct = g.util_pct.max(v);
-                    if ty.is_empty() {
-                        continue;
-                    }
-                    match types.iter_mut().find(|(t, _)| t == ty) {
+                    let Some(ty) = types.get(*t).filter(|ty| !ty.is_empty()) else { continue };
+                    match by_type.iter_mut().find(|(t, _)| t == ty) {
                         Some(t) => t.1 = t.1.max(v),
-                        None => types.push((ty.clone(), v)),
+                        None => by_type.push((ty.clone(), v)),
                     }
                 }
-                types.sort_by(|x, y| x.0.cmp(&y.0));
-                g.engines = types;
+                by_type.sort_by(|x, y| x.0.cmp(&y.0));
+                g.engines = by_type;
 
                 let kmt = a.kmt_stats();
                 let (src, vs) = match (&a.vendor, &self.nvml, &self.adl) {
@@ -415,18 +452,17 @@ impl Source for GpuSource {
             sh.at = Some(Instant::now());
         }
 
-        let mut per_pid: HashMap<u32, f64> = HashMap::new();
-        for (&(pid, _, _), &v) in &procs {
+        for (&(pid, _, _), &v) in procs.iter() {
             let e = per_pid.entry(pid).or_default();
             *e = e.max(v);
         }
         self.names.retain(|pid, _| per_pid.contains_key(pid));
-        let mut top: Vec<(u32, f64)> = per_pid.into_iter().filter(|&(pid, v)| pid != 0 && v >= 0.05).collect();
+        top.extend(per_pid.iter().map(|(&pid, &v)| (pid, v)).filter(|&(pid, v)| pid != 0 && v >= 0.05));
         top.sort_by(|a, b| b.1.total_cmp(&a.1));
         top.truncate(TOP_N);
         snap.top.by_gpu = top
-            .into_iter()
-            .map(|(pid, v)| ProcEntry {
+            .iter()
+            .map(|&(pid, v)| ProcEntry {
                 pid,
                 name: self.names.entry(pid).or_insert_with(|| proc_name(pid)).clone(),
                 gpu_pct: v.clamp(0.0, 100.0) as f32,
