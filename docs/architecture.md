@@ -117,7 +117,6 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 | HWiNFO reopens and copies its mapping every tick; processes, GPU, disk and network rebuild their maps every tick. | Performance: reuse buffers |
 | The taskbar redraws every snapshot and every watch tick; the flyout repaints on every mouse move. | Performance: redraw only on change |
 | About 2 `SAFETY` comments for about 200 `unsafe` blocks. | Security: `SAFETY` comments |
-| The battery device is opened `GENERIC_READ \| GENERIC_WRITE`. | Security: least privilege |
 | LHM row count and string lengths, and the config file size, are unbounded. | Security: foreign data |
 | CI actions are pinned by tag, with no `permissions:` block and no dependency audit. | Security: CI |
 
