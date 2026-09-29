@@ -4,6 +4,7 @@
 
 mod app;
 mod ctx;
+#[cfg(debug_assertions)]
 mod fake;
 mod flyout;
 mod fmt;
@@ -33,7 +34,10 @@ fn main() {
     if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
         return;
     }
-    // `--open-flyout`: open the flyout after the first sample (debugging/screenshots).
+    // Debug builds: `--open-flyout` opens the flyout after the first sample (screenshots).
+    #[cfg(debug_assertions)]
     let open_flyout = std::env::args().any(|a| a == "--open-flyout");
+    #[cfg(not(debug_assertions))]
+    let open_flyout = false;
     let _ = app::run(open_flyout);
 }
