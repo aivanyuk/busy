@@ -43,6 +43,7 @@ name = "busy-settings"
 version = "0.1.0"
 dependencies = [
  "busy-core",
+ "busy-win",
  "windows",
 ]
 
