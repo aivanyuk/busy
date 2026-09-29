@@ -9,13 +9,13 @@ const CORE_BARS: usize = 8;
 
 /// The reading picked for the taskbar Sensors cell (`options.sensors.sensor`). `Named` and `Cpu` fall back to
 /// the hottest temperature so the cell isn't empty; `Gpu` and `Storage` show nothing rather than another part.
-pub(crate) fn taskbar_sensor<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a SensorReading> {
+pub fn taskbar_sensor<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a SensorReading> {
     pick(snap, &cfg.options.sensors.sensor, true)
 }
 
 /// The hottest temperature of one part (`Cpu`, `Gpu` or `Storage`), without falling back to another part: a
 /// flyout's "Temperature" row names the part it belongs to.
-pub(crate) fn part_temp<'a>(snap: &'a Snapshot, part: &SensorPick) -> Option<&'a SensorReading> {
+pub fn part_temp<'a>(snap: &'a Snapshot, part: &SensorPick) -> Option<&'a SensorReading> {
     pick(snap, part, false)
 }
 
@@ -51,7 +51,7 @@ fn pick<'a>(snap: &'a Snapshot, pick: &SensorPick, fallback: bool) -> Option<&'a
 
 /// The volume the Disk Text and Bar cells show (`options.disk.drive`, else the system drive). A configured drive
 /// that is gone (unplugged) falls back to the system drive, whose letter the cell then shows.
-pub(crate) fn disk_volume<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a VolumeInfo> {
+pub fn disk_volume<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a VolumeInfo> {
     let chosen =
         cfg.options.disk.drive.as_deref().and_then(|d| snap.volumes.iter().find(|v| v.mount.eq_ignore_ascii_case(d)));
     chosen.or_else(|| snap.volumes.iter().find(|v| v.is_system)).or(snap.volumes.first())
@@ -59,7 +59,7 @@ pub(crate) fn disk_volume<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a Vo
 
 /// (download, upload) bytes/s of the interfaces `options.network.interface` picks: the physical-interface
 /// totals for `Auto`, else the sum over the matching interfaces (0 when none matches, e.g. Wi-Fi off).
-pub(crate) fn net_rates(snap: &Snapshot, cfg: &Config) -> Option<(f64, f64)> {
+pub fn net_rates(snap: &Snapshot, cfg: &Config) -> Option<(f64, f64)> {
     let n = snap.net.as_ref()?;
     let sum = |pick: &dyn Fn(&NetIf) -> bool| {
         n.interfaces.iter().filter(|i| pick(i)).fold((0.0, 0.0), |(rx, tx), i| (rx + i.rx_bps, tx + i.tx_bps))
@@ -74,13 +74,13 @@ pub(crate) fn net_rates(snap: &Snapshot, cfg: &Config) -> Option<(f64, f64)> {
 
 /// The GPU the taskbar cell and the flyout show: the busiest, with its index into `Snapshot::gpus` (and the
 /// history's `gpus`).
-pub(crate) fn busiest_gpu(snap: &Snapshot) -> Option<(usize, &GpuInfo)> {
+pub fn busiest_gpu(snap: &Snapshot) -> Option<(usize, &GpuInfo)> {
     snap.gpus.iter().enumerate().max_by(|a, b| a.1.util_pct.total_cmp(&b.1.util_pct))
 }
 
 /// Up to three engines for the GPU flyout's legend, busiest first; idle ones (under 1 %) are left out, except
 /// that the busiest is always shown so the legend isn't empty on an idle GPU.
-pub(crate) fn busy_engines(engines: &[(String, f32)]) -> Vec<(&str, f32)> {
+pub fn busy_engines(engines: &[(String, f32)]) -> Vec<(&str, f32)> {
     let mut v: Vec<(&str, f32)> = engines.iter().map(|(n, p)| (n.as_str(), *p)).collect();
     v.sort_by(|a, b| b.1.total_cmp(&a.1));
     v.into_iter().enumerate().filter(|(i, e)| *i == 0 || e.1 >= 1.0).take(3).map(|(_, e)| e).collect()
@@ -88,7 +88,7 @@ pub(crate) fn busy_engines(engines: &[(String, f32)]) -> Vec<(&str, f32)> {
 
 /// The interface the Network flyout describes: the one `options.network.interface` names, else the first
 /// connected one of the chosen kind; for `Auto` the connected physical interface moving the most data.
-pub(crate) fn net_interface<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a NetIf> {
+pub fn net_interface<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a NetIf> {
     let n = snap.net.as_ref()?;
     let up = || n.interfaces.iter().filter(|i| i.connected);
     match &cfg.options.network.interface {
@@ -104,7 +104,7 @@ pub(crate) fn net_interface<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a 
 
 /// The CPU "Cores" bars: at most `CORE_BARS`, each the mean of an equal run of logical processors (pairs on a
 /// 16-thread CPU, as in the design; one bar per processor with 8 or fewer).
-pub(crate) fn core_bars(per_core: &[f32]) -> Vec<f32> {
+pub fn core_bars(per_core: &[f32]) -> Vec<f32> {
     if per_core.is_empty() {
         return Vec::new();
     }

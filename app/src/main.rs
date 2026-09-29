@@ -7,13 +7,10 @@ mod ctx;
 #[cfg(debug_assertions)]
 mod fake;
 mod flyout;
-mod fmt;
-mod history;
 mod launch;
 mod menu;
 mod render;
 mod sampler;
-mod select;
 mod sync;
 mod taskbar;
 mod theme;

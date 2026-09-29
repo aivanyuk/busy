@@ -36,6 +36,7 @@ Definition of done for any change: fmt clean, clippy clean with `-D warnings`, t
 | CPU/memory/disk/network/battery/processes collectors | [docs/areas/metrics.md](docs/areas/metrics.md) |
 | GPU, NVML/ADL/D3DKMT, LHM/HWiNFO sensors | [docs/areas/sensors.md](docs/areas/sensors.md) |
 | Taskbar widget, flyout, rendering, theme | [docs/areas/app.md](docs/areas/app.md) |
+| Shared UI code: formatting, selection, history | [docs/areas/ui.md](docs/areas/ui.md) |
 | Settings window, autostart | [docs/areas/settings.md](docs/areas/settings.md) |
 | Code style, unsafe, errors, lints | [docs/code-quality.md](docs/code-quality.md) |
 | Test strategy and manual UI checks | [docs/testing.md](docs/testing.md) |

@@ -1,8 +1,8 @@
 use super::super::detail::{Chart, Detail, Value, series_span};
 use crate::ctx::Ctx;
-use crate::fmt;
 use crate::tone::{self, SECOND};
 use busy_core::{Module, ModuleCfg};
+use busy_ui::fmt;
 
 /// Design `fly('mem')`: memory in use over time, the composition of physical memory (in use, modified,
 /// standby, free), commit and kernel pools, and the processes using the most.

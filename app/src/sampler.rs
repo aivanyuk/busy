@@ -1,8 +1,8 @@
 //! Background sampling thread. Sources are created and driven only on this thread.
 
-use crate::history::Fresh;
 use crate::sync::lock;
 use busy_core::{Config, Module, Snapshot, Source, SourceOptions};
+use busy_ui::history::Fresh;
 use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};

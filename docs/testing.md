@@ -8,7 +8,7 @@ cargo test --workspace
 
 | Layer | Where | What |
 |---|---|---|
-| Unit | `#[cfg(test)] mod tests` next to the code | Pure logic: config normalize/serde, formatting (`app/src/fmt.rs`), history ring, PDH instance-name parsing, shared-memory parsers fed with synthetic bytes, network counting rule. |
+| Unit | `#[cfg(test)] mod tests` next to the code | Pure logic: config normalize/serde, formatting (`crates/ui/src/fmt.rs`), history ring, PDH instance-name parsing, shared-memory parsers fed with synthetic bytes, network counting rule. |
 | Smoke (real hardware) | `crates/metrics/tests/smoke.rs`, `crates/sensors/tests/smoke.rs` | Build all sources, sample twice, assert no panic and sane ranges. Hardware-dependent fields (GPU, battery, sensors) are range-checked only when present, so they pass on CI runners without a GPU. |
 | Live dump | `cargo run -p busy-metrics --example dump_metrics`, `-p busy-sensors --example dump_sensors` | Human sanity check against Task Manager / `Get-Counter` / `nvidia-smi`. Prints per-source sample cost and heap allocations (a counting global allocator in the example). |
 | UI manual | see below | Taskbar/flyout/settings can't be meaningfully unit-tested. |
