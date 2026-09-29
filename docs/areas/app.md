@@ -40,6 +40,8 @@ Taskbar follows `SystemUsesLightTheme` (not `AppsUseLightTheme`) unless `Config.
 - Module colors are decided in `tone.rs` (pure, tested) as a `Tone` — `Fg`, `Pal(i)` or `Load(level)` — and `Theme::color` maps it to this theme's value. Module color: `pal[ModuleCfg::color_index()]` (`color`, else `Module::default_color()`). Graphs and bars use `tone::fill` (module color, or the load color when `color_by_load`); values use `tone::value` (`fg`, or the load color). Load steps: < 60 → normal, < 85 → elevated, else high (`LOAD`).
 - Rates (Network, Disk) pair the module color (download, read) with `tone::SECOND` = `pal[4]` (upload, write), and ignore `color_by_load` (no percentage).
 - Sensors: color by load reads a temperature in °C as the percentage (design); temperatures are not tinted otherwise. Battery (`tone::battery`): its load is depletion (100 − charge); below 20 % on battery it is always the high load color.
+- Widget background: `active` while the flyout is open (`App::sync_active` after every show/hide, including hide-on-deactivate and Esc; `Taskbar::set_active` reports a change, so it redraws only then), else `hover` under the mouse. Per-cell hover/active is Phase 2.
+- Flyout border: `DWMWA_BORDER_COLOR` = `fly_line` blended over `fly` (COLORREF has no alpha; ignored before Win11).
 - Labels `fg3`; bar and sparkline tracks `track`; flyout chart background `well` with `grid` lines; selected Processes tab `accent` / `on_accent`; the flyout paints the translucent `fly` over its acrylic backdrop (opaque `fly` without one).
 
 ## Integration points

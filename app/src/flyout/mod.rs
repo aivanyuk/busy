@@ -98,9 +98,16 @@ impl Flyout {
     }
 
     pub fn apply_theme(&mut self, t: &Theme) {
+        // SAFETY: `self.hwnd` is our live window; every attribute set here takes a 4-byte value, read from `v`
+        // for the duration of the call.
         let set = |attr, v: i32| unsafe { DwmSetWindowAttribute(self.hwnd, attr, &v as *const i32 as _, 4).is_ok() };
         set(DWMWA_USE_IMMERSIVE_DARK_MODE, t.dark as i32);
         set(DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND.0);
+        // DWM draws the 1 px border of rounded windows; give it `--fly-line` over `--fly` (COLORREF has no alpha).
+        // Fails harmlessly before Windows 11.
+        let (l, f) = (t.fly_line, t.fly);
+        let mix = |a: f32, b: f32| ((a * l.a + b * (1.0 - l.a)) * 255.0).round() as u32;
+        set(DWMWA_BORDER_COLOR, (mix(l.r, f.r) | mix(l.g, f.g) << 8 | mix(l.b, f.b) << 16) as i32);
         // Fails before Win11 22H2; we then paint a solid background.
         self.backdrop = set(DWMWA_SYSTEMBACKDROP_TYPE, DWMSBT_TRANSIENTWINDOW.0);
         if self.backdrop {
@@ -121,6 +128,10 @@ impl Flyout {
             self.show(ctx, anchor, dpi);
         }
         // Otherwise the press that deactivated (and hid) the flyout was on the widget itself: stay closed.
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.visible
     }
 
     pub fn is_foreground(&self) -> bool {

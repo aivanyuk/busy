@@ -33,13 +33,13 @@ pub(crate) struct Theme {
     pub(crate) tb_line: Color,
     /// Flyout surface, painted over the acrylic backdrop (opaque when there is none).
     pub(crate) fly: Color,
-    #[allow(dead_code)] // Used by the flyout border (widget-active commit).
+    /// Flyout border (DWM draws it; blended over `fly` since it takes no alpha).
     pub(crate) fly_line: Color,
     pub(crate) fg: Color,
     pub(crate) fg2: Color,
     pub(crate) fg3: Color,
     pub(crate) hover: Color,
-    #[allow(dead_code)] // Used by the widget while its flyout is open (widget-active commit).
+    /// The widget while its flyout is open.
     pub(crate) active: Color,
     /// Empty part of bars and sparklines.
     pub(crate) track: Color,

@@ -211,6 +211,7 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                     {
                         f.hide(true);
                     }
+                    a.sync_active();
                 });
             }
             WM_TIMER => {
@@ -288,6 +289,7 @@ impl App {
         self.taskbar = None;
         self.taskbar = Taskbar::create(&self.gfx);
         self.render_all();
+        self.sync_active();
     }
 
     /// Re-reads the theme on the theme reader; `set_theme` applies the result.
@@ -316,11 +318,25 @@ impl App {
         let (Some(f), Some(tb)) = (&mut self.flyout, &self.taskbar) else { return };
         let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
         f.toggle(&ctx, tb.screen_rect(), tb.dpi());
+        self.sync_active();
     }
 
     fn hide_flyout(&mut self) {
         if let Some(f) = &mut self.flyout {
             f.hide(false);
+        }
+        self.sync_active();
+    }
+
+    /// The widget shows `--active` while its flyout is open (design: the open module's cell); redrawn only when
+    /// that changes.
+    fn sync_active(&mut self) {
+        let open = self.flyout.as_ref().is_some_and(Flyout::is_visible);
+        if let Some(tb) = &mut self.taskbar
+            && tb.set_active(open)
+        {
+            let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
+            tb.render(&ctx);
         }
     }
 
