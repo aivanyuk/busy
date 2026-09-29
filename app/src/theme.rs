@@ -1,7 +1,8 @@
 //! Light/dark resolution and the design's colors: tokens (`design/Meterbar.dc.html`, `[data-mb]` for dark and
-//! `[data-mb][data-theme=light]`), copied 1:1.
+//! `[data-mb][data-theme=light]`), module palette `PAL` and load colors `LOAD`, copied 1:1.
 
-use busy_core::ThemeMode;
+use crate::tone::{Load, Tone};
+use busy_core::{PALETTE_LEN, ThemeMode};
 use busy_win::reg_dword;
 use windows::Win32::Graphics::Direct2D::Common::D2D1_COLOR_F;
 use windows::Win32::System::Registry::HKEY_CURRENT_USER;
@@ -54,13 +55,10 @@ pub(crate) struct Theme {
     pub(crate) link: Color,
     #[allow(dead_code)] // Phase 3: process icon placeholder.
     pub(crate) tile: Color,
-    pub(crate) mem: Color,
-    pub(crate) gpu: Color,
-    pub(crate) rx: Color,
-    pub(crate) tx: Color,
-    pub(crate) battery: Color,
-    pub(crate) warn: Color,
-    pub(crate) crit: Color,
+    /// Module palette (design `PAL`), indexed by `ModuleCfg::color_index`.
+    pub(crate) pal: [Color; PALETTE_LEN as usize],
+    /// Load colors (design `LOAD`): normal, elevated, high.
+    pub(crate) load: [Color; 3],
 }
 
 const DARK: Theme = Theme {
@@ -83,13 +81,8 @@ const DARK: Theme = Theme {
     on_accent: rgb(0x000000),
     link: rgb(0x60CDFF),
     tile: rgba(0xFFFFFF, 0.16),
-    mem: rgb(0x6CCB5F),
-    gpu: rgb(0xC09BFF),
-    rx: rgb(0x4CC2FF),
-    tx: rgb(0xFF8F5E),
-    battery: rgb(0x6CCB5F),
-    warn: rgb(0xFCE100),
-    crit: rgb(0xFF6B6B),
+    pal: [rgb(0x60CDFF), rgb(0xC3A1FF), rgb(0x6FD49A), rgb(0xE8C46A), rgb(0xFF9B7A), rgb(0xFF8AC6)],
+    load: [rgb(0x6FD49A), rgb(0xF2C661), rgb(0xFF7B72)],
 };
 
 const LIGHT: Theme = Theme {
@@ -112,13 +105,8 @@ const LIGHT: Theme = Theme {
     on_accent: rgb(0xFFFFFF),
     link: rgb(0x005FB8),
     tile: rgba(0x000000, 0.14),
-    mem: rgb(0x0F7B0F),
-    gpu: rgb(0x8764B8),
-    rx: rgb(0x0067C0),
-    tx: rgb(0xCA5010),
-    battery: rgb(0x0F7B0F),
-    warn: rgb(0x9D5D00),
-    crit: rgb(0xC42B1C),
+    pal: [rgb(0x0067C0), rgb(0x7A4FC4), rgb(0x0E7A45), rgb(0x8A5E00), rgb(0xC24A26), rgb(0xB8327A)],
+    load: [rgb(0x0E7A45), rgb(0x8A5E00), rgb(0xC42B1C)],
 };
 
 impl Theme {
@@ -140,20 +128,14 @@ impl Theme {
         if dark { DARK } else { LIGHT }
     }
 
-    /// Color for a utilization value: normal until 80%, then warning, critical from 95%.
-    pub(crate) fn level(&self, base: Color, pct: f32) -> Color {
-        match pct {
-            p if p >= 95.0 => self.crit,
-            p if p >= 80.0 => self.warn,
-            _ => base,
-        }
-    }
-
-    pub(crate) fn temp(&self, c: f32) -> Color {
-        match c {
-            c if c >= 90.0 => self.crit,
-            c if c >= 75.0 => self.warn,
-            _ => self.fg,
+    /// This theme's value of a design color role (`tone.rs` decides which role).
+    pub(crate) fn color(&self, tone: Tone) -> Color {
+        match tone {
+            Tone::Fg => self.fg,
+            Tone::Pal(i) => self.pal[(i as usize).min(self.pal.len() - 1)],
+            Tone::Load(Load::Normal) => self.load[0],
+            Tone::Load(Load::Elevated) => self.load[1],
+            Tone::Load(Load::High) => self.load[2],
         }
     }
 }
@@ -168,5 +150,14 @@ mod tests {
         assert_eq!((LIGHT.fg, LIGHT.accent, LIGHT.on_accent), (rgb(0x1A1A1A), rgb(0x005FB8), rgb(0xFFFFFF)));
         assert_eq!(DARK.fly, Color { r: 44.0 / 255.0, g: 44.0 / 255.0, b: 44.0 / 255.0, a: 0.86 });
         assert!(Theme::resolve(ThemeMode::Dark).dark && !Theme::resolve(ThemeMode::Light).dark);
+        assert_eq!((DARK.pal[0], LIGHT.load[2]), (rgb(0x60CDFF), rgb(0xC42B1C)));
+    }
+
+    #[test]
+    fn tones_map_to_the_theme() {
+        assert_eq!(DARK.color(Tone::Fg), DARK.fg);
+        assert_eq!(LIGHT.color(Tone::Pal(4)), LIGHT.pal[4]);
+        assert_eq!(LIGHT.color(Tone::Pal(PALETTE_LEN)), LIGHT.pal[5]);
+        assert_eq!(DARK.color(Tone::Load(Load::Elevated)), rgb(0xF2C661));
     }
 }

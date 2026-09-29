@@ -15,6 +15,7 @@ mod select;
 mod sync;
 mod taskbar;
 mod theme;
+mod tone;
 mod win;
 mod worker;
 

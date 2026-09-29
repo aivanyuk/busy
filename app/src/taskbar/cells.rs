@@ -4,6 +4,7 @@ use crate::ctx::Ctx;
 use crate::history::Series;
 use crate::render::{Align, Canvas, Gfx, Rect, nice_max};
 use crate::theme::Color;
+use crate::tone::{self, SECOND};
 use crate::{fmt, select};
 use busy_core::{CellStyle, Module};
 use windows::Win32::Graphics::DirectWrite::IDWriteTextFormat;
@@ -28,6 +29,8 @@ pub(super) struct Cell<'a> {
     style: CellStyle,
     label: String,
     val: Val,
+    /// Color of a `Val::One` value (design `valueColor`).
+    value_color: Color,
     /// Widest strings the value can take, so the cell doesn't jitter.
     worst: &'static [&'static str],
     short: String,
@@ -43,10 +46,16 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
     let (snap, hist, t) = (ctx.snap, ctx.hist, ctx.theme);
     let mut out = Vec::new();
     for mc in ctx.cfg.modules.iter().filter(|m| m.taskbar) {
+        // Design `widget()`: graphs and bars in the module color (or by load), values in `fg` (or by load);
+        // rates pair the module color (download, read) with `SECOND` (upload, write).
+        let (color, second) = (t.color(tone::module(mc)), t.color(SECOND));
+        let fill = |pct| t.color(tone::fill(mc, pct));
+        let value = |pct| t.color(tone::value(mc, pct));
         let base = |label: &str, val, worst, short: String| Cell {
             style: mc.style,
             label: label.into(),
             val,
+            value_color: t.fg,
             worst,
             short,
             series: Vec::new(),
@@ -55,34 +64,37 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
         };
         let cell = match mc.module {
             Module::Cpu => snap.cpu.as_ref().map(|c| Cell {
-                series: vec![(&hist.cpu, t.accent)],
-                bars: vec![(c.total / 100.0, t.level(t.accent, c.total))],
+                series: vec![(&hist.cpu, fill(c.total))],
+                bars: vec![(c.total / 100.0, fill(c.total))],
+                value_color: value(c.total),
                 ..base("CPU", Val::One(fmt::pct(c.total)), PCT, fmt::pct(c.total))
             }),
             Module::Memory => snap.memory.as_ref().filter(|m| m.total > 0).map(|m| {
                 let p = m.used as f32 * 100.0 / m.total as f32;
                 Cell {
-                    series: vec![(&hist.mem, t.mem)],
-                    bars: vec![(p / 100.0, t.level(t.mem, p))],
+                    series: vec![(&hist.mem, fill(p))],
+                    bars: vec![(p / 100.0, fill(p))],
+                    value_color: value(p),
                     ..base("MEM", Val::One(fmt::pct(p)), PCT, fmt::pct(p))
                 }
             }),
             Module::Gpu => {
                 snap.gpus.iter().enumerate().max_by(|a, b| a.1.util_pct.total_cmp(&b.1.util_pct)).map(|(i, g)| Cell {
-                    series: hist.gpus.get(i).map(|s| vec![(s, t.gpu)]).unwrap_or_default(),
-                    bars: snap.gpus.iter().take(2).map(|g| (g.util_pct / 100.0, t.level(t.gpu, g.util_pct))).collect(),
+                    series: hist.gpus.get(i).map(|s| vec![(s, fill(g.util_pct))]).unwrap_or_default(),
+                    bars: snap.gpus.iter().take(2).map(|g| (g.util_pct / 100.0, fill(g.util_pct))).collect(),
+                    value_color: value(g.util_pct),
                     ..base("GPU", Val::One(fmt::pct(g.util_pct)), PCT, fmt::pct(g.util_pct))
                 })
             }
             Module::Network => snap.net.as_ref().map(|n| {
                 let max = nice_max(hist.net_rx.max().max(hist.net_tx.max()));
                 Cell {
-                    series: vec![(&hist.net_rx, t.rx), (&hist.net_tx, t.tx)],
+                    series: vec![(&hist.net_rx, color), (&hist.net_tx, second)],
                     max,
-                    bars: vec![(n.rx_bps as f32 / max, t.rx), (n.tx_bps as f32 / max, t.tx)],
+                    bars: vec![(n.rx_bps as f32 / max, color), (n.tx_bps as f32 / max, second)],
                     ..base(
                         "NET",
-                        Val::Two([("↑", t.tx, fmt::rate(n.tx_bps)), ("↓", t.rx, fmt::rate(n.rx_bps))]),
+                        Val::Two([("↑", second, fmt::rate(n.tx_bps)), ("↓", color, fmt::rate(n.rx_bps))]),
                         RATES,
                         format!("↓{}", fmt::rate_short(n.rx_bps)),
                     )
@@ -95,12 +107,12 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
                 );
                 let max = nice_max(hist.disk_r.max().max(hist.disk_w.max()));
                 Cell {
-                    series: vec![(&hist.disk_r, t.rx), (&hist.disk_w, t.tx)],
+                    series: vec![(&hist.disk_r, color), (&hist.disk_w, second)],
                     max,
-                    bars: vec![(r as f32 / max, t.rx), (w as f32 / max, t.tx)],
+                    bars: vec![(r as f32 / max, color), (w as f32 / max, second)],
                     ..base(
                         "DISK",
-                        Val::Two([("R", t.rx, fmt::rate(r)), ("W", t.tx, fmt::rate(w))]),
+                        Val::Two([("R", color, fmt::rate(r)), ("W", second, fmt::rate(w))]),
                         RATES,
                         fmt::rate_short(r + w),
                     )
@@ -108,10 +120,12 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
             }),
             Module::Battery => snap.battery.as_ref().map(|b| {
                 let v = format!("{}{}", fmt::pct(b.percent), if b.charging { "⚡" } else { "" });
-                let c = if b.percent < 20.0 && !b.charging { t.crit } else { t.battery };
+                let (fill, value) = tone::battery(mc, b);
+                let c = t.color(fill);
                 Cell {
                     series: vec![(&hist.battery, c)],
                     bars: vec![(b.percent / 100.0, c)],
+                    value_color: t.color(value),
                     ..base("BAT", Val::One(v.clone()), &["100%⚡"], v)
                 }
             }),
@@ -121,12 +135,13 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
                 let max = if is_temp { 100.0 } else { nice_max(hist.sensor.max()) };
                 let label =
                     if is_temp { "TEMP".into() } else { s.name.chars().take(6).collect::<String>().to_uppercase() };
-                let col = if is_temp { t.temp(s.value) } else { t.fg };
-                let bar_col = if is_temp && col == t.fg { t.accent } else { col };
+                // Load coloring reads a temperature in °C as percent, like the design.
+                let (c, vc) = if is_temp { (fill(s.value), value(s.value)) } else { (color, t.fg) };
                 Cell {
-                    series: vec![(&hist.sensor, bar_col)],
+                    series: vec![(&hist.sensor, c)],
                     max,
-                    bars: vec![(s.value / max, bar_col)],
+                    bars: vec![(s.value / max, c)],
+                    value_color: vc,
                     ..base(&label, Val::One(v.clone()), &["100°C", "212°F", "8888 rpm", "888.8 W"], v)
                 }
             }),
@@ -173,7 +188,7 @@ impl Cell<'_> {
         match &self.val {
             Val::One(v) => {
                 cv.text(&self.label, &f.label, Rect::new(r.x, y0, r.w, 13.0), t.fg3, Align::Left);
-                cv.text(v, &f.value, Rect::new(r.x, y0 + 12.0, r.w, 18.0), t.fg, Align::Left);
+                cv.text(v, &f.value, Rect::new(r.x, y0 + 12.0, r.w, 18.0), self.value_color, Align::Left);
             }
             Val::Two(rows) => {
                 let pw = rows.iter().map(|row| ctx.gfx.text_width(&f.pair, row.0)).fold(0.0, f32::max);
@@ -193,7 +208,7 @@ impl Cell<'_> {
             CellStyle::Graph => {
                 let y0 = (r.h - 32.0) / 2.0;
                 cv.text(&self.label, &f.label, Rect::new(r.x, y0, r.w, 13.0), t.fg3, Align::Left);
-                cv.text(&self.short, &f.tiny, Rect::new(r.x, y0, r.w, 13.0), t.fg, Align::Right);
+                cv.text(&self.short, &f.tiny, Rect::new(r.x, y0, r.w, 13.0), self.value_color, Align::Right);
                 let g = Rect::new(r.x, y0 + 15.0, r.w, 17.0);
                 cv.round(g, 3.0, t.track);
                 let inner = g.inset(1.0, 1.5);
