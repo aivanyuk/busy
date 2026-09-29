@@ -2,7 +2,7 @@
 
 `crates/sensors` — `sources()` returns `[Gpu, Sensors]` (in that order; they share `Rc<RefCell<Shared>>`). Files: `gpu.rs` (DXGI + PDH through `busy_win::pdh` + D3DKMT), `dx.rs` (driver version, feature level), `nvml.rs`, `adl.rs`, `lhm.rs` (WMI), `hwinfo.rs` (shared memory), `lib.rs` (System32 DLL loader, sensors merge logic).
 
-Live check: `cargo run -p busy-sensors --example dump_sensors` (add `-- --third-party` to also read LHM/HWiNFO).
+Live check: `cargo run -p busy-sensors --example dump_sensors -- [samples] [--third-party]` (`--third-party` also reads LHM/HWiNFO).
 
 ## Opt-in: third-party sensor tools
 
