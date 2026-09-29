@@ -21,9 +21,8 @@ pub fn alpha(c: Color, a: f32) -> Color {
     Color { a: c.a * a, ..c }
 }
 
-/// One field per design token (`--tb` → `tb`, `--on-accent` → `on_accent`). Tokens only the settings window
-/// uses (`--win`, `--card`, `--pop`, `--knob`) are left to Phase 4; `dim` is a color the design's `fly()`
-/// hard-codes per theme, like `standby`.
+/// One field per design token (`--tb` → `tb`, `--on-accent` → `on_accent`); `dim` is a color the design's
+/// `fly()` hard-codes per theme, like `standby`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Theme {
     pub dark: bool,
@@ -58,6 +57,18 @@ pub struct Theme {
     pub ctl: Color,
     pub ctl_line: Color,
     pub ctl_bottom: Color,
+    /// Settings window surface and border.
+    pub win: Color,
+    pub win_line: Color,
+    /// Settings cards (one per row) and their border.
+    pub card: Color,
+    pub card_line: Color,
+    /// Strong control edges: the search box's bottom, an off toggle's track.
+    pub ctl_strong: Color,
+    /// Dropdown popup surface.
+    pub pop: Color,
+    /// An off toggle's knob.
+    pub knob: Color,
     /// Idle / free parts of a composition (design `dim`).
     pub dim: Color,
     /// Memory standby list (design `sbc`).
@@ -91,6 +102,13 @@ const DARK: Theme = Theme {
     ctl: rgba(0xFFFFFF, 0.06),
     ctl_line: rgba(0xFFFFFF, 0.07),
     ctl_bottom: rgba(0xFFFFFF, 0.16),
+    win: rgb(0x202020),
+    win_line: rgba(0xFFFFFF, 0.1),
+    card: rgb(0x2B2B2B),
+    card_line: rgb(0x1D1D1D),
+    ctl_strong: rgba(0xFFFFFF, 0.6),
+    pop: rgb(0x2C2C2C),
+    knob: rgba(0xFFFFFF, 0.8),
     dim: rgb(0x6B6B6B),
     standby: rgb(0x3E6A80),
     pal: [rgb(0x60CDFF), rgb(0xC3A1FF), rgb(0x6FD49A), rgb(0xE8C46A), rgb(0xFF9B7A), rgb(0xFF8AC6)],
@@ -120,6 +138,13 @@ const LIGHT: Theme = Theme {
     ctl: rgb(0xFFFFFF),
     ctl_line: rgba(0x000000, 0.08),
     ctl_bottom: rgba(0x000000, 0.2),
+    win: rgb(0xF3F3F3),
+    win_line: rgba(0x000000, 0.1),
+    card: rgb(0xFBFBFB),
+    card_line: rgb(0xE5E5E5),
+    ctl_strong: rgba(0x000000, 0.55),
+    pop: rgb(0xF9F9F9),
+    knob: rgba(0x000000, 0.6),
     dim: rgb(0xB8B8B8),
     standby: rgb(0x9CC3E0),
     pal: [rgb(0x0067C0), rgb(0x7A4FC4), rgb(0x0E7A45), rgb(0x8A5E00), rgb(0xC24A26), rgb(0xB8327A)],
@@ -142,6 +167,12 @@ impl Theme {
                 ) == Some(0)
             }
         };
+        Self::new(dark)
+    }
+
+    /// The dark or the light theme, for a caller that resolved which itself (the settings window follows the
+    /// app mode, not the system mode).
+    pub const fn new(dark: bool) -> Self {
         if dark { DARK } else { LIGHT }
     }
 
@@ -168,6 +199,8 @@ mod tests {
         assert_eq!(DARK.fly, Color { r: 44.0 / 255.0, g: 44.0 / 255.0, b: 44.0 / 255.0, a: 0.86 });
         assert!(Theme::resolve(ThemeMode::Dark).dark && !Theme::resolve(ThemeMode::Light).dark);
         assert_eq!((DARK.pal[0], LIGHT.load[2]), (rgb(0x60CDFF), rgb(0xC42B1C)));
+        assert_eq!((DARK.win, LIGHT.card_line, DARK.knob), (rgb(0x202020), rgb(0xE5E5E5), rgba(0xFFFFFF, 0.8)));
+        assert!(Theme::new(true).dark && !Theme::new(false).dark);
     }
 
     #[test]

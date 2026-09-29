@@ -195,9 +195,22 @@ impl<'a> Canvas<'a> {
 
     /// 1-DIP outline of a rounded rect, drawn inside `r` (CSS `border: 1px solid`).
     pub fn round_outline(&self, r: Rect, radius: f32, c: Color) {
-        let rr = D2D1_ROUNDED_RECT { rect: r.inset(0.5, 0.5).d2d(), radiusX: radius - 0.5, radiusY: radius - 0.5 };
+        self.round_stroke(r, radius, 1.0, c);
+    }
+
+    /// `width`-DIP outline of a rounded rect, drawn inside `r` (CSS `border: <width>px solid`). A radius of half
+    /// the side outlines a circle.
+    pub fn round_stroke(&self, r: Rect, radius: f32, width: f32, c: Color) {
+        let h = width / 2.0;
+        let rr = D2D1_ROUNDED_RECT { rect: r.inset(h, h).d2d(), radiusX: radius - h, radiusY: radius - h };
         // SAFETY: the render target and brush are live COM objects.
-        unsafe { self.rt.DrawRoundedRectangle(&rr, self.brush(c), 1.0, None) }
+        unsafe { self.rt.DrawRoundedRectangle(&rr, self.brush(c), width, None) }
+    }
+
+    /// A `width`-DIP line from (`x0`, `y0`) to (`x1`, `y1`), for glyphs drawn as strokes (chevrons, arrows).
+    pub fn line(&self, (x0, y0): (f32, f32), (x1, y1): (f32, f32), width: f32, c: Color) {
+        // SAFETY: the render target and brush are live COM objects.
+        unsafe { self.rt.DrawLine(point(x0, y0), point(x1, y1), self.brush(c), width, None) }
     }
 
     /// 1-DIP dashed horizontal line from `x0` to `x1` along the pixel row starting at `y`.
