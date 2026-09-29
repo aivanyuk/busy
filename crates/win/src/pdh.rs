@@ -1,8 +1,8 @@
 use crate::text::wide;
 use windows::Win32::System::Performance::{
-    PDH_CSTATUS_NEW_DATA, PDH_CSTATUS_VALID_DATA, PDH_FMT, PDH_FMT_COUNTERVALUE, PDH_FMT_COUNTERVALUE_ITEM_W,
-    PDH_FMT_DOUBLE, PDH_FMT_LARGE, PDH_HCOUNTER, PDH_HQUERY, PDH_MORE_DATA, PdhAddEnglishCounterW, PdhCollectQueryData,
-    PdhGetFormattedCounterArrayW, PdhGetFormattedCounterValue, PdhOpenQueryW,
+    PDH_CSTATUS_NEW_DATA, PDH_CSTATUS_VALID_DATA, PDH_FMT, PDH_FMT_COUNTERVALUE, PDH_FMT_DOUBLE, PDH_FMT_LARGE,
+    PDH_HCOUNTER, PDH_HQUERY, PDH_MORE_DATA, PdhAddEnglishCounterW, PdhCollectQueryData, PdhGetFormattedCounterArrayW,
+    PdhGetFormattedCounterValue, PdhGetRawCounterArrayW, PdhOpenQueryW,
 };
 use windows::core::{Owned, PCWSTR};
 
@@ -87,34 +87,55 @@ impl Counter {
             .then_some(out)
     }
 
-    fn each(self, fmt: PDH_FMT, buf: &mut ArrayBuf, mut f: impl FnMut(String, &PDH_FMT_COUNTERVALUE)) -> bool {
-        let (mut size, mut count) = (0u32, 0u32);
-        // SAFETY: a null buffer asks only for the size.
-        if unsafe { PdhGetFormattedCounterArrayW(self.0, fmt, &mut size, &mut count, None) } != PDH_MORE_DATA {
-            return false;
-        }
-        let items = &mut buf.0;
-        items.resize(items.len().max((size as usize).div_ceil(8)), 0);
-        let cap = items.len() * 8;
-        let ptr = items.as_mut_ptr().cast::<PDH_FMT_COUNTERVALUE_ITEM_W>();
-        // SAFETY: `ptr` has at least `size` writable, 8-byte aligned bytes, and `size` tells the API so.
-        if unsafe { PdhGetFormattedCounterArrayW(self.0, fmt, &mut size, &mut count, Some(ptr)) } != 0 {
-            return false;
-        }
-        if (count as usize).saturating_mul(size_of::<PDH_FMT_COUNTERVALUE_ITEM_W>()) > cap {
-            return false;
-        }
-        // SAFETY: PDH wrote `count` items at the start of the buffer, which holds them (checked above).
-        let items = unsafe { std::slice::from_raw_parts(ptr, count as usize) };
-        for it in items.iter().filter(|it| valid(it.FmtValue.CStatus)) {
+    /// Raw `FirstValue` of each instance of a wildcard counter with valid data, without formatting. For a rate
+    /// counter of type PERF_COUNTER_BULK_COUNT (e.g. `Disk Read Bytes/sec`) that is the running count since boot.
+    pub fn each_raw(self, buf: &mut ArrayBuf, mut f: impl FnMut(&str, i64)) -> bool {
+        // SAFETY: `fill` passes either no buffer (size query) or one of `*size` writable, 8-byte aligned bytes.
+        let items = fill(buf, |size, count, p| unsafe { PdhGetRawCounterArrayW(self.0, size, count, p) });
+        let Some(items) = items else { return false };
+        for it in items.iter().filter(|it| valid(it.RawValue.CStatus)) {
             // SAFETY: `szName` is a NUL-terminated string PDH wrote into the same, still unmodified buffer.
-            let w = unsafe { it.szName.as_wide() };
-            // `from_utf16` first: `from_utf16_lossy` (and a hand-written decode loop) is compiled at our opt-level
-            // and cost the GPU source (~600 engine instances) 1.5–2 ms a tick in debug builds.
-            f(String::from_utf16(w).unwrap_or_else(|_| String::from_utf16_lossy(w)), &it.FmtValue);
+            f(&decode(unsafe { it.szName.as_wide() }), it.RawValue.FirstValue);
         }
         true
     }
+
+    fn each(self, fmt: PDH_FMT, buf: &mut ArrayBuf, mut f: impl FnMut(String, &PDH_FMT_COUNTERVALUE)) -> bool {
+        // SAFETY: `fill` passes either no buffer (size query) or one of `*size` writable, 8-byte aligned bytes.
+        let items = fill(buf, |size, count, p| unsafe { PdhGetFormattedCounterArrayW(self.0, fmt, size, count, p) });
+        let Some(items) = items else { return false };
+        for it in items.iter().filter(|it| valid(it.FmtValue.CStatus)) {
+            // SAFETY: `szName` is a NUL-terminated string PDH wrote into the same, still unmodified buffer.
+            f(decode(unsafe { it.szName.as_wide() }), &it.FmtValue);
+        }
+        true
+    }
+}
+
+/// Runs a two-call PDH array API — `call(size, count, None)` for the size, then with a buffer — into `buf`, and
+/// returns the items it wrote.
+fn fill<T>(buf: &mut ArrayBuf, mut call: impl FnMut(&mut u32, &mut u32, Option<*mut T>) -> u32) -> Option<&[T]> {
+    const { assert!(align_of::<T>() <= 8) };
+    let (mut size, mut count) = (0u32, 0u32);
+    if call(&mut size, &mut count, None) != PDH_MORE_DATA {
+        return None;
+    }
+    let items = &mut buf.0;
+    items.resize(items.len().max((size as usize).div_ceil(8)), 0);
+    let cap = items.len() * 8;
+    let ptr = items.as_mut_ptr().cast::<T>();
+    if call(&mut size, &mut count, Some(ptr)) != 0 || (count as usize).saturating_mul(size_of::<T>()) > cap {
+        return None;
+    }
+    // SAFETY: PDH wrote `count` items at the start of the buffer, which holds them (checked above); the slice
+    // borrows `buf`, so the instance names the items point to stay valid and unmodified while it lives.
+    Some(unsafe { std::slice::from_raw_parts(ptr, count as usize) })
+}
+
+/// `from_utf16` first: `from_utf16_lossy` (and a hand-written decode loop) is compiled at our opt-level and cost
+/// the GPU source (~600 engine instances) 1.5–2 ms a tick in debug builds.
+fn decode(w: &[u16]) -> String {
+    String::from_utf16(w).unwrap_or_else(|_| String::from_utf16_lossy(w))
 }
 
 #[cfg(test)]
@@ -155,5 +176,19 @@ mod tests {
             assert!(each.each_large(&mut buf, |n, _| names.push(n.to_owned())));
             assert_eq!(names, a.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>());
         }
+
+        // The raw value of % Processor Time is a running 100 ns tick count: same instances, never decreasing.
+        let raw = |buf: &mut ArrayBuf| {
+            let mut v = Vec::new();
+            assert!(each.each_raw(buf, |n, r| v.push((n.to_owned(), r))));
+            // Instance order is not stable between reads.
+            v.sort();
+            v
+        };
+        let before = raw(&mut buf);
+        assert!(q.collect());
+        let after = raw(&mut buf);
+        assert!(before.iter().any(|(n, _)| n == "_Total"), "{before:?}");
+        assert!(before.iter().zip(&after).all(|((n, b), (m, c))| n == m && 0 <= *b && b <= c), "{before:?} {after:?}");
     }
 }
