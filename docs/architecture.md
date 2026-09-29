@@ -42,7 +42,7 @@ Rules:
 - **Domain decisions live in pure modules.** Choosing what to show (the pinned sensor, the busiest GPU) is in `select.rs` or `busy-core`, with tests, not in the router or a window procedure.
 - **One implementation of each Win32 helper.** Wide-string conversion, registry reads, DLL loading and the PDH wrapper exist once, in `busy-win`; kernel handles are held in `windows::core::Owned`. A new `encode_utf16().chain(..)`, `RegGetValueW`, `PdhOpenQueryW`, `LoadLibraryExW` or bare `CloseHandle` elsewhere is a duplicate.
 - **One concern per file, 500 lines at most.** A file that passes 500 lines, or that combines a window procedure with layout and painting, is split in the PR that grows it.
-- **Workers get only what they use.** The sampler receives `sampler::Params` (interval, active modules and the `SourceOptions` its sources act on), not the whole `Config`.
+- **Workers get only what they use.** The sampler receives `sampler::Params` (per-module intervals, active modules and the `SourceOptions` its sources act on), not the whole `Config`.
 - **Items in private modules are `pub(crate)` or private**, never plain `pub`, so the crate's real surface is its `lib.rs`.
 
 ## Data flow
@@ -50,16 +50,16 @@ Rules:
 ```
 sampler thread (COM MTA)                       UI thread (message loop)
   sources: Vec<Box<dyn Source>>                  Config (source of truth, persisted)
-  every interval_ms:                             History (rolling series)
-    snap = Snapshot::default()                   taskbar widget (child of Shell_TrayWnd)
-    for s in active sources: s.sample(&mut snap) flyout (top-level popup)
-    hand snap to UI + PostMessage(WM_APP) ──────▶ on WM_APP: push history, redraw
-  ◀── Params (interval / active / SourceOptions)  settings window (busy-settings)
+  snap: Snapshot (kept across ticks)             History (rolling series)
+  when a module is due (its own interval):       taskbar widget (child of Shell_TrayWnd)
+    snap.clear(m); m's sources sample(&mut snap) flyout (top-level popup)
+    hand (snap, fresh) + PostMessage(WM_APP) ───▶ on WM_APP: push fresh history, redraw
+  ◀── Params (intervals / active / SourceOptions) settings window (busy-settings)
                                                   │ on_apply → submit_config → WM_APP_CONFIG
 config writer thread ◀── latest Config ───────────┘ (persisted off the UI thread)
 ```
 
-- One fresh `Snapshot` per tick; each source fills only its part. Sources are ordered: the GPU source runs before the Sensors source (they share state via `Rc<RefCell<_>>`, which is why `Source` has no `Send` bound).
+- One `Snapshot` kept across ticks; each source fills only its part (`Snapshot::clear` names it), and a module is cleared and refilled when it is due, at `Config::module_interval_ms`. The UI gets a copy plus the set of modules refreshed since it last took one, and pushes history only for those. Sources are ordered: the GPU source runs before the Sensors source (they share state via `Rc<RefCell<_>>`, which is why `Source` has no `Send` bound).
 - Sources are constructed **on** the sampler thread after `CoInitializeEx(COINIT_MULTITHREADED)` and never leave it.
 - Sources skipped when `Config::is_active(module, flyout_open)` is false: a module is sampled for its taskbar cell, and for its flyout section only while the flyout is open.
 - Settings reach sources only as `SourceOptions` (`Config::source_options()`), carried in `sampler::Params`: the sampler calls `Source::configure` on every source before the first tick and whenever the options change, on the sampler thread. Sources never see the `Config`.
