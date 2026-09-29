@@ -74,6 +74,34 @@ pub struct Snapshot {
     pub top: TopProcesses,
 }
 
+impl Snapshot {
+    /// Drops the readings `m`'s source writes, so a snapshot kept across ticks can be refilled one module at a
+    /// time and a module that stopped being sampled shows nothing rather than stale data. The GPU source also
+    /// owns per-process GPU usage (`top.by_gpu`); Processes owns the other process lists.
+    pub fn clear(&mut self, m: Module) {
+        match m {
+            Module::Cpu => self.cpu = None,
+            Module::Memory => self.memory = None,
+            Module::Disk => {
+                self.disks.clear();
+                self.volumes.clear();
+            }
+            Module::Network => self.net = None,
+            Module::Gpu => {
+                self.gpus.clear();
+                self.top.by_gpu.clear();
+            }
+            Module::Battery => self.battery = None,
+            Module::Sensors => self.sensors.clear(),
+            Module::Processes => {
+                self.top.by_cpu.clear();
+                self.top.by_mem.clear();
+                self.top.by_disk.clear();
+            }
+        }
+    }
+}
+
 /// Percentages are 0..=100.
 #[derive(Clone, Debug, Default)]
 pub struct CpuInfo {
@@ -278,6 +306,52 @@ pub const TOP_N: usize = 5;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clear_drops_only_that_module() {
+        let proc = || vec![ProcEntry::default()];
+        let full = || Snapshot {
+            cpu: Some(CpuInfo::default()),
+            memory: Some(MemInfo::default()),
+            disks: vec![DiskInfo::default()],
+            volumes: vec![VolumeInfo::default()],
+            net: Some(NetInfo::default()),
+            gpus: vec![GpuInfo::default()],
+            battery: Some(BatteryInfo::default()),
+            sensors: vec![SensorReading {
+                source: String::new(),
+                hardware: String::new(),
+                name: String::new(),
+                kind: SensorKind::Other,
+                value: 0.0,
+            }],
+            top: TopProcesses { by_cpu: proc(), by_mem: proc(), by_disk: proc(), by_gpu: proc() },
+        };
+        // What each module's readings look like: (cpu, memory, disks+volumes, net, gpus+by_gpu, battery, sensors,
+        // by_cpu+by_mem+by_disk).
+        let shape = |s: &Snapshot| {
+            [
+                s.cpu.is_some(),
+                s.memory.is_some(),
+                !s.disks.is_empty() && !s.volumes.is_empty(),
+                s.net.is_some(),
+                !s.gpus.is_empty() && !s.top.by_gpu.is_empty(),
+                s.battery.is_some(),
+                !s.sensors.is_empty(),
+                !s.top.by_cpu.is_empty() && !s.top.by_mem.is_empty() && !s.top.by_disk.is_empty(),
+            ]
+        };
+        for (i, m) in Module::ALL.into_iter().enumerate() {
+            let mut s = full();
+            s.clear(m);
+            let mut want = [true; Module::ALL.len()];
+            want[i] = false;
+            assert_eq!(shape(&s), want, "{m:?}");
+            // Nothing of the module is left, not just part of it.
+            let partial = [s.disks.is_empty() != s.volumes.is_empty(), s.gpus.is_empty() != s.top.by_gpu.is_empty()];
+            assert_eq!(partial, [false, false], "{m:?}");
+        }
+    }
 
     #[test]
     fn mem_in_use() {
