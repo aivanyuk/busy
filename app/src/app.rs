@@ -5,7 +5,6 @@
 
 use crate::ctx::Ctx;
 use crate::flyout::{Action, Flyout};
-use crate::history::History;
 use crate::launch;
 use crate::menu::{self, Command};
 use crate::render::Gfx;
@@ -16,6 +15,7 @@ use crate::theme::Theme;
 use crate::win::{self, Event, register_class};
 use crate::worker::Worker;
 use busy_core::{Config, Module, Snapshot, ThemeMode};
+use busy_ui::history::History;
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};

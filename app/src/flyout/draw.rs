@@ -3,9 +3,9 @@
 
 use super::Action;
 use super::detail::{Chart, Detail};
-use crate::fmt;
 use crate::render::{Align, Canvas, Gfx, Rect};
 use crate::theme::{Color, Theme};
+use busy_ui::fmt;
 use windows::Win32::Graphics::DirectWrite::IDWriteTextFormat;
 use windows::core::Result;
 

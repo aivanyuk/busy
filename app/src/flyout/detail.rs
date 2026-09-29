@@ -2,10 +2,10 @@
 //! under `modules/` fill it from a `Ctx`; `draw.rs` lays it out and paints it. Rows without data are left out,
 //! never faked.
 
-use crate::fmt;
-use crate::history::Series;
 use crate::theme::Color;
 use busy_core::{Module, RateUnit, SensorKind, TempUnit};
+use busy_ui::fmt;
+use busy_ui::history::Series;
 
 pub(super) struct Detail<'a> {
     /// Whose flyout it is (the footer's settings button).

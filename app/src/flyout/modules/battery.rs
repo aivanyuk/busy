@@ -1,8 +1,8 @@
 use super::super::detail::{Chart, Detail, Value, series_span};
 use crate::ctx::Ctx;
-use crate::fmt;
 use crate::tone;
 use busy_core::{Module, ModuleCfg};
+use busy_ui::fmt;
 
 /// Design `fly('bat')`: charge over time, time left, and the battery's state and health. The per-app "Power
 /// usage" list needs the SRUM opt-in and is left out.

@@ -1,9 +1,9 @@
 use super::super::detail::{Chart, Detail, Value, series_span};
 use crate::ctx::Ctx;
-use crate::fmt;
-use crate::select;
 use crate::tone::{self, SECOND};
 use busy_core::{Module, ModuleCfg, SensorPick};
+use busy_ui::fmt;
+use busy_ui::select;
 
 /// Design `fly('cpu')`: utilization over time with the System share as a second line, the System / User /
 /// Idle split, every logical processor, and the busiest processes.

@@ -2,12 +2,12 @@
 //! How a cell is measured and drawn in its style is `styles.rs`.
 
 use crate::ctx::Ctx;
-use crate::history::Series;
 use crate::render::nice_max;
 use crate::theme::Color;
 use crate::tone::{self, SECOND};
-use crate::{fmt, select};
 use busy_core::{CellStyle, CpuBar, Module, SensorKind};
+use busy_ui::history::Series;
+use busy_ui::{fmt, select};
 
 pub(super) struct Cell<'a> {
     pub(super) module: Module,

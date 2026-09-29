@@ -2,8 +2,8 @@ use super::super::detail::{Chart, Detail, Value, series_span};
 use crate::ctx::Ctx;
 use crate::render::nice_max;
 use crate::tone::{self, SECOND};
-use crate::{fmt, select};
 use busy_core::{Module, ModuleCfg, NetKind};
+use busy_ui::{fmt, select};
 
 /// Design `fly('net')`: download and upload of the chosen interface (`options.network.interface`, as on the
 /// cell) in the chosen units, and what that interface is. No process list: per-process network needs the ETW

@@ -2,8 +2,8 @@ use super::super::detail::{BarRow, Chart, Detail, Value, series_span};
 use crate::ctx::Ctx;
 use crate::render::nice_max;
 use crate::tone;
-use crate::{fmt, select};
 use busy_core::{Module, ModuleCfg, SensorKind, SensorReading};
+use busy_ui::{fmt, select};
 
 /// Design `fly('sens')`: the reading the cell shows over time, every temperature as a bar, and the other
 /// readings (fans, power, clocks) as stats. No process list.

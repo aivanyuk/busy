@@ -10,6 +10,7 @@ busy-core.workspace = true
 busy-metrics.workspace = true
 busy-sensors.workspace = true
 busy-settings.workspace = true
+busy-ui.workspace = true
 busy-win.workspace = true
 windows = { workspace = true, features = [
     "Win32_Foundation",
