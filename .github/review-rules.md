@@ -89,7 +89,7 @@ Authority: `docs/architecture.md` § Workspace, § Layering and § Persistence; 
 | T3 | The sampler hands a fresh `Snapshot` per tick to the UI and wakes it with `PostMessage(WM_APP)`; the UI pushes history and redraws on that message. Config changes (interval, active modules) flow back to the sampler; the UI never calls into a source. | Sampler/UI hand-off, `WM_APP`, interval or module toggling |
 | T4 | **No wait on the UI thread while a child of `Shell_TrayWnd` exists**: shutdown destroys the taskbar widget before it stops and joins any worker, whether by explicit calls or by struct field order. | `Drop` of `App` or a thread owner, field order of `App`, `join`, `WM_ENDSESSION`/`WM_DESTROY` handling |
 | T5 | No registry or file API is reachable from a window procedure or message handler; the result is computed on a worker and posted back. Startup before the widget is embedded is exempt. | `RegGetValueW`, `RegSetKeyValueW`, `std::fs`, `Theme::resolve`, `autostart::*` on a message path |
-| T6 | A critical section on a mutex shared with a worker holds only moves, swaps and `Copy` reads: no allocation, clone of a heap type, I/O or FFI under the lock. | `lock(`…`)` in `sampler.rs`, `persist.rs`, `app.rs` |
+| T6 | A critical section on a mutex shared with a worker holds only moves, swaps and `Copy` reads: no allocation, clone of a heap type, I/O or FFI under the lock. | `lock(`…`)` in `sampler.rs`, `worker.rs`, `app.rs` |
 | T7 | Config persistence goes through the config writer, never a `thread::spawn` per save; every thread the app starts is in the Threads table of `docs/architecture.md`. | `Config::save`, `thread::spawn`, `thread::Builder` |
 
 Authority: `CLAUDE.md` § Hard rules; `docs/architecture.md` § Data flow and § Threads;

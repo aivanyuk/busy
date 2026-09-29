@@ -31,7 +31,7 @@ Inside the `busy` app crate, modules form layers too. A module may use the ones 
 |---|---|---|
 | Router | `app.rs` | Owns the `App` state; the **only** module that turns events into state changes. |
 | Windows | `taskbar/`, `flyout/` | Own an HWND and its GPU resources; draw from a read-only `Ctx`; report input as `win::Event`s. |
-| Workers | `sampler.rs`, `persist.rs` | Threads with a small, typed hand-off to the router. |
+| Workers | `sampler.rs`, `worker.rs` | Threads with a small, typed hand-off to the router. |
 | Support | `win.rs`, `ctx.rs`, `render.rs`, `theme.rs` | Window-class and message plumbing, render context, D2D/DWrite helpers, palette. |
 | Pure logic | `select.rs`, `fmt.rs`, `history.rs` | No Win32; unit-tested. |
 
