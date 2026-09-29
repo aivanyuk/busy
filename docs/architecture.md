@@ -5,7 +5,7 @@
 | Crate | Path | Role |
 |---|---|---|
 | `busy-core` | `crates/core` | Shared types (`Snapshot`, `*Info`), `Source` trait, `Module`, `Config` (+ JSON persistence). No Win32. |
-| `busy-win` | `crates/win` | Win32 plumbing used by more than one crate: wide strings, registry reads, the System32-only `Dll` loader. |
+| `busy-win` | `crates/win` | Win32 plumbing used by more than one crate: wide strings, registry reads, the System32-only `Dll` loader, the PDH wrapper (`pdh`). |
 | `busy-metrics` | `crates/metrics` | Collectors: CPU, memory, disk, network, battery, top processes. |
 | `busy-sensors` | `crates/sensors` | GPU (DXGI/PDH/D3DKMT/NVML/ADL) and temperature/fan sensors (LHM WMI, HWiNFO shared memory). |
 | `busy-settings` | `crates/settings` | Modeless native settings window, autostart registry. |

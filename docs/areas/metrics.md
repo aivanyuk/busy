@@ -27,3 +27,5 @@ CPU 0.6–5 ms · Memory <0.3 ms · Disk ~0.3 ms · Network ~0.5 ms · Battery �
 
 - First sample: Processes/Network rates are 0; CPU/Disk collect once in the constructor so they have data.
 - PDH instance churn (hot-plugged disks, cores) must be tolerated — re-parse instance names each sample.
+- A formatted PDH value is usable only when its `CStatus` is `PDH_CSTATUS_VALID_DATA` (0) or `PDH_CSTATUS_NEW_DATA` (1); any other status (e.g. `PDH_CALC_NEGATIVE_VALUE` on a rate counter whose instance just restarted) carries garbage and is skipped. `busy_win::pdh` applies this to every read.
+- Decode PDH instance names with `String::from_utf16`, falling back to `from_utf16_lossy` only on error: the lossy decoder is instantiated in our crate, so in debug builds it made the GPU source (~600 `GPU Engine` instances here) 1.5 ms a tick slower.
