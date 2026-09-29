@@ -27,6 +27,7 @@ enum Val {
 }
 
 pub(super) struct Cell<'a> {
+    module: Module,
     style: CellStyle,
     label: String,
     val: Val,
@@ -68,6 +69,7 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
         let fill = |pct| t.color(tone::fill(mc, pct));
         let value = |pct| t.color(tone::value(mc, pct));
         let base = |label: &str, val, worst, short: String| Cell {
+            module: mc.module,
             style: mc.style,
             label: label.into(),
             val,
@@ -170,6 +172,10 @@ pub(super) fn cells<'a>(ctx: &Ctx<'a>) -> Vec<Cell<'a>> {
 }
 
 impl Cell<'_> {
+    pub(super) fn module(&self) -> Module {
+        self.module
+    }
+
     fn text_width(&self, gfx: &Gfx, f: &Fonts) -> f32 {
         let worst = |fmt: &IDWriteTextFormat| self.worst.iter().map(|s| gfx.text_width(fmt, s)).fold(0.0, f32::max);
         match &self.val {

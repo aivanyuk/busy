@@ -11,7 +11,8 @@ use crate::ctx::Ctx;
 use crate::render::{Canvas, Gfx, Rect};
 use crate::theme::Theme;
 use crate::win::{self, Event, raise};
-use busy_core::{Anchor, Config};
+use busy_core::{Anchor, Config, Module};
+use std::cell::RefCell;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Direct2D::Common::*;
 use windows::Win32::Graphics::Direct2D::*;
@@ -26,6 +27,16 @@ use windows::core::{PCWSTR, Result, w};
 const CLASS: PCWSTR = w!("busy.taskbar");
 const PAD: f32 = 6.0;
 const GAP: f32 = 12.0;
+
+thread_local! {
+    /// Each drawn cell's horizontal extent in client pixels, for hit-testing in the window procedure.
+    static HITS: RefCell<Vec<(i32, i32, Module)>> = const { RefCell::new(Vec::new()) };
+}
+
+/// The cell at client x `x`, if any.
+fn hit(x: i32) -> Option<Module> {
+    HITS.with_borrow(|h| h.iter().find(|&&(l, r, _)| (l..r).contains(&x)).map(|&(.., m)| m))
+}
 
 /// Where the taskbar lets us draw; any change calls for a new layout.
 #[derive(Clone, Copy, Default, PartialEq)]
@@ -43,8 +54,8 @@ struct Frame {
     dpi: u32,
     w_px: i32,
     h_px: i32,
-    hover: bool,
-    active: bool,
+    hover: Option<Module>,
+    active: Option<Module>,
     theme: Theme,
     cells: Vec<(cells::Key, f32)>,
 }
@@ -59,9 +70,10 @@ pub struct Taskbar {
     geom: Geometry,
     /// What the surface and the layered window currently show.
     drawn: Option<Frame>,
-    hover: bool,
-    /// Its flyout is open.
-    active: bool,
+    /// The cell under the pointer.
+    hover: Option<Module>,
+    /// The cell whose flyout is open.
+    active: Option<Module>,
 }
 
 impl Taskbar {
@@ -117,8 +129,8 @@ impl Taskbar {
                 placed: RECT::default(),
                 geom: Geometry::default(),
                 drawn: None,
-                hover: false,
-                active: false,
+                hover: None,
+                active: None,
             })
         }
     }
@@ -137,13 +149,13 @@ impl Taskbar {
         unsafe { GetDpiForWindow(self.tray) }
     }
 
-    /// Records whether the pointer is over the widget; true if that changed and a redraw is due.
-    pub fn set_hover(&mut self, hover: bool) -> bool {
+    /// Records the cell under the pointer (drawn as `--hover`); true if that changed and a redraw is due.
+    pub fn set_hover(&mut self, hover: Option<Module>) -> bool {
         std::mem::replace(&mut self.hover, hover) != hover
     }
 
-    /// Records whether the flyout is open (drawn as `--active`); true if that changed and a redraw is due.
-    pub fn set_active(&mut self, active: bool) -> bool {
+    /// Records the cell whose flyout is open (drawn as `--active`); true if that changed and a redraw is due.
+    pub fn set_active(&mut self, active: Option<Module>) -> bool {
         std::mem::replace(&mut self.active, active) != active
     }
 
@@ -194,6 +206,16 @@ impl Taskbar {
             widths.pop();
             cells.pop();
         }
+        HITS.with_borrow_mut(|hits| {
+            hits.clear();
+            let mut x = PAD;
+            for (c, cw) in cells.iter().zip(&widths) {
+                // Each cell owns half the gap on either side, so the pointer is always over some cell.
+                let (l, r) = (x - GAP / 2.0, x + cw + GAP / 2.0);
+                hits.push(((l * scale).round() as i32, (r * scale).round() as i32, c.module()));
+                x += cw + GAP;
+            }
+        });
         if cells.is_empty() || h_px <= 0 {
             if self.placed != RECT::default() {
                 unsafe {
@@ -239,12 +261,17 @@ impl Taskbar {
             self.rt.Clear(Some(&D2D1_COLOR_F { r: 0.0, g: 0.0, b: 0.0, a: 1.0 / 255.0 }));
         }
         if let Ok(cv) = Canvas::new(&self.rt, ctx.gfx) {
-            let bg = if self.active { Some(ctx.theme.active) } else { self.hover.then_some(ctx.theme.hover) };
-            if let Some(bg) = bg {
-                cv.round(Rect::new(1.0, 4.0, w - 2.0, h - 8.0), 4.0, bg);
-            }
             let mut x = PAD;
             for (c, cw) in cells.iter().zip(&widths) {
+                let m = Some(c.module());
+                let bg = if m == self.active {
+                    Some(ctx.theme.active)
+                } else {
+                    (m == self.hover).then_some(ctx.theme.hover)
+                };
+                if let Some(bg) = bg {
+                    cv.round(Rect::new(x - GAP / 2.0 + 1.0, 4.0, cw + GAP - 2.0, h - 8.0), 4.0, bg);
+                }
                 c.draw(&cv, &self.fonts, ctx, Rect::new(x, 0.0, *cw, h));
                 x += cw + GAP;
             }
@@ -317,7 +344,7 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
                 LRESULT(1)
             }
             WM_MOUSEMOVE => {
-                raise(Event::WidgetHover(true));
+                raise(Event::WidgetHover(hit(x_of(lp))));
                 let mut tme = TRACKMOUSEEVENT {
                     cbSize: size_of::<TRACKMOUSEEVENT>() as u32,
                     dwFlags: TME_LEAVE,
@@ -328,11 +355,13 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
                 LRESULT(0)
             }
             WM_MOUSELEAVE => {
-                raise(Event::WidgetHover(false));
+                raise(Event::WidgetHover(None));
                 LRESULT(0)
             }
             WM_LBUTTONUP => {
-                raise(Event::WidgetClick);
+                if let Some(m) = hit(x_of(lp)) {
+                    raise(Event::WidgetClick(m));
+                }
                 LRESULT(0)
             }
             WM_RBUTTONUP => {
@@ -346,4 +375,9 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
             _ => DefWindowProcW(hwnd, msg, wp, lp),
         }
     }
+}
+
+/// Client x of a mouse message (`GET_X_LPARAM`).
+fn x_of(lp: LPARAM) -> i32 {
+    (lp.0 & 0xFFFF) as u16 as i16 as i32
 }
