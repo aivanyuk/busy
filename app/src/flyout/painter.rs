@@ -2,8 +2,6 @@
 
 use super::draw::GraphHit;
 use crate::ctx::Ctx;
-use crate::fmt;
-use crate::history::Series;
 use crate::render::{Align, Canvas, Rect};
 use crate::theme::{Color, Theme};
 use windows::Win32::Graphics::DirectWrite::IDWriteTextFormat;
@@ -28,8 +26,6 @@ pub(super) struct Painter<'a> {
     pub(super) graphs: Vec<GraphHit>,
     pub(super) tab: usize,
 }
-
-pub(super) type Fmt<'a> = &'a dyn Fn(f32) -> String;
 
 impl Painter<'_> {
     pub(super) fn t(&self) -> &Theme {
@@ -58,10 +54,6 @@ impl Painter<'_> {
         self.y += 4.0;
         self.text(s, &self.f.bold, Rect::new(self.x, self.y, self.w, 18.0), self.t().fg, Align::Left);
         self.y += 19.0;
-    }
-
-    pub(super) fn gap(&mut self, h: f32) {
-        self.y += h;
     }
 
     /// Two-column label/value grid.
@@ -98,48 +90,6 @@ impl Painter<'_> {
         self.y += h + 4.0;
     }
 
-    /// History graph with optional hover readout. `max_label` is drawn in the top-right corner.
-    pub(super) fn graph(&mut self, series: &[(&Series, Color)], max: f32, h: f32, fv: Fmt, max_label: Option<String>) {
-        let r = Rect::new(self.x, self.y, self.w, h);
-        self.y += h + 8.0;
-        let inner = r.inset(1.0, 2.0);
-        let hit = series.first().map(|(s0, _)| GraphHit::new(r, inner, s0.cap(), s0.len()));
-        self.graphs.extend(hit);
-        let Some(cv) = self.cv else { return };
-        let t = self.t();
-        cv.round(r, 4.0, t.well);
-        for f in [0.25, 0.5, 0.75] {
-            let y = (r.y + r.h * f).round();
-            cv.hline(r.x + 4.0, r.right() - 4.0, y, t.grid);
-        }
-        for (s, c) in series {
-            cv.graph(inner, s, max, *c, if series.len() > 1 { 0.16 } else { 0.28 }, 1.25, s.cap());
-        }
-        if let Some(l) = max_label {
-            self.text(&l, &self.f.small, Rect::new(r.x + 6.0, r.y + 2.0, r.w - 12.0, 14.0), t.fg3, Align::Right);
-        }
-        let Some((mx, my)) = self.mouse.filter(|&(x, y)| r.contains(x, y)) else { return };
-        let Some((hit, k)) = hit.and_then(|h| Some((h, h.sample_at(mx)?))) else { return };
-        let x = hit.x_of(k);
-        cv.vline(x, r.y + 2.0, r.bottom() - 2.0, t.fg2);
-        let secs = k as u64 * series.first().map_or(0, |(s, _)| s.interval_ms()) as u64 / 1000;
-        let mut label = series
-            .iter()
-            .filter(|(s, _)| k < s.len())
-            .map(|(s, _)| fv(s.get(s.len() - 1 - k)))
-            .collect::<Vec<_>>()
-            .join("  ");
-        if secs > 0 {
-            label = format!("{label}  · {} ago", fmt::duration(secs));
-        }
-        let lw = self.ctx.gfx.text_width(&self.f.small, &label) + 12.0;
-        // Placed from the sample, not the pointer: the readout repaints only when the sample changes.
-        let lx = if x > r.x + r.w / 2.0 { x - lw - 4.0 } else { x + 4.0 };
-        let lr = Rect::new(lx.clamp(r.x, r.right() - lw), my.clamp(r.y + 2.0, r.bottom() - 20.0) - 9.0, lw, 18.0);
-        cv.round(lr, 4.0, Color { a: 0.95, ..t.fly });
-        self.text(&label, &self.f.small, lr, t.fg, Align::Center);
-    }
-
     pub(super) fn tabs(&mut self, names: &[&str]) {
         let r = Rect::new(self.x, self.y, self.w, 24.0);
         let tw = r.w / names.len() as f32;
@@ -163,39 +113,11 @@ impl Painter<'_> {
         self.y += 30.0;
     }
 
-    pub(super) fn meter(&mut self, label: &str, p: f32, c: Color) {
-        let r = Rect::new(self.x, self.y, self.w, 18.0);
-        let t = *self.t();
-        self.text(label, &self.f.small, Rect { w: 60.0, ..r }, t.fg2, Align::Left);
-        self.text(&fmt::pct(p), &self.f.small, r, t.fg2, Align::Right);
-        if let Some(cv) = self.cv {
-            cv.hbar(Rect::new(self.x + 60.0, self.y + 6.5, self.w - 100.0, 5.0), p / 100.0, c, t.track);
-        }
-        self.y += 20.0;
-    }
-
     pub(super) fn row_kv(&mut self, left: &str, right: &str, rc: Color) {
         let r = Rect::new(self.x, self.y, self.w, 19.0);
         self.text(left, &self.f.body, Rect { w: r.w - 80.0, ..r }, self.t().fg2, Align::Left);
         self.text(right, &self.f.body, r, rc, Align::Right);
         self.y += 19.0;
-    }
-
-    /// Two colored rate readouts side by side (download/upload, read/write).
-    pub(super) fn rates(&mut self, a: (&str, f64, Color), b: (&str, f64, Color)) {
-        let half = self.w / 2.0;
-        for (i, (p, v, c)) in [a, b].into_iter().enumerate() {
-            let x = self.x + i as f32 * half;
-            self.text(p, &self.f.bold, Rect::new(x, self.y, 14.0, 20.0), c, Align::Left);
-            self.text(
-                &fmt::rate(v),
-                &self.f.bold,
-                Rect::new(x + 14.0, self.y, half - 14.0, 20.0),
-                self.t().fg,
-                Align::Left,
-            );
-        }
-        self.y += 24.0;
     }
 
     pub(super) fn missing(&mut self, title: &str) {

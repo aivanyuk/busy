@@ -5,6 +5,7 @@
 use crate::fmt;
 use crate::history::Series;
 use crate::theme::Color;
+use busy_core::RateUnit;
 
 pub(super) struct Detail<'a> {
     pub(super) title: &'static str,
@@ -22,6 +23,8 @@ pub(super) struct Detail<'a> {
     pub(super) cores: Vec<(f32, Color)>,
     /// Two-column (key, value) grid.
     pub(super) stats: Vec<(String, String)>,
+    pub(super) bars_title: &'static str,
+    pub(super) bars: Vec<BarRow>,
     pub(super) procs_title: &'static str,
     /// (process name, value), busiest first.
     pub(super) procs: Vec<(String, String)>,
@@ -41,16 +44,26 @@ pub(super) struct Chart<'a> {
     pub(super) value: Value,
 }
 
+/// A labelled thin bar (a volume's fill, a temperature).
+pub(super) struct BarRow {
+    pub(super) label: String,
+    pub(super) text: String,
+    pub(super) frac: f32,
+    pub(super) color: Color,
+}
+
 /// Formatting of chart samples for the hover readout.
 #[derive(Clone, Copy)]
 pub(super) enum Value {
     Pct,
+    Rate(RateUnit),
 }
 
 impl Value {
     pub(super) fn format(self, v: f32) -> String {
         match self {
             Value::Pct => fmt::pct(v),
+            Value::Rate(unit) => fmt::rate_in(v as f64, unit),
         }
     }
 }
@@ -67,6 +80,8 @@ impl<'a> Detail<'a> {
             legend: Vec::new(),
             cores: Vec::new(),
             stats: Vec::new(),
+            bars_title: "",
+            bars: Vec::new(),
             procs_title: "Top processes",
             procs: Vec::new(),
             note: None,
@@ -111,5 +126,6 @@ mod tests {
     #[test]
     fn values_format_like_the_cells() {
         assert_eq!(Value::Pct.format(42.4), "42%");
+        assert_eq!(Value::Rate(RateUnit::Bits).format(1024.0), "8.0 Kb/s");
     }
 }

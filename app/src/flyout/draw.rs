@@ -132,6 +132,9 @@ pub(super) fn draw(
     if !d.stats.is_empty() {
         p.stats(&d.stats);
     }
+    if !d.bars.is_empty() {
+        p.bars(d);
+    }
     if !d.procs.is_empty() {
         p.procs(d);
     }
@@ -314,6 +317,27 @@ impl Pen<'_> {
         }
         let rows = stats.len().div_ceil(2);
         self.y += rows as f32 * row_h + rows.saturating_sub(1) as f32 * 10.0 + 12.0;
+    }
+
+    /// Titled list of label/text rows over 4-DIP bars, 10 DIPs apart.
+    fn bars(&mut self, d: &Detail) {
+        self.block();
+        let t = self.t;
+        self.text(d.bars_title, &self.f.bold, Rect::new(PAD, self.y, W, LINE_12), t.fg, Align::Left);
+        self.y += LINE_12;
+        for b in &d.bars {
+            self.y += 10.0;
+            let row = Rect::new(PAD, self.y, W, LINE_12);
+            let tw = self.gfx.text_width(&self.f.body, &b.text);
+            self.text(&b.label, &self.f.body, Rect { w: (W - tw - 8.0).max(0.0), ..row }, t.fg, Align::Left);
+            self.text(&b.text, &self.f.body, row, t.fg2, Align::Right);
+            self.y += LINE_12 + 4.0;
+            if let Some(cv) = self.cv {
+                cv.hbar(Rect::new(PAD, self.y, W, 4.0), b.frac, b.color, t.track);
+            }
+            self.y += 4.0;
+        }
+        self.y += 12.0;
     }
 
     /// Titled process rows: icon tile, name, value.

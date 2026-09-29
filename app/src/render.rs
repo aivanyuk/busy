@@ -200,11 +200,6 @@ impl<'a> Canvas<'a> {
         unsafe { self.rt.DrawRoundedRectangle(&rr, self.brush(c), 1.0, None) }
     }
 
-    /// 1-DIP horizontal line.
-    pub fn hline(&self, x0: f32, x1: f32, y: f32, c: Color) {
-        self.fill(Rect::new(x0, y, x1 - x0, 1.0), c);
-    }
-
     /// 1-DIP dashed horizontal line from `x0` to `x1` along the pixel row starting at `y`.
     pub fn dashed_hline(&self, x0: f32, x1: f32, y: f32, c: Color) {
         // SAFETY: the render target, brush and stroke style are live COM objects.
