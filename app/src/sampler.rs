@@ -1,7 +1,7 @@
 //! Background sampling thread. Sources are created and driven only on this thread.
 
 use crate::sync::lock;
-use busy_core::{Config, Module, Snapshot, Source};
+use busy_core::{Config, Module, Snapshot, Source, SourceOptions};
 use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -29,11 +29,17 @@ pub struct Params {
     interval_ms: u32,
     /// Indexed like `Module::ALL`.
     active: [bool; Module::ALL.len()],
+    /// Handed to every source through `Source::configure` when it changes.
+    sources: SourceOptions,
 }
 
 impl Params {
     pub fn new(cfg: &Config) -> Self {
-        Self { interval_ms: cfg.interval_ms, active: Module::ALL.map(|m| cfg.is_active(m)) }
+        Self {
+            interval_ms: cfg.interval_ms,
+            active: Module::ALL.map(|m| cfg.is_active(m)),
+            sources: cfg.source_options(),
+        }
     }
 
     fn is_active(&self, m: Module) -> bool {
@@ -97,6 +103,7 @@ impl Drop for Sampler {
 fn run(shared: Arc<Shared>, hwnd: isize, msg: u32) {
     let com = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.is_ok();
     let mut sources = build_sources();
+    let mut configured = None;
     loop {
         let started = Instant::now();
         let params = {
@@ -106,6 +113,12 @@ fn run(shared: Arc<Shared>, hwnd: isize, msg: u32) {
             }
             st.params
         };
+        if configured != Some(params.sources) {
+            for s in &mut sources {
+                s.configure(params.sources);
+            }
+            configured = Some(params.sources);
+        }
         let mut snap = Snapshot::default();
         for s in sources.iter_mut().filter(|s| params.is_active(s.module())) {
             s.sample(&mut snap);
@@ -152,8 +165,10 @@ mod tests {
                 (m.taskbar, m.flyout) = (false, false);
             }
         }
+        cfg.opt_in.third_party_sensors = true;
         let p = Params::new(&cfg);
         assert_eq!(p.interval_ms, 2000);
+        assert!(p.sources.third_party_sensors);
         assert!(!p.is_active(Module::Disk));
         assert!(Module::ALL.iter().filter(|&&m| m != Module::Disk).all(|&m| p.is_active(m)));
     }
