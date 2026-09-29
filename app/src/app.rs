@@ -15,7 +15,7 @@ use crate::taskbar::Taskbar;
 use crate::theme::Theme;
 use crate::win::{self, Event, register_class};
 use crate::worker::Worker;
-use busy_core::{Config, Snapshot, ThemeMode};
+use busy_core::{Config, Module, Snapshot, ThemeMode};
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
@@ -65,6 +65,8 @@ struct App {
     taskbar: Option<Taskbar>,
     flyout: Option<Flyout>,
     open_flyout: bool,
+    /// The taskbar cell the flyout was last opened from.
+    open_cell: Option<Module>,
     /// The session is locked (`WTS_SESSION_LOCK`).
     locked: bool,
     /// The console display is off (`GUID_CONSOLE_DISPLAY_STATE` = 0).
@@ -149,6 +151,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
         gfx,
         cfg,
         open_flyout,
+        open_cell: None,
         locked: false,
         display_off: false,
     };
@@ -176,8 +179,8 @@ fn on_event(ev: Event) {
         Event::WidgetHover(h) => {
             with(|a| a.set_hover(h));
         }
-        Event::WidgetClick => {
-            with(App::toggle_flyout);
+        Event::WidgetClick(m) => {
+            with(|a| a.toggle_flyout(m));
         }
         Event::WidgetMenu => context_menu(),
         Event::WidgetRerender => post(WM_APP_RENDER),
@@ -312,8 +315,10 @@ impl App {
         self.hist.push(&snap, &fresh, sensor);
         self.snap = snap;
         self.render_all();
-        if std::mem::take(&mut self.open_flyout) {
-            self.toggle_flyout();
+        if std::mem::take(&mut self.open_flyout)
+            && let Some(first) = self.cfg.modules.iter().find(|m| m.taskbar)
+        {
+            self.toggle_flyout(first.module);
         }
     }
 
@@ -357,7 +362,7 @@ impl App {
         self.render_all();
     }
 
-    fn set_hover(&mut self, hover: bool) {
+    fn set_hover(&mut self, hover: Option<Module>) {
         if let Some(tb) = &mut self.taskbar
             && tb.set_hover(hover)
         {
@@ -366,10 +371,15 @@ impl App {
         }
     }
 
-    fn toggle_flyout(&mut self) {
+    /// Opens the flyout from the cell of `m`, or closes it. Until the flyout shows one module (Phase 3) it shows
+    /// every module; `m` is the cell drawn as open.
+    fn toggle_flyout(&mut self, m: Module) {
         let (Some(f), Some(tb)) = (&mut self.flyout, &self.taskbar) else { return };
         let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
         f.toggle(&ctx, tb.screen_rect(), tb.dpi());
+        if f.is_visible() {
+            self.open_cell = Some(m);
+        }
         self.sync_sampler();
         self.sync_active();
     }
@@ -389,12 +399,11 @@ impl App {
         self.sampler.set_params(Params::new(&self.cfg, flyout_open, self.locked || self.display_off));
     }
 
-    /// The widget shows `--active` while its flyout is open (design: the open module's cell); redrawn only when
-    /// that changes.
+    /// The cell the flyout was opened from shows `--active` while it is open; redrawn only when that changes.
     fn sync_active(&mut self) {
         let open = self.flyout.as_ref().is_some_and(Flyout::is_visible);
         if let Some(tb) = &mut self.taskbar
-            && tb.set_active(open)
+            && tb.set_active(self.open_cell.filter(|_| open))
         {
             let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
             tb.render(&ctx);
