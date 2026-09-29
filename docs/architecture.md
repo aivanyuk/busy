@@ -108,7 +108,6 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 
 | Gap | Rule |
 |---|---|
-| Each config save spawns its own thread, all writing the same `config.json.tmp`. | Threads: config writer |
 | `ModuleCfg` has no `#[serde(default)]`: a file missing a per-module field resets the whole config. | Persistence |
 | `taskbar.rs` and `flyout.rs` call back into `crate::app`; `Taskbar`/`Flyout` expose `pub` fields; `pinned_sensor` lives in `app.rs`. | Layering: app modules |
 | `taskbar.rs` (595 lines) and `flyout.rs` (800) mix window procedure, layout and painting; `crates/settings/src/window.rs` is 977 lines. | Layering: one concern per file |

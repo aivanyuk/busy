@@ -1,6 +1,6 @@
 # busy (app)
 
-`app/` — the binary. Files: `main.rs` (single instance, `--open-flyout` debug flag), `app.rs` (state, config, message routing), `sampler.rs`, `history.rs`, `fake.rs` (synthetic Source for UI dev), `taskbar.rs`, `flyout.rs`, `render.rs` (D2D/DWrite helpers), `theme.rs`, `fmt.rs`. Manifest: `app/app.manifest` embedded by `app/build.rs` via `/MANIFEST:EMBED /MANIFESTINPUT` (PerMonitorV2, comctl32 v6, supportedOS Win8/10 — required for layered child windows).
+`app/` — the binary. Files: `main.rs` (single instance, `--open-flyout` debug flag), `app.rs` (state, config, message routing), `sampler.rs`, `persist.rs` (config writer thread), `history.rs`, `fake.rs` (synthetic Source for UI dev), `taskbar.rs`, `flyout.rs`, `render.rs` (D2D/DWrite helpers), `theme.rs`, `fmt.rs`. Manifest: `app/app.manifest` embedded by `app/build.rs` via `/MANIFEST:EMBED /MANIFESTINPUT` (PerMonitorV2, comctl32 v6, supportedOS Win8/10 — required for layered child windows).
 
 Verified on Windows 11 build 26200.9457 (25H2), 3840×2160 @ 200 %, centered taskbar icons. Release exe ~500 KB.
 
@@ -8,7 +8,7 @@ Verified on Windows 11 build 26200.9457 (25H2), 3840×2160 @ 200 %, centered tas
 
 - UI state lives in a `thread_local RefCell` accessed via `app::with()` using `try_borrow_mut`: re-entrant messages are skipped, never panic. Messages that can arrive during our own calls (flyout deactivate, re-render, new config) are posted back to ourselves.
 - A hidden top-level `busy.main` window receives `TaskbarCreated`, `WM_SETTINGCHANGE("ImmersiveColorSet")`, colorization changes, snapshots (`WM_APP+1`) and new configs (`WM_APP_CONFIG`).
-- `app::submit_config(Config)` is callable from any thread; the UI thread applies it live (sampler interval/modules, history size, theme, re-layout) and saves on a worker thread. Config load/save never run on the UI thread.
+- `app::submit_config(Config)` is callable from any thread; the UI thread applies it live (sampler interval/modules, history size, theme, re-layout) and queues the save to the config writer thread (`persist.rs`), which writes one at a time and skips superseded configs. Config save never runs on the UI thread; load runs once at startup, before the widget is embedded.
 - Sampler: own thread, COM MTA, sources built there; Mutex+Condvar carries config and stop flag (interruptible waits, joined on drop, poison-tolerant).
 - `BUSY_FAKE=1` swaps in `fake.rs` (fills every field) — for UI work on machines without GPU/battery/sensors.
 - Debug builds only: `BUSY_DUMP=<dir>` writes `taskbar.bmp`; `BUSY_PIN_FLYOUT=1` keeps the flyout open on focus loss. `--open-flyout` opens it after the first sample.

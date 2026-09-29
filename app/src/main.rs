@@ -7,6 +7,7 @@ mod fake;
 mod flyout;
 mod fmt;
 mod history;
+mod persist;
 mod render;
 mod sampler;
 mod taskbar;
