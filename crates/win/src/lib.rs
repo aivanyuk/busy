@@ -8,5 +8,5 @@ mod reg;
 mod text;
 
 pub use dll::Dll;
-pub use reg::{reg_bytes, reg_dword, reg_string};
+pub use reg::{reg_bytes, reg_dword, reg_qword, reg_string, reg_subkeys};
 pub use text::{from_wide, utf16, wide};
