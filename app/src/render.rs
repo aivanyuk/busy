@@ -2,6 +2,7 @@
 
 use crate::history::Series;
 use crate::theme::{Color, alpha};
+use busy_win::utf16;
 use windows::Win32::Graphics::Direct2D::Common::*;
 use windows::Win32::Graphics::Direct2D::*;
 use windows::Win32::Graphics::DirectWrite::*;
@@ -47,10 +48,6 @@ impl Rect {
     fn d2d(&self) -> D2D_RECT_F {
         D2D_RECT_F { left: self.x, top: self.y, right: self.right(), bottom: self.bottom() }
     }
-}
-
-pub fn wide(s: &str) -> Vec<u16> {
-    s.encode_utf16().collect()
 }
 
 impl Gfx {
@@ -109,7 +106,7 @@ impl Gfx {
     /// (width, height) of `s` laid out within `max_w`.
     pub fn metrics(&self, f: &IDWriteTextFormat, s: &str, max_w: f32) -> (f32, f32) {
         unsafe {
-            let Ok(layout) = self.dw.CreateTextLayout(&wide(s), f, max_w, 10_000.0) else { return (0.0, 0.0) };
+            let Ok(layout) = self.dw.CreateTextLayout(&utf16(s), f, max_w, 10_000.0) else { return (0.0, 0.0) };
             let mut m = DWRITE_TEXT_METRICS::default();
             if layout.GetMetrics(&mut m).is_err() {
                 return (0.0, 0.0);
@@ -164,7 +161,7 @@ impl<'a> Canvas<'a> {
         unsafe {
             let _ = f.SetTextAlignment(a);
             self.rt.DrawText(
-                &wide(s),
+                &utf16(s),
                 f,
                 &r.d2d(),
                 self.brush(c),
