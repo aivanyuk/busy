@@ -44,7 +44,8 @@ pub struct ModuleCfg {
     /// Shown as a cell on the taskbar.
     #[serde(default)]
     pub taskbar: bool,
-    /// Shown as a section in the flyout.
+    /// Processes: show top-process lists in the CPU, Memory and Disk flyouts. Other modules ignore it: a cell
+    /// always opens its module's flyout (design); it stays in the file for the settings window and older builds.
     #[serde(default = "yes")]
     pub flyout: bool,
     #[serde(default = "text")]
@@ -249,9 +250,12 @@ impl Config {
         self.module(m).and_then(|c| c.interval_s).map_or(self.interval_ms, |s| s.saturating_mul(1000))
     }
 
-    /// Whether a module needs sampling: it has a taskbar cell, or a flyout section while the flyout is open.
-    pub fn is_active(&self, m: Module, flyout_open: bool) -> bool {
-        self.module(m).is_some_and(|c| c.taskbar || (c.flyout && flyout_open))
+    /// Whether a module needs sampling: it has a taskbar cell, or the open flyout (`open`) shows it, as its own
+    /// module or as data it borrows (`Module::flyout_needs`; top-process lists only with Processes' `flyout`).
+    pub fn is_active(&self, m: Module, open: Option<Module>) -> bool {
+        let Some(c) = self.module(m) else { return false };
+        let borrowed = |o: Module| o.flyout_needs().contains(&m) && (m != Module::Processes || c.flyout);
+        c.taskbar || open.is_some_and(|o| o == m || borrowed(o))
     }
 }
 
@@ -412,18 +416,21 @@ mod tests {
     }
 
     #[test]
-    fn is_active_requires_taskbar_or_open_flyout() {
-        let mut cfg = Config::default();
-        for m in &mut cfg.modules {
-            match m.module {
-                Module::Disk => (m.taskbar, m.flyout) = (false, false),
-                Module::Battery => (m.taskbar, m.flyout) = (false, true),
-                _ => {}
-            }
-        }
-        assert!(!cfg.is_active(Module::Disk, true));
-        assert!(cfg.is_active(Module::Cpu, false));
-        assert!(!cfg.is_active(Module::Battery, false));
-        assert!(cfg.is_active(Module::Battery, true));
+    fn is_active_requires_a_cell_or_the_open_flyout() {
+        let cfg = Config::default();
+        let active =
+            |cfg: &Config, open| Module::ALL.into_iter().filter(|&m| cfg.is_active(m, open)).collect::<Vec<_>>();
+        let cells = vec![Module::Cpu, Module::Memory, Module::Network, Module::Gpu];
+        assert_eq!(active(&cfg, None), cells);
+        // CPU's flyout borrows temperatures and processes; Battery's adds itself.
+        assert_eq!(active(&cfg, Some(Module::Cpu)), [cells.clone(), vec![Module::Sensors, Module::Processes]].concat());
+        assert_eq!(active(&cfg, Some(Module::Battery)), [cells.clone(), vec![Module::Battery]].concat());
+        let disk = vec![Module::Cpu, Module::Memory, Module::Disk, Module::Network, Module::Gpu, Module::Sensors];
+        assert_eq!(active(&cfg, Some(Module::Disk)), [disk, vec![Module::Processes]].concat());
+        // Processes' `flyout` turns the top-process lists (and their sampling) off.
+        let mut off = cfg.clone();
+        off.modules.iter_mut().filter(|c| c.module == Module::Processes).for_each(|c| c.flyout = false);
+        assert!(!off.is_active(Module::Processes, Some(Module::Disk)));
+        assert!(off.is_active(Module::Sensors, Some(Module::Disk)));
     }
 }

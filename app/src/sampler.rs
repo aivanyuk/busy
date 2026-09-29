@@ -43,10 +43,11 @@ pub struct Params {
 const PROMPT: Duration = Duration::from_millis(250);
 
 impl Params {
-    pub fn new(cfg: &Config, flyout_open: bool, paused: bool) -> Self {
+    /// `open` is the module whose flyout is open.
+    pub fn new(cfg: &Config, open: Option<Module>, paused: bool) -> Self {
         Self {
             interval_ms: Module::ALL.map(|m| cfg.module_interval_ms(m)),
-            active: Module::ALL.map(|m| cfg.is_active(m, flyout_open)),
+            active: Module::ALL.map(|m| cfg.is_active(m, open)),
             sources: cfg.source_options(),
             paused,
         }
@@ -276,27 +277,27 @@ mod tests {
         }
         set_interval(&mut cfg, Module::Memory, Some(5));
         cfg.opt_in.third_party_sensors = true;
-        let p = Params::new(&cfg, true, false);
+        let p = Params::new(&cfg, Some(Module::Battery), false);
         assert_eq!(p.interval_ms[Module::Cpu.index()], 2000);
         assert_eq!(p.interval_ms[Module::Memory.index()], 5000);
         assert!(p.sources.third_party_sensors);
-        assert!(!p.is_active(Module::Disk));
-        assert!(Module::ALL.iter().filter(|&&m| m != Module::Disk).all(|&m| p.is_active(m)));
+        let active: Vec<_> = Module::ALL.into_iter().filter(|&m| p.is_active(m)).collect();
+        assert_eq!(active, vec![Module::Cpu, Module::Memory, Module::Network, Module::Gpu, Module::Battery]);
     }
 
     #[test]
-    fn flyout_only_modules_follow_the_flyout() {
+    fn the_open_flyout_adds_what_it_shows() {
         let cfg = Config::default();
-        let (closed, open) = (Params::new(&cfg, false, false), Params::new(&cfg, true, false));
+        let (closed, open) = (Params::new(&cfg, None, false), Params::new(&cfg, Some(Module::Disk), false));
         assert!(closed.is_active(Module::Cpu) && !closed.is_active(Module::Processes));
-        assert!(open.is_active(Module::Processes));
+        assert!(open.is_active(Module::Disk) && open.is_active(Module::Processes) && !open.is_active(Module::Battery));
     }
 
     #[test]
     fn each_module_runs_at_its_own_interval() {
         let mut cfg = Config { interval_ms: 1000, ..Config::default() };
         set_interval(&mut cfg, Module::Memory, Some(3));
-        let p = Params::new(&cfg, false, false);
+        let p = Params::new(&cfg, None, false);
         let t0 = Instant::now();
         let mut s = Schedule::default();
         // Everything active is due on the first tick.
@@ -318,7 +319,7 @@ mod tests {
         let mut cfg = Config { interval_ms: 5000, ..Config::default() };
         cfg.modules.iter_mut().filter(|c| c.module == Module::Sensors).for_each(|c| c.taskbar = true);
         set_interval(&mut cfg, Module::Sensors, Some(1));
-        let p = Params::new(&cfg, false, false);
+        let p = Params::new(&cfg, None, false);
         let t0 = Instant::now();
         let mut s = Schedule::default();
         s.sampled(&s.due(&p, t0), t0);
@@ -328,21 +329,22 @@ mod tests {
     #[test]
     fn a_module_that_appears_is_sampled_promptly() {
         let cfg = Config { interval_ms: 10_000, ..Config::default() };
-        let (closed, open) = (Params::new(&cfg, false, false), Params::new(&cfg, true, false));
+        let (closed, open) = (Params::new(&cfg, None, false), Params::new(&cfg, Some(Module::Disk), false));
         let t0 = Instant::now();
         let mut s = Schedule::default();
         s.sampled(&s.due(&closed, t0), t0);
         assert_eq!(s.next(&open, t0), Some(t0 + PROMPT));
         // Sensors pulls GPU along.
-        let want = vec![Module::Disk, Module::Gpu, Module::Battery, Module::Sensors, Module::Processes];
+        let want = vec![Module::Disk, Module::Gpu, Module::Sensors, Module::Processes];
         assert_eq!(due_list(&s, &open, t0 + PROMPT), want);
     }
 
     #[test]
     fn disabled_modules_are_forgotten_but_paused_ones_are_not() {
         let cfg = Config::default();
+        let disk = Some(Module::Disk);
         let (open, closed, paused) =
-            (Params::new(&cfg, true, false), Params::new(&cfg, false, false), Params::new(&cfg, true, true));
+            (Params::new(&cfg, disk, false), Params::new(&cfg, None, false), Params::new(&cfg, disk, true));
         let t0 = Instant::now();
         let mut s = Schedule::default();
         s.sampled(&s.due(&open, t0), t0);
@@ -353,7 +355,7 @@ mod tests {
         assert!(s.has_inactive(&closed));
         let gone = s.forget_inactive(&closed);
         let gone: Vec<_> = Module::ALL.into_iter().filter(|m| gone[m.index()]).collect();
-        assert_eq!(gone, vec![Module::Disk, Module::Battery, Module::Sensors, Module::Processes]);
+        assert_eq!(gone, vec![Module::Disk, Module::Sensors, Module::Processes]);
         assert!(!s.has_inactive(&closed));
     }
 }
