@@ -1,6 +1,7 @@
 //! The window procedure and its message dispatch.
 
 use super::controls::ID_OK;
+use super::worker::{Job, WM_APP_REPLY};
 use super::{UI, Ui, ui};
 use crate::dark;
 use windows::Win32::Foundation::*;
@@ -63,12 +64,18 @@ impl Ui {
                 }
                 WM_SETTINGCHANGE => {
                     if l.0 != 0 && PCWSTR(l.0 as _).to_string().is_ok_and(|s| s == "ImmersiveColorSet") {
-                        self.update_dark();
+                        self.worker.submit(Job::Theme);
                     }
                     None
                 }
+                WM_APP_REPLY => {
+                    for r in self.worker.replies() {
+                        self.on_reply(r);
+                    }
+                    Some(LRESULT(0))
+                }
                 WM_CLOSE => {
-                    let _ = DestroyWindow(self.hwnd);
+                    self.close();
                     Some(LRESULT(0))
                 }
                 WM_NCDESTROY => {

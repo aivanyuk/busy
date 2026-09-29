@@ -1,5 +1,6 @@
 //! The settings window: its state (`Ui`), creation and the open/focus entry point.
-//! Split by concern into control creation, layout, painting, command handling, config and the window procedure.
+//! Split by concern into control creation, layout, painting, command handling, config, the window procedure
+//! and the registry worker.
 
 use crate::dark;
 use busy_core::{Config, ModuleCfg};
@@ -19,10 +20,12 @@ mod controls;
 mod layout;
 mod paint;
 mod wndproc;
+mod worker;
 
 use controls::Controls;
 use layout::work_area;
 use wndproc::wndproc;
+use worker::{Job, Worker};
 
 const CLASS: PCWSTR = w!("busy.settings");
 const STYLE: WINDOW_STYLE = WINDOW_STYLE(WS_OVERLAPPED.0 | WS_CAPTION.0 | WS_SYSMENU.0);
@@ -65,6 +68,13 @@ struct Ui {
     field: HBRUSH,
     syncing: Cell<bool>,
     focus: Cell<HWND>,
+    worker: Worker,
+    /// Windows app mode, as last read by the worker.
+    system_dark: Cell<bool>,
+    /// Autostart state in the registry; `None` until the worker's first read.
+    reg_autostart: Cell<Option<bool>>,
+    /// A config waiting on the worker's autostart write, and whether to close once it is applied.
+    pending: RefCell<Option<(Config, bool)>>,
 }
 
 impl Drop for Ui {
@@ -125,11 +135,15 @@ fn create(cfg: &Config, on_apply: Box<dyn Fn(Config)>) -> Result<()> {
             on_apply,
             dpi: Cell::new(GetDpiForWindow(hwnd).max(96)),
             font: Cell::new(HFONT::default()),
-            dark: Cell::new(dark::wanted(cfg.theme)),
+            dark: Cell::new(dark::wanted(cfg.theme, false)),
             bg: CreateSolidBrush(dark::BG),
             field: CreateSolidBrush(dark::FIELD),
             syncing: Cell::new(false),
             focus: Cell::new(list),
+            worker: Worker::start(hwnd),
+            system_dark: Cell::new(false),
+            reg_autostart: Cell::new(None),
+            pending: RefCell::new(None),
         });
         ui.set_font();
         ui.init(cfg);
@@ -140,9 +154,20 @@ fn create(cfg: &Config, on_apply: Box<dyn Fn(Config)>) -> Result<()> {
         let x = work.left + (work.right - work.left - ww) / 2;
         let y = work.top + (work.bottom - work.top - wh) / 2;
         let _ = SetWindowPos(hwnd, None, x, y, ww, wh, SWP_NOZORDER | SWP_NOACTIVATE);
+        // Stays hidden until the worker's first read, so it opens in the right theme; without a worker,
+        // it opens now with what it has.
+        let read = ui.worker.submit(Job::Read);
         UI.set(Some(ui));
+        if !read {
+            show(hwnd);
+        }
+        Ok(())
+    }
+}
+
+fn show(hwnd: HWND) {
+    unsafe {
         let _ = ShowWindow(hwnd, SW_SHOW);
         let _ = SetForegroundWindow(hwnd);
-        Ok(())
     }
 }

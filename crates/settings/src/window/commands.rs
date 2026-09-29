@@ -13,14 +13,9 @@ use windows::core::{HSTRING, PWSTR};
 impl Ui {
     pub(super) fn command(&self, id: u16, code: u32) {
         match (id, code) {
-            (ID_OK, _) => {
-                self.apply();
-                let _ = unsafe { DestroyWindow(self.hwnd) };
-            }
-            (ID_CANCEL, _) => {
-                let _ = unsafe { DestroyWindow(self.hwnd) };
-            }
-            (ID_APPLY, BN_CLICKED) => self.apply(),
+            (ID_OK, _) => self.apply(true),
+            (ID_CANCEL, _) => self.close(),
+            (ID_APPLY, BN_CLICKED) => self.apply(false),
             (ID_UP, BN_CLICKED) => self.move_row(-1),
             (ID_DOWN, BN_CLICKED) => self.move_row(1),
             (ID_TASKBAR, BN_CLICKED) => {
