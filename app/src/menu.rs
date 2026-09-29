@@ -30,7 +30,7 @@ pub fn show(owner: HWND, cfg: &Config) -> Option<Command> {
         };
         let checked = |b: bool| if b { MF_CHECKED } else { MF_UNCHECKED };
         for mc in cfg.modules.iter().filter(|mc| !mc.module.allowed_styles().is_empty()) {
-            let idx = Module::ALL.iter().position(|m| *m == mc.module).unwrap_or(0) as u32;
+            let idx = mc.module.index() as u32;
             let label = busy_win::wide(mc.module.label());
             let _ = AppendMenuW(
                 sub_mods,

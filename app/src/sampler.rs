@@ -49,7 +49,7 @@ impl Params {
     }
 
     fn is_active(&self, m: Module) -> bool {
-        !self.paused && Module::ALL.iter().position(|&x| x == m).is_some_and(|i| self.active[i])
+        !self.paused && self.active[m.index()]
     }
 
     /// Whether some module is active here that was not in `before`.
