@@ -8,6 +8,7 @@ mod fake;
 mod flyout;
 mod launch;
 mod menu;
+mod presence;
 mod sampler;
 mod sync;
 mod taskbar;

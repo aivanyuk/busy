@@ -34,7 +34,7 @@ Inside the `busy` app crate, modules form layers too. A module may use the ones 
 | Router | `app.rs` | Owns the `App` state; the **only** module that turns events into state changes. |
 | Windows | `taskbar/`, `flyout/`, `menu.rs` | Own an HWND (or a popup menu) and its GPU resources; draw from a read-only `Ctx`; report input as `win::Event`s, or return the menu's choice as a `menu::Command`. |
 | Workers | `sampler.rs`, `worker.rs` | Threads with a small, typed hand-off to the router. |
-| Support | `win.rs`, `launch.rs`, and `busy_ui::{ctx, render, theme}` | Window-class and message plumbing, starting other programs, render context, D2D/DWrite helpers, palette. |
+| Support | `win.rs`, `launch.rs`, `presence.rs`, and `busy_ui::{ctx, render, theme}` | Window-class and message plumbing, starting other programs, session-lock and display-state notifications, render context, D2D/DWrite helpers, palette. |
 | Pure logic | `busy_ui::{select, tone, fmt, history}` | No Win32; unit-tested. |
 
 Rules:
