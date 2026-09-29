@@ -12,7 +12,7 @@ Live check: `cargo run -p busy-metrics --example dump_metrics [samples]`.
 | Memory | `GlobalMemoryStatusEx`, `GetPerformanceInfo` | `cached` = `SystemCache` × page size — lower than Task Manager's standby+modified. |
 | Disk | PDH `\PhysicalDisk(*)` read/write bytes/s, `% Idle Time` | active = 100 − idle. Query rebuilt ≤ every 10 s on failure. Volumes (fixed drives) refreshed every 10 s. |
 | Network | `GetIfTable2` for discovery (every 60 s or on IPv4 change), `GetIfEntry2` per sample, `GetUnicastIpAddressTable` every 10 s | `GetAdaptersAddresses` was 6–9 ms — don't reintroduce it on the hot path. |
-| Battery | `GetSystemPowerStatus`; SetupDi + `IOCTL_BATTERY_*` for rate/capacity/cycles | Capacity refreshed every 60 s. **Untested on real battery hardware** (dev machine is a desktop). |
+| Battery | `GetSystemPowerStatus`; SetupDi + `IOCTL_BATTERY_*` for rate/capacity/cycles | Capacity refreshed every 60 s. Devices opened `GENERIC_READ` only: the three query IOCTLs encode `FILE_READ_ACCESS` (only `IOCTL_BATTERY_SET_INFORMATION` needs write). **Untested on real battery hardware** (dev machine is a desktop). |
 | Processes | one `NtQuerySystemInformation(SystemProcessInformation)` into a reused buffer | Hand-defined `SYSTEM_PROCESS_INFORMATION` with compile-time size/offset asserts (x64). Deltas keyed by (pid, CreateTime). CPU% normalized to all logical CPUs. "Memory Compression" excluded from `by_mem`. |
 
 ## Network counting rule (totals)

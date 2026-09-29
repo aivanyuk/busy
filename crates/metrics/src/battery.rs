@@ -1,7 +1,7 @@
 use crate::util::Every;
 use busy_core::{BatteryInfo, Module, Snapshot, Source};
 use windows::Win32::Devices::DeviceAndDriverInstallation::*;
-use windows::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE, HANDLE};
+use windows::Win32::Foundation::{GENERIC_READ, HANDLE};
 use windows::Win32::Storage::FileSystem::{
     CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
 };
@@ -159,10 +159,13 @@ fn open(set: HDEVINFO, did: &SP_DEVICE_INTERFACE_DATA) -> Option<Dev> {
     unsafe { (*detail).cbSize = size_of::<SP_DEVICE_INTERFACE_DETAIL_DATA_W>() as u32 };
     unsafe { SetupDiGetDeviceInterfaceDetailW(set, did, Some(detail), need, None, None) }.ok()?;
     let path = PCWSTR(unsafe { std::ptr::addr_of!((*detail).DevicePath) }.cast());
+    // The QUERY_TAG/INFORMATION/STATUS IOCTL codes encode FILE_READ_ACCESS, so read access is all the I/O manager
+    // checks; only IOCTL_BATTERY_SET_INFORMATION needs write, and we never send it.
+    // SAFETY: `path` points into `buf`, NUL-terminated by SetupDiGetDeviceInterfaceDetailW, and outlives the call.
     let h = unsafe {
         CreateFileW(
             path,
-            (GENERIC_READ | GENERIC_WRITE).0,
+            GENERIC_READ.0,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
             None,
             OPEN_EXISTING,
