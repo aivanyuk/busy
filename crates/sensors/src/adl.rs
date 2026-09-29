@@ -6,7 +6,8 @@ use std::ffi::c_void;
 use windows::Win32::System::Com::CoTaskMemAlloc;
 use windows::core::w;
 
-use crate::{Dll, gpu::Stats};
+use crate::gpu::Stats;
+use busy_win::Dll;
 
 type Ctx = *mut c_void;
 

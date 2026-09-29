@@ -6,7 +6,8 @@ use std::ffi::c_void;
 
 use windows::core::w;
 
-use crate::{Dll, gpu::Stats};
+use crate::gpu::Stats;
+use busy_win::Dll;
 
 type Dev = *mut c_void;
 type Ret = i32;
