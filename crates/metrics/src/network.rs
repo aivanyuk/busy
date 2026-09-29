@@ -4,8 +4,9 @@
 //! interface is connected, all connected non-filter, non-loopback interfaces are summed instead.
 //! Listed: connected interfaces that are hardware or have an IPv4 address, plus disconnected physical NICs.
 //!
-//! GetIfTable2 costs several ms, so it only (re)discovers candidates every 10 s; each sample polls those
-//! with GetIfEntry2 (~tens of µs each).
+//! GetIfTable2 costs several ms, so it only (re)discovers candidates every 60 s, or sooner when the 10 s
+//! IPv4 address check sees an interface gain an address; each sample polls those with GetIfEntry2
+//! (~tens of µs each).
 
 use crate::util::{Clock, Every, from_wide};
 use busy_core::{Module, NetIf, NetInfo, Snapshot, Source};
