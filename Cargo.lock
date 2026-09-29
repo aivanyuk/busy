@@ -10,6 +10,7 @@ dependencies = [
  "busy-metrics",
  "busy-sensors",
  "busy-settings",
+ "busy-win",
  "windows",
 ]
 

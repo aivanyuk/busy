@@ -1,10 +1,11 @@
 //! Light/dark resolution, accent color and palette.
 
 use busy_core::ThemeMode;
+use busy_win::{reg_bytes, reg_dword};
 use windows::Win32::Graphics::Direct2D::Common::D2D1_COLOR_F;
 use windows::Win32::Graphics::Dwm::DwmGetColorizationColor;
-use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_BINARY, RRF_RT_REG_DWORD, RegGetValueW};
-use windows::core::{BOOL, w};
+use windows::Win32::System::Registry::HKEY_CURRENT_USER;
+use windows::core::BOOL;
 
 pub type Color = D2D1_COLOR_F;
 
@@ -50,8 +51,9 @@ impl Theme {
             // The taskbar and its flyouts follow the *system* (not app) theme.
             ThemeMode::System => {
                 reg_dword(
-                    w!("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
-                    w!("SystemUsesLightTheme"),
+                    HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+                    "SystemUsesLightTheme",
                 ) == Some(0)
             }
         };
@@ -115,31 +117,10 @@ impl Theme {
     }
 }
 
-fn reg_dword(key: windows::core::PCWSTR, value: windows::core::PCWSTR) -> Option<u32> {
-    let (mut v, mut n) = (0u32, 4u32);
-    let r = unsafe {
-        RegGetValueW(HKEY_CURRENT_USER, key, value, RRF_RT_REG_DWORD, None, Some(&mut v as *mut _ as _), Some(&mut n))
-    };
-    r.is_ok().then_some(v)
-}
-
 /// Accent shade tuned for the theme: `AccentPalette` holds 8 RGBA swatches, light (0) to dark (7), base at 3.
 fn accent(dark: bool) -> Color {
-    let mut pal = [0u8; 32];
-    let mut n = pal.len() as u32;
-    let key = w!("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Accent");
-    let ok = unsafe {
-        RegGetValueW(
-            HKEY_CURRENT_USER,
-            key,
-            w!("AccentPalette"),
-            RRF_RT_REG_BINARY,
-            None,
-            Some(pal.as_mut_ptr() as _),
-            Some(&mut n),
-        )
-    };
-    if ok.is_ok() && n == 32 {
+    let key = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Accent";
+    if let Some(pal) = reg_bytes(HKEY_CURRENT_USER, key, "AccentPalette").filter(|p| p.len() == 32) {
         let i = if dark { 1 } else { 4 } * 4;
         return rgb(u32::from_be_bytes([0, pal[i], pal[i + 1], pal[i + 2]]));
     }

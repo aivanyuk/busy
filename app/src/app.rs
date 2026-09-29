@@ -404,7 +404,7 @@ pub fn context_menu() {
         let checked = |b: bool| if b { MF_CHECKED } else { MF_UNCHECKED };
         for mc in &cfg.modules {
             let idx = Module::ALL.iter().position(|m| *m == mc.module).unwrap_or(0) as u32;
-            let label: Vec<u16> = mc.module.label().encode_utf16().chain([0]).collect();
+            let label = busy_win::wide(mc.module.label());
             let _ = AppendMenuW(
                 sub_mods,
                 MF_STRING | checked(mc.taskbar),
