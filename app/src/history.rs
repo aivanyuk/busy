@@ -7,11 +7,13 @@ use std::collections::VecDeque;
 pub struct Series {
     buf: VecDeque<f32>,
     cap: usize,
+    /// Samples ever pushed: a change counter for redraw checks.
+    pushed: u64,
 }
 
 impl Series {
     pub fn new(cap: usize) -> Self {
-        Self { buf: VecDeque::with_capacity(cap), cap }
+        Self { buf: VecDeque::with_capacity(cap), cap, pushed: 0 }
     }
 
     pub fn push(&mut self, v: f32) {
@@ -19,6 +21,7 @@ impl Series {
             self.buf.pop_front();
         }
         self.buf.push_back(if v.is_finite() { v } else { 0.0 });
+        self.pushed += 1;
     }
 
     pub fn set_cap(&mut self, cap: usize) {
@@ -30,6 +33,9 @@ impl Series {
 
     pub fn cap(&self) -> usize {
         self.cap
+    }
+    pub fn pushed(&self) -> u64 {
+        self.pushed
     }
     pub fn len(&self) -> usize {
         self.buf.len()
@@ -133,6 +139,7 @@ mod tests {
         assert_eq!((s.len(), s.get(0), s.get(2)), (3, 2.0, 4.0));
         s.set_cap(2);
         assert_eq!((s.len(), s.get(0), s.max()), (2, 3.0, 4.0));
+        assert_eq!(s.pushed(), 5);
         assert_eq!(capacity(120, 1000), 120);
         assert_eq!(capacity(60, 500), 120);
     }

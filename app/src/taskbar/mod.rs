@@ -4,13 +4,14 @@ mod cells;
 mod explorer;
 mod surface;
 
-use cells::Fonts;
+use cells::{Cell, Fonts};
 use surface::Surface;
 
 use crate::ctx::Ctx;
 use crate::render::{Canvas, Gfx, Rect};
+use crate::theme::Theme;
 use crate::win::{self, Event, raise};
-use busy_core::Anchor;
+use busy_core::{Anchor, Config};
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Direct2D::Common::*;
 use windows::Win32::Graphics::Direct2D::*;
@@ -26,6 +27,28 @@ const CLASS: PCWSTR = w!("busy.taskbar");
 const PAD: f32 = 6.0;
 const GAP: f32 = 12.0;
 
+/// Where the taskbar lets us draw; any change calls for a new layout.
+#[derive(Clone, Copy, Default, PartialEq)]
+struct Geometry {
+    dpi: u32,
+    /// Taskbar client rect.
+    client: RECT,
+    /// `explorer::slot`: (anchor edge, room).
+    slot: (i32, i32),
+}
+
+/// Everything the widget's pixels depend on; an equal frame is not drawn again.
+#[derive(PartialEq)]
+struct Frame {
+    dpi: u32,
+    w_px: i32,
+    h_px: i32,
+    hover: bool,
+    active: bool,
+    theme: Theme,
+    cells: Vec<(cells::Key, f32)>,
+}
+
 pub struct Taskbar {
     hwnd: HWND,
     tray: HWND,
@@ -33,7 +56,9 @@ pub struct Taskbar {
     fonts: Fonts,
     surf: Option<Surface>,
     placed: RECT,
-    dpi: u32,
+    geom: Geometry,
+    /// What the surface and the layered window currently show.
+    drawn: Option<Frame>,
     hover: bool,
     /// Its flyout is open.
     active: bool,
@@ -90,7 +115,8 @@ impl Taskbar {
                 fonts,
                 surf: None,
                 placed: RECT::default(),
-                dpi: 0,
+                geom: Geometry::default(),
+                drawn: None,
                 hover: false,
                 active: false,
             })
@@ -129,40 +155,75 @@ impl Taskbar {
         r
     }
 
-    /// Re-lays out, repositions (only when changed) and redraws the widget.
-    pub fn render(&mut self, ctx: &Ctx) {
+    fn geometry(&self, cfg: &Config) -> Geometry {
         let dpi = unsafe { GetDpiForWindow(self.tray) }.max(96);
-        let scale = dpi as f32 / 96.0;
-        if dpi != self.dpi {
-            self.dpi = dpi;
-            unsafe { self.rt.SetDpi(dpi as f32, dpi as f32) };
-        }
         let mut client = RECT::default();
         unsafe {
             let _ = GetClientRect(self.tray, &mut client);
         }
+        let slot = explorer::slot(self.tray, cfg, dpi as f32 / 96.0, &client);
+        Geometry { dpi, client, slot }
+    }
+
+    /// Timer path: follows taskbar geometry changes, otherwise only restores z-order and visibility.
+    /// Content changes arrive through `render`, so an unchanged taskbar costs no layout or drawing here.
+    pub fn watch(&mut self, ctx: &Ctx) {
+        if self.geometry(ctx.cfg) != self.geom {
+            self.render(ctx);
+        } else if self.placed != RECT::default() {
+            self.place(self.placed);
+        }
+    }
+
+    /// Re-lays out and repositions the widget (moving it only on change); draws only when the frame differs
+    /// from the one on screen.
+    pub fn render(&mut self, ctx: &Ctx) {
+        let geom = self.geometry(ctx.cfg);
+        if geom.dpi != self.geom.dpi {
+            unsafe { self.rt.SetDpi(geom.dpi as f32, geom.dpi as f32) };
+        }
+        self.geom = geom;
+        let Geometry { dpi, client, slot } = geom;
+        let scale = dpi as f32 / 96.0;
         let h_px = client.bottom - client.top;
         let mut cells = cells::cells(ctx);
         let mut widths: Vec<f32> = cells.iter().map(|c| c.width(ctx.gfx, &self.fonts)).collect();
         let total = |ws: &[f32]| 2.0 * PAD + ws.iter().sum::<f32>() + GAP * ws.len().saturating_sub(1) as f32;
-        let slot = explorer::slot(self.tray, ctx.cfg, scale, &client);
         // Never cover the task buttons: drop trailing (lowest-priority) cells that don't fit.
         while !widths.is_empty() && (total(&widths) * scale).ceil() as i32 > slot.1 {
             widths.pop();
             cells.pop();
         }
         if cells.is_empty() || h_px <= 0 {
-            unsafe {
-                let _ = ShowWindow(self.hwnd, SW_HIDE);
+            if self.placed != RECT::default() {
+                unsafe {
+                    let _ = ShowWindow(self.hwnd, SW_HIDE);
+                }
             }
             self.placed = RECT::default();
+            self.drawn = None;
             return;
         }
         let h = h_px as f32 / scale;
         let w = total(&widths);
         let w_px = (w * scale).ceil() as i32;
-        self.place(ctx.cfg.anchor, slot, w_px, h_px, &client);
+        let x = if ctx.cfg.anchor == Anchor::NearTray { slot.0 - w_px } else { slot.0 };
+        let x = x.clamp(0, (client.right - w_px).max(0));
+        self.place(RECT { left: x, top: 0, right: x + w_px, bottom: h_px });
 
+        let frame = Frame {
+            dpi,
+            w_px,
+            h_px,
+            hover: self.hover,
+            active: self.active,
+            theme: *ctx.theme,
+            cells: cells.iter().map(Cell::key).zip(widths.iter().copied()).collect(),
+        };
+        if self.drawn.as_ref() == Some(&frame) {
+            return;
+        }
+        self.drawn = None;
         if self.surf.as_ref().is_none_or(|s| s.w != w_px || s.h != h_px) {
             self.surf = None;
             self.surf = Surface::new(w_px, h_px);
@@ -199,7 +260,7 @@ impl Taskbar {
                 AlphaFormat: AC_SRC_ALPHA as u8,
                 BlendFlags: 0,
             };
-            let _ = UpdateLayeredWindow(
+            let shown = UpdateLayeredWindow(
                 self.hwnd,
                 None,
                 None,
@@ -210,21 +271,23 @@ impl Taskbar {
                 Some(&blend),
                 ULW_ALPHA,
             );
+            if shown.is_ok() {
+                self.drawn = Some(frame);
+            }
         }
         #[cfg(debug_assertions)]
         surface::debug_dump(surf, ctx.theme.tb);
     }
 
-    fn place(&mut self, anchor: Anchor, (edge, _): (i32, i32), w: i32, h: i32, client: &RECT) {
-        let x = if anchor == Anchor::NearTray { edge - w } else { edge };
-        let x = x.clamp(0, (client.right - w).max(0));
-        let want = RECT { left: x, top: 0, right: x + w, bottom: h };
+    /// Moves the window to `want` if that changed, and restores z-order and visibility if explorer changed them.
+    fn place(&mut self, want: RECT) {
+        let moved = std::mem::replace(&mut self.placed, want) != want;
         unsafe {
             // Something (e.g. the XAML island) was raised above us: restore our z-order.
             let covered = GetWindow(self.hwnd, GW_HWNDPREV).is_ok();
-            if want != self.placed || covered || !IsWindowVisible(self.hwnd).as_bool() {
-                let _ = SetWindowPos(self.hwnd, Some(HWND_TOP), x, 0, w, h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
-                self.placed = want;
+            if moved || covered || !IsWindowVisible(self.hwnd).as_bool() {
+                let (w, h) = (want.right - want.left, want.bottom - want.top);
+                let _ = SetWindowPos(self.hwnd, Some(HWND_TOP), want.left, 0, w, h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
             }
         }
     }
