@@ -8,6 +8,16 @@ const CORE_BARS: usize = 8;
 /// The reading picked for the taskbar Sensors cell (`options.sensors.sensor`). `Named` and `Cpu` fall back to
 /// the hottest temperature so the cell isn't empty; `Gpu` and `Storage` show nothing rather than another part.
 pub(crate) fn taskbar_sensor<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a SensorReading> {
+    pick(snap, &cfg.options.sensors.sensor, true)
+}
+
+/// The hottest temperature of one part (`Cpu`, `Gpu` or `Storage`), without falling back to another part: a
+/// flyout's "Temperature" row names the part it belongs to.
+pub(crate) fn part_temp<'a>(snap: &'a Snapshot, part: &SensorPick) -> Option<&'a SensorReading> {
+    pick(snap, part, false)
+}
+
+fn pick<'a>(snap: &'a Snapshot, pick: &SensorPick, fallback: bool) -> Option<&'a SensorReading> {
     let temps = || snap.sensors.iter().filter(|s| s.kind == SensorKind::Temperature);
     let hottest = |a: &&SensorReading, b: &&SensorReading| a.value.total_cmp(&b.value);
     let any = |keys: &[&str], s: &str| {
@@ -24,8 +34,8 @@ pub(crate) fn taskbar_sensor<'a>(snap: &'a Snapshot, cfg: &Config) -> Option<&'a
             || any(&["gpu", "geforce", "radeon"], &hw)
     };
     let is_storage = |s: &&SensorReading| any(&["nvme", "ssd", "hdd", "disk", "drive"], &s.hardware);
-    let cpu = || temps().filter(is_cpu).max_by(hottest).or_else(|| temps().max_by(hottest));
-    match &cfg.options.sensors.sensor {
+    let cpu = || temps().filter(is_cpu).max_by(hottest).or_else(|| temps().max_by(hottest).filter(|_| fallback));
+    match pick {
         SensorPick::Cpu => cpu(),
         SensorPick::Gpu => temps().filter(is_gpu).max_by(hottest),
         SensorPick::Storage => temps().filter(is_storage).max_by(hottest),
@@ -147,6 +157,16 @@ mod tests {
         assert_eq!(pick(&s, SensorPick::Cpu).as_deref(), Some("ACPI/Thermal zone"));
         assert_eq!(pick(&s, SensorPick::Gpu), None);
         assert_eq!(pick(&s, SensorPick::Storage), None);
+    }
+
+    #[test]
+    fn part_temps_never_substitute() {
+        let s = snap(vec![temp("NVIDIA RTX", "GPU Core", 55.0), temp("AMD Ryzen 7", "Tctl", 61.0)]);
+        let name = |p| super::part_temp(&s, &p).map(|r| r.name.clone());
+        assert_eq!(name(SensorPick::Cpu).as_deref(), Some("Tctl"));
+        assert_eq!(name(SensorPick::Storage), None);
+        let gpu_only = snap(vec![temp("NVIDIA RTX", "GPU Core", 55.0)]);
+        assert!(super::part_temp(&gpu_only, &SensorPick::Cpu).is_none());
     }
 
     #[test]

@@ -15,6 +15,8 @@ pub struct Gfx {
     /// Tabular figures (OpenType `tnum`, design `font-variant-numeric: tabular-nums`): equal-width digits, so
     /// changing values don't jitter. Created once; applied to every layout, where it only affects digits.
     typography: IDWriteTypography,
+    /// 3-on/3-off dashes for 1-DIP lines (CSS `1px dashed`), created once.
+    dash: ID2D1StrokeStyle,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -71,7 +73,9 @@ impl Gfx {
                 nameTag: DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES,
                 parameter: 1,
             })?;
-            Ok(Self { d2d, dw, family, typography })
+            let props = D2D1_STROKE_STYLE_PROPERTIES { dashStyle: D2D1_DASH_STYLE_CUSTOM, ..Default::default() };
+            let dash = d2d.CreateStrokeStyle(&props, Some(&[3.0, 3.0]))?;
+            Ok(Self { d2d, dw, family, typography, dash })
         }
     }
 
@@ -189,9 +193,22 @@ impl<'a> Canvas<'a> {
         unsafe { self.rt.FillRoundedRectangle(&rr, self.brush(c)) }
     }
 
+    /// 1-DIP outline of a rounded rect, drawn inside `r` (CSS `border: 1px solid`).
+    pub fn round_outline(&self, r: Rect, radius: f32, c: Color) {
+        let rr = D2D1_ROUNDED_RECT { rect: r.inset(0.5, 0.5).d2d(), radiusX: radius - 0.5, radiusY: radius - 0.5 };
+        // SAFETY: the render target and brush are live COM objects.
+        unsafe { self.rt.DrawRoundedRectangle(&rr, self.brush(c), 1.0, None) }
+    }
+
     /// 1-DIP horizontal line.
     pub fn hline(&self, x0: f32, x1: f32, y: f32, c: Color) {
         self.fill(Rect::new(x0, y, x1 - x0, 1.0), c);
+    }
+
+    /// 1-DIP dashed horizontal line from `x0` to `x1` along the pixel row starting at `y`.
+    pub fn dashed_hline(&self, x0: f32, x1: f32, y: f32, c: Color) {
+        // SAFETY: the render target, brush and stroke style are live COM objects.
+        unsafe { self.rt.DrawLine(point(x0, y + 0.5), point(x1, y + 0.5), self.brush(c), 1.0, &self.gfx.dash) }
     }
 
     /// 1-DIP vertical line centered on `x`.
@@ -266,7 +283,9 @@ impl<'a> Canvas<'a> {
 
     /// Area sparkline of `s`, right-aligned so the newest sample touches the right edge;
     /// the width spans the last `span` samples, so the graph fills up over time.
-    pub fn graph(&self, r: Rect, s: &Series, max: f32, c: Color, fill: f32, span: usize) {
+    /// `fill` is the opacity of the area under the line (0 = line only), `stroke` the line width.
+    #[allow(clippy::too_many_arguments)]
+    pub fn graph(&self, r: Rect, s: &Series, max: f32, c: Color, fill: f32, stroke: f32, span: usize) {
         let n = s.len();
         if n < 2 || max <= 0.0 {
             return;
@@ -276,12 +295,12 @@ impl<'a> Canvas<'a> {
         let step = r.w / (span - 1) as f32;
         let x = |i: usize| r.right() - (n - 1 - i) as f32 * step;
         let y = |i: usize| r.bottom() - (s.get(i) / max).clamp(0.0, 1.0) * r.h;
-        let (Ok(area), Ok(stroke)) =
+        let (Ok(area), Ok(line)) =
             (unsafe { self.gfx.d2d.CreatePathGeometry() }, unsafe { self.gfx.d2d.CreatePathGeometry() })
         else {
             return;
         };
-        let (Ok(a), Ok(l)) = (unsafe { area.Open() }, unsafe { stroke.Open() }) else { return };
+        let (Ok(a), Ok(l)) = (unsafe { area.Open() }, unsafe { line.Open() }) else { return };
         unsafe {
             a.BeginFigure(point(x(first), r.bottom()), D2D1_FIGURE_BEGIN_FILLED);
             l.BeginFigure(point(x(first), y(first)), D2D1_FIGURE_BEGIN_HOLLOW);
@@ -302,7 +321,7 @@ impl<'a> Canvas<'a> {
         if fill > 0.0 {
             unsafe { self.rt.FillGeometry(&area, self.brush(alpha(c, fill)), None) };
         }
-        unsafe { self.rt.DrawGeometry(&stroke, self.brush(c), 1.25, None) };
+        unsafe { self.rt.DrawGeometry(&line, self.brush(c), stroke, None) };
         self.unclip();
     }
 }

@@ -19,26 +19,8 @@ impl Painter<'_> {
         let pct = &|v: f32| fmt::pct(v);
         let rate = &|v: f32| fmt::rate(v as f64);
         match mc.module {
-            Module::Cpu => {
-                let Some(c) = &snap.cpu else { return self.missing("CPU") };
-                self.header("CPU", &fmt::pct(c.total), value(c.total));
-                if !c.name.is_empty() {
-                    self.sub(c.name.trim());
-                }
-                self.gap(4.0);
-                self.graph(&[(&hist.cpu, color)], 100.0, 56.0, pct, None);
-                self.cores(&c.per_core, mc);
-                let mut kv = vec![("User", fmt::pct(c.user)), ("System", fmt::pct(c.kernel))];
-                if let Some(f) = c.freq_mhz {
-                    kv.push(("Frequency", fmt::mhz(f)));
-                }
-                kv.push(("Cores", format!("{} / {}", c.physical_cores, c.logical_cores)));
-                kv.push(("Processes", fmt::count(c.processes as u64)));
-                kv.push(("Threads", fmt::count(c.threads as u64)));
-                kv.push(("Handles", fmt::count(c.handles as u64)));
-                kv.push(("Uptime", fmt::duration(c.uptime_secs)));
-                self.kv(&kv);
-            }
+            // Drawn by `modules::cpu`.
+            Module::Cpu => {}
             Module::Memory => {
                 let Some(mem) = snap.memory.as_ref().filter(|m| m.total > 0) else { return self.missing("Memory") };
                 let p = mem.used as f32 * 100.0 / mem.total as f32;

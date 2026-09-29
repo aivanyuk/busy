@@ -66,6 +66,8 @@ pub struct History {
     /// (capacity, interval) of GPU series, for GPUs that appear later.
     gpu_size: (usize, u32),
     pub cpu: Series,
+    /// Kernel ("System") share of CPU time, the CPU flyout's second line.
+    pub cpu_kernel: Series,
     pub mem: Series,
     pub gpus: Vec<Series>,
     pub net_rx: Series,
@@ -95,6 +97,7 @@ impl History {
         Self {
             gpu_size: size(cfg, Module::Gpu),
             cpu: s(Module::Cpu),
+            cpu_kernel: s(Module::Cpu),
             mem: s(Module::Memory),
             gpus: Vec::new(),
             net_rx: s(Module::Network),
@@ -111,6 +114,7 @@ impl History {
         self.gpu_size = size(cfg, Module::Gpu);
         let series = [
             (&mut self.cpu, Module::Cpu),
+            (&mut self.cpu_kernel, Module::Cpu),
             (&mut self.mem, Module::Memory),
             (&mut self.net_rx, Module::Network),
             (&mut self.net_tx, Module::Network),
@@ -134,6 +138,7 @@ impl History {
         let is = |m: Module| fresh[m.index()];
         if let Some(c) = snap.cpu.as_ref().filter(|_| is(Module::Cpu)) {
             self.cpu.push(c.total);
+            self.cpu_kernel.push(c.kernel.min(c.total));
         }
         if let Some(m) = snap.memory.as_ref().filter(|m| m.total > 0 && is(Module::Memory)) {
             self.mem.push(m.used as f32 * 100.0 / m.total as f32);
