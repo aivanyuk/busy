@@ -5,7 +5,7 @@
 use crate::fmt;
 use crate::history::Series;
 use crate::theme::Color;
-use busy_core::RateUnit;
+use busy_core::{RateUnit, SensorKind, TempUnit};
 
 pub(super) struct Detail<'a> {
     pub(super) title: &'static str,
@@ -57,6 +57,7 @@ pub(super) struct BarRow {
 pub(super) enum Value {
     Pct,
     Rate(RateUnit),
+    Sensor(SensorKind, TempUnit),
 }
 
 impl Value {
@@ -64,6 +65,7 @@ impl Value {
         match self {
             Value::Pct => fmt::pct(v),
             Value::Rate(unit) => fmt::rate_in(v as f64, unit),
+            Value::Sensor(kind, unit) => fmt::sensor(v, kind, unit),
         }
     }
 }
@@ -127,5 +129,6 @@ mod tests {
     fn values_format_like_the_cells() {
         assert_eq!(Value::Pct.format(42.4), "42%");
         assert_eq!(Value::Rate(RateUnit::Bits).format(1024.0), "8.0 Kb/s");
+        assert_eq!(Value::Sensor(SensorKind::Temperature, TempUnit::Celsius).format(61.2), "61°C");
     }
 }
