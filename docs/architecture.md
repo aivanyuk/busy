@@ -118,7 +118,6 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 | The taskbar redraws every snapshot and every watch tick; the flyout repaints on every mouse move. | Performance: redraw only on change |
 | About 2 `SAFETY` comments for about 200 `unsafe` blocks. | Security: `SAFETY` comments |
 | LHM row count and string lengths, and the config file size, are unbounded. | Security: foreign data |
-| CI actions are pinned by tag, with no `permissions:` block and no dependency audit. | Security: CI |
 
 ## Persistence
 
