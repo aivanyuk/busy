@@ -101,6 +101,7 @@ pub struct MemInfo {
     pub commit_used: u64,
     pub commit_limit: u64,
     pub cached: Option<u64>,
+    /// RAM held by the memory compression store (Task Manager "Compressed"; Memory Compression working set).
     pub compressed: Option<u64>,
     /// Modified page list: dirty pages not yet written out (Task Manager "Modified").
     pub modified: Option<u64>,

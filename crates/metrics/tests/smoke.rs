@@ -27,7 +27,8 @@ fn sources_sample_without_panicking() {
     assert!(cpu.logical_cores > 0 && cpu.per_core.len() == cpu.logical_cores as usize);
     let mem = snap.memory.expect("memory");
     assert!(mem.total > 0 && mem.used <= mem.total);
-    let parts = [mem.modified, mem.standby, mem.free, mem.paged_pool, mem.nonpaged_pool, mem.hardware_reserved];
+    let parts =
+        [mem.modified, mem.standby, mem.free, mem.paged_pool, mem.nonpaged_pool, mem.hardware_reserved, mem.compressed];
     for list in parts.into_iter().flatten() {
         assert!(list <= mem.total, "{mem:?}");
     }
