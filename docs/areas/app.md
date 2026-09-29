@@ -7,7 +7,7 @@ Verified on Windows 11 build 26200.9457 (25H2), 3840×2160 @ 200 %, centered tas
 ## Threads and state
 
 - UI state lives in a `thread_local RefCell` accessed via `app::with()` using `try_borrow_mut`: re-entrant messages are skipped, never panic. Window procedures don't touch it: they `win::raise` an `Event`, and `app::on_event` (registered with `win::set_handler` before any window exists) routes it synchronously. Messages that can arrive during our own calls (flyout deactivate, re-render, new config) are posted back to ourselves.
-- A hidden top-level `busy.main` window receives `TaskbarCreated`, `WM_SETTINGCHANGE("ImmersiveColorSet")`, colorization changes, snapshots (`WM_APP+1`) and new configs (`WM_APP_CONFIG`).
+- A hidden top-level `busy.main` window receives `TaskbarCreated`, `WM_SETTINGCHANGE("ImmersiveColorSet")`, snapshots (`WM_APP+1`) and new configs (`WM_APP_CONFIG`).
 - `app::submit_config(Config)` is callable from any thread; the UI thread applies it live (sampler interval/modules, history size, theme, re-layout) and queues the save to the config writer thread (a `worker::Worker`), which writes one at a time and skips superseded configs. Config save never runs on the UI thread; load runs once at startup, before the widget is embedded.
 - Sampler: own thread, COM MTA, sources built there; Mutex+Condvar carries `sampler::Params` (interval, active modules, `SourceOptions` — `Copy`, so nothing allocates under the lock; the sampler calls `Source::configure` when the options differ from the last ones applied) and the stop flag (interruptible waits, joined on drop, poison-tolerant).
 - Debug hooks, compiled only under `cfg(debug_assertions)` so a release build ignores them: `BUSY_FAKE=1` swaps in `fake.rs` (fills every field) — for UI work on machines without GPU/battery/sensors; `BUSY_DUMP=<dir>` writes `taskbar.bmp`; `BUSY_PIN_FLYOUT=1` keeps the flyout open on focus loss; `--open-flyout` opens it after the first sample.
@@ -33,7 +33,11 @@ Verified on Windows 11 build 26200.9457 (25H2), 3840×2160 @ 200 %, centered tas
 
 ## Theme
 
-Taskbar follows `SystemUsesLightTheme` (not `AppsUseLightTheme`) unless `Config.theme` overrides. Reacts to `WM_SETTINGCHANGE` "ImmersiveColorSet" and `WM_DWMCOLORIZATIONCOLORCHANGED`. Accent from DWM colorization / registry. The registry reads run on the theme reader thread (`WM_APP_THEME` brings the result back), except the first resolution at startup, before the widget exists.
+Taskbar follows `SystemUsesLightTheme` (not `AppsUseLightTheme`) unless `Config.theme` overrides. Reacts to `WM_SETTINGCHANGE` "ImmersiveColorSet". The registry read runs on the theme reader thread (`WM_APP_THEME` brings the resolved `Theme` back), except the first resolution at startup, before the widget exists.
+
+`theme.rs` holds the design's tokens 1:1 (`design/Meterbar.dc.html`): one `Theme` field per token (`--tb` → `tb`, `--fg2` → `fg2`, `--on-accent` → `on_accent`, …) in two const tables, dark and light; resolving a theme only picks one. The accent is the design's fixed `--accent`, not the system accent color, so nothing reads `AccentPalette` or DWM colorization any more. Settings-window tokens (`--win`, `--card`, `--ctl*`, `--pop`, `--knob`) come with Phase 4.
+
+- Labels `fg3`; bar and sparkline tracks `track`; flyout chart background `well` with `grid` lines; selected Processes tab `accent` / `on_accent`; the flyout paints the translucent `fly` over its acrylic backdrop (opaque `fly` without one).
 
 ## Integration points
 

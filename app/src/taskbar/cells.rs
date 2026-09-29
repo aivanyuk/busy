@@ -3,7 +3,7 @@
 use crate::ctx::Ctx;
 use crate::history::Series;
 use crate::render::{Align, Canvas, Gfx, Rect, nice_max};
-use crate::theme::{Color, rgba};
+use crate::theme::Color;
 use crate::{fmt, select};
 use busy_core::{CellStyle, Module};
 use windows::Win32::Graphics::DirectWrite::IDWriteTextFormat;
@@ -172,7 +172,7 @@ impl Cell<'_> {
         let y0 = (r.h - 30.0) / 2.0;
         match &self.val {
             Val::One(v) => {
-                cv.text(&self.label, &f.label, Rect::new(r.x, y0, r.w, 13.0), t.fg2, Align::Left);
+                cv.text(&self.label, &f.label, Rect::new(r.x, y0, r.w, 13.0), t.fg3, Align::Left);
                 cv.text(v, &f.value, Rect::new(r.x, y0 + 12.0, r.w, 18.0), t.fg, Align::Left);
             }
             Val::Two(rows) => {
@@ -192,7 +192,7 @@ impl Cell<'_> {
             CellStyle::Text | CellStyle::Io => self.draw_text(cv, f, ctx, r),
             CellStyle::Graph => {
                 let y0 = (r.h - 32.0) / 2.0;
-                cv.text(&self.label, &f.label, Rect::new(r.x, y0, r.w, 13.0), t.fg2, Align::Left);
+                cv.text(&self.label, &f.label, Rect::new(r.x, y0, r.w, 13.0), t.fg3, Align::Left);
                 cv.text(&self.short, &f.tiny, Rect::new(r.x, y0, r.w, 13.0), t.fg, Align::Right);
                 let g = Rect::new(r.x, y0 + 15.0, r.w, 17.0);
                 cv.round(g, 3.0, t.track);
@@ -213,7 +213,7 @@ impl Cell<'_> {
                 let bh = 30.0;
                 let y0 = (r.h - bh) / 2.0;
                 for (i, (frac, c)) in self.bars.iter().enumerate() {
-                    cv.vbar(Rect::new(r.x + i as f32 * (BAR_W + 2.0), y0, BAR_W, bh), *frac, *c, rgba(0x808080, 0.28));
+                    cv.vbar(Rect::new(r.x + i as f32 * (BAR_W + 2.0), y0, BAR_W, bh), *frac, *c, t.track);
                 }
                 let dx = self.bars_width() + 6.0;
                 self.draw_text(cv, f, ctx, Rect::new(r.x + dx, r.y, r.w - dx, r.h));

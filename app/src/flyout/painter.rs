@@ -4,7 +4,7 @@ use crate::ctx::Ctx;
 use crate::fmt;
 use crate::history::Series;
 use crate::render::{Align, Canvas, Rect};
-use crate::theme::{Color, Theme, alpha};
+use crate::theme::{Color, Theme};
 use windows::Win32::Graphics::DirectWrite::IDWriteTextFormat;
 
 pub(super) struct Fonts {
@@ -110,10 +110,10 @@ impl Painter<'_> {
         self.y += h + 8.0;
         let Some(cv) = self.cv else { return };
         let t = self.t();
-        cv.round(r, 4.0, t.track);
+        cv.round(r, 4.0, t.well);
         for f in [0.25, 0.5, 0.75] {
             let y = (r.y + r.h * f).round();
-            cv.hline(r.x + 4.0, r.right() - 4.0, y, alpha(t.line, 0.7));
+            cv.hline(r.x + 4.0, r.right() - 4.0, y, t.grid);
         }
         let inner = r.inset(1.0, 2.0);
         for (s, c) in series {
@@ -144,7 +144,7 @@ impl Painter<'_> {
         let lw = self.ctx.gfx.text_width(&self.f.small, &label) + 12.0;
         let lx = if mx > r.x + r.w / 2.0 { x - lw - 4.0 } else { x + 4.0 };
         let lr = Rect::new(lx.clamp(r.x, r.right() - lw), my.clamp(r.y + 2.0, r.bottom() - 20.0) - 9.0, lw, 18.0);
-        cv.round(lr, 4.0, if t.dark { alpha(t.fly, 0.92) } else { alpha(crate::theme::rgb(0xFFFFFF), 0.95) });
+        cv.round(lr, 4.0, Color { a: 0.95, ..t.fly });
         self.text(&label, &self.f.small, lr, t.fg, Align::Center);
     }
 
@@ -180,13 +180,13 @@ impl Painter<'_> {
             let tr = Rect::new(r.x + i as f32 * tw, r.y, tw, r.h);
             if let Some(cv) = self.cv {
                 if i == self.tab {
-                    cv.round(tr.inset(2.0, 2.0), 4.0, alpha(t.accent, 0.25));
+                    cv.round(tr.inset(2.0, 2.0), 4.0, t.accent);
                 } else if self.mouse.is_some_and(|(x, y)| tr.contains(x, y)) {
                     cv.round(tr.inset(2.0, 2.0), 4.0, t.hover);
                 }
             }
             let f = if i == self.tab { &self.f.bold } else { &self.f.body };
-            self.text(name, f, tr, if i == self.tab { t.fg } else { t.fg2 }, Align::Center);
+            self.text(name, f, tr, if i == self.tab { t.on_accent } else { t.fg2 }, Align::Center);
             self.hits.push((tr, i));
         }
         self.y += 30.0;

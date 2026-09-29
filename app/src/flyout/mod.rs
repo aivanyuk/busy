@@ -7,7 +7,7 @@ use painter::{Fonts, Painter};
 
 use crate::ctx::Ctx;
 use crate::render::{Canvas, Gfx, Rect};
-use crate::theme::{Theme, alpha};
+use crate::theme::{Color, Theme};
 use crate::win::{self, Event, raise};
 use busy_core::Anchor;
 use windows::Win32::Foundation::*;
@@ -230,7 +230,8 @@ impl Flyout {
             }
             rt.BeginDraw();
             let t = ctx.theme;
-            rt.Clear(Some(&if self.backdrop { alpha(t.fly, if t.dark { 0.5 } else { 0.4 }) } else { t.fly }));
+            // `--fly` is translucent over the blurred backdrop, like the design's backdrop-filter.
+            rt.Clear(Some(&if self.backdrop { t.fly } else { Color { a: 1.0, ..t.fly } }));
         }
         let hits = Canvas::new(&rt, ctx.gfx).ok().map(|cv| {
             let (_, hits) = self.layout(ctx, Some(&cv));

@@ -224,9 +224,6 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                     with(App::render_all);
                 }
             }
-            WM_DWMCOLORIZATIONCOLORCHANGED => {
-                with(App::refresh_theme);
-            }
             WM_DISPLAYCHANGE => {
                 with(App::render_all);
             }
