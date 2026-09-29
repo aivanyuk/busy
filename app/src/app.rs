@@ -178,7 +178,7 @@ fn on_event(ev: Event) {
             with(|a| a.flyout_event(|f, ctx| f.on_click(ctx, x, y)));
         }
         Event::FlyoutPaint => {
-            with(|a| a.flyout_event(Flyout::paint));
+            with(|a| a.flyout_event(Flyout::render));
         }
     }
 }
