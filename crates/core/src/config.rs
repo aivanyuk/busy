@@ -1,5 +1,5 @@
 use crate::Module;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,10 +37,28 @@ pub enum TempUnit {
 pub struct ModuleCfg {
     pub module: Module,
     /// Shown as a cell on the taskbar.
+    #[serde(default)]
     pub taskbar: bool,
     /// Shown as a section in the flyout.
+    #[serde(default = "yes")]
     pub flyout: bool,
+    #[serde(default = "text")]
     pub style: CellStyle,
+}
+
+fn yes() -> bool {
+    true
+}
+
+fn text() -> CellStyle {
+    CellStyle::Text
+}
+
+/// Drops entries that don't parse (a module or style from a newer build, a hand-edit) instead of failing the
+/// whole file; `normalize()` then re-adds any module that went missing.
+fn valid_modules<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<ModuleCfg>, D::Error> {
+    let raw = Vec::<serde_json::Value>::deserialize(d)?;
+    Ok(raw.into_iter().filter_map(|v| serde_json::from_value(v).ok()).collect())
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -48,6 +66,7 @@ pub struct ModuleCfg {
 pub struct Config {
     pub interval_ms: u32,
     /// Order = display order.
+    #[serde(deserialize_with = "valid_modules")]
     pub modules: Vec<ModuleCfg>,
     pub anchor: Anchor,
     /// Extra horizontal offset from the anchor, in logical (96-dpi) pixels. Positive = away from anchor.
@@ -167,6 +186,32 @@ mod tests {
         let cfg: Config = serde_json::from_str(r#"{"interval_ms": 2000}"#).unwrap();
         assert_eq!(cfg.interval_ms, 2000);
         assert_eq!(cfg.anchor, Anchor::NearTray);
+    }
+
+    #[test]
+    fn module_entry_missing_fields_gets_defaults() {
+        let cfg: Config = serde_json::from_str(r#"{"modules": [{"module": "Gpu", "taskbar": true}]}"#).unwrap();
+        assert_eq!(
+            cfg.modules,
+            vec![ModuleCfg { module: Module::Gpu, taskbar: true, flyout: true, style: CellStyle::Text }]
+        );
+    }
+
+    #[test]
+    fn unparsable_module_entry_is_dropped_not_the_whole_file() {
+        let json = r#"{"interval_ms": 2000, "modules": [
+            {"module": "Cpu", "taskbar": false, "flyout": false, "style": "Bar"},
+            {"module": "Fans", "taskbar": true},
+            {"module": "Memory", "style": "Hologram"}
+        ]}"#;
+        let mut cfg: Config = serde_json::from_str(json).unwrap();
+        cfg.normalize();
+        assert_eq!(cfg.interval_ms, 2000);
+        assert_eq!(
+            cfg.modules[0],
+            ModuleCfg { module: Module::Cpu, taskbar: false, flyout: false, style: CellStyle::Bar }
+        );
+        assert_eq!(cfg.modules.len(), Module::ALL.len());
     }
 
     #[test]
