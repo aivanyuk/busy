@@ -108,7 +108,6 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 
 | Gap | Rule |
 |---|---|
-| `Sampler` is joined while the taskbar widget still exists (`App` drops `sampler` before `taskbar`). | Threads: no wait while a tray child exists |
 | Each config save spawns its own thread, all writing the same `config.json.tmp`. | Threads: config writer |
 | `ModuleCfg` has no `#[serde(default)]`: a file missing a per-module field resets the whole config. | Persistence |
 | `taskbar.rs` and `flyout.rs` call back into `crate::app`; `Taskbar`/`Flyout` expose `pub` fields; `pinned_sensor` lives in `app.rs`. | Layering: app modules |

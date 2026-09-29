@@ -243,6 +243,15 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
     LRESULT(0)
 }
 
+impl Drop for App {
+    /// Windows go first: until our child of explorer's taskbar is gone, the sampler join below
+    /// (the `sampler` field's drop, possibly waiting out a WMI call) would freeze the user's taskbar.
+    fn drop(&mut self) {
+        self.taskbar = None;
+        self.flyout = None;
+    }
+}
+
 impl App {
     fn on_snapshot(&mut self) {
         let Some(snap) = self.sampler.take() else { return };
