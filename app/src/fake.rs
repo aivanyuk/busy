@@ -1,4 +1,5 @@
-//! Random-walk data source used until the real collectors are wired in.
+//! Random-walk data source filling every Snapshot field; selected with `BUSY_FAKE=1` for UI work on machines
+//! without a GPU, battery or sensors.
 
 use busy_core::*;
 
