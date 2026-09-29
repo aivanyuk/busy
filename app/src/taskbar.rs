@@ -26,14 +26,14 @@ const GRAPH_W: f32 = 54.0;
 const BAR_W: f32 = 4.0;
 
 pub struct Taskbar {
-    pub hwnd: HWND,
-    pub tray: HWND,
+    hwnd: HWND,
+    tray: HWND,
     rt: ID2D1DCRenderTarget,
     fonts: Fonts,
     surf: Option<Surface>,
     placed: RECT,
     dpi: u32,
-    pub hover: bool,
+    hover: bool,
 }
 
 struct Fonts {
@@ -163,6 +163,16 @@ impl Taskbar {
         unsafe {
             IsWindow(Some(self.hwnd)).as_bool() && IsWindow(Some(self.tray)).as_bool() && find_tray() == Some(self.tray)
         }
+    }
+
+    /// DPI of the taskbar we are embedded in (the flyout opens at the same scale).
+    pub fn dpi(&self) -> u32 {
+        unsafe { GetDpiForWindow(self.tray) }
+    }
+
+    /// Records whether the pointer is over the widget; true if that changed and a redraw is due.
+    pub fn set_hover(&mut self, hover: bool) -> bool {
+        std::mem::replace(&mut self.hover, hover) != hover
     }
 
     pub fn screen_rect(&self) -> RECT {

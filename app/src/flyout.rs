@@ -35,12 +35,12 @@ struct Fonts {
 }
 
 pub struct Flyout {
-    pub hwnd: HWND,
+    hwnd: HWND,
     rt: Option<ID2D1HwndRenderTarget>,
     fonts: Fonts,
-    pub visible: bool,
-    /// Tick of the last hide caused by deactivation (see `App::toggle_flyout`).
-    pub deactivated_at: u64,
+    visible: bool,
+    /// Tick of the last hide caused by deactivation (see `toggle`).
+    deactivated_at: u64,
     backdrop: bool,
     dpi: u32,
     anchor: RECT,
@@ -120,7 +120,21 @@ impl Flyout {
         self.dpi as f32 / 96.0
     }
 
-    pub fn show(&mut self, ctx: &Ctx, anchor: RECT, dpi: u32) {
+    /// Shows the flyout next to `anchor` (the widget's screen rect), or hides it if it is open.
+    pub fn toggle(&mut self, ctx: &Ctx, anchor: RECT, dpi: u32) {
+        if self.visible {
+            self.hide(false);
+        } else if unsafe { GetTickCount64() }.saturating_sub(self.deactivated_at) >= 250 {
+            self.show(ctx, anchor, dpi);
+        }
+        // Otherwise the press that deactivated (and hid) the flyout was on the widget itself: stay closed.
+    }
+
+    pub fn is_foreground(&self) -> bool {
+        unsafe { GetForegroundWindow() == self.hwnd }
+    }
+
+    fn show(&mut self, ctx: &Ctx, anchor: RECT, dpi: u32) {
         self.anchor = anchor;
         self.anchor_side = ctx.cfg.anchor;
         self.dpi = dpi;
