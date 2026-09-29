@@ -2,8 +2,10 @@
 
 mod config;
 mod migrate;
+mod options;
 pub use config::*;
 pub use migrate::CONFIG_VERSION;
+pub use options::*;
 
 /// A data collector. Constructed and driven exclusively on the sampler thread,
 /// which has called `CoInitializeEx(COINIT_MULTITHREADED)` beforehand.
