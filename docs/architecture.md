@@ -123,8 +123,6 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 | LHM row count and string lengths, and the config file size, are unbounded. | Security: foreign data |
 | CI actions are pinned by tag, with no `permissions:` block and no dependency audit. | Security: CI |
 
-Open decision: release builds use `panic = "abort"` and no source is wrapped in `catch_unwind`, so a panicking source ends the process. Either keep abort (and say so in `docs/areas/core.md` § Source contract), or switch to unwind and isolate each source with `catch_unwind`.
-
 ## Persistence
 
 - Config: `%APPDATA%\busy\config.json` (atomic write via temp + rename). Unknown/missing fields fall back to defaults (`#[serde(default)]`), then `Config::normalize()`.

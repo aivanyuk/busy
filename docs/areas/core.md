@@ -13,6 +13,7 @@ pub trait Source {
 
 - Constructed and called only on the sampler thread (COM MTA initialized). Not `Send` on purpose.
 - Must not panic; on failure leave fields untouched (`None` / empty).
+- Panic policy: release builds keep `panic = "abort"`, and sources are **not** wrapped in `catch_unwind`. A panicking source ends the process; the no-panic rule is the guard, not isolation. Unwinding was rejected: it would need an unwind-safe boundary around shared `Rc<RefCell<_>>` GPU/Sensors state, which a panic mid-borrow leaves inconsistent, and it would grow the binary.
 - Budget: a few ms per call at ~1 Hz. Anything slower (WMI, re-enumeration) is throttled/cached inside the source.
 - Units: percentages 0..=100, bytes, bytes/s, °C, RPM, W, MHz.
 
