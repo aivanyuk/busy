@@ -83,14 +83,6 @@ impl Painter<'_> {
         self.y += h;
     }
 
-    pub(super) fn separator(&mut self) {
-        self.y += 12.0;
-        if let Some(cv) = self.cv {
-            cv.fill(Rect::new(self.x, self.y, self.w, 1.0), self.t().line);
-        }
-        self.y += 13.0;
-    }
-
     /// Two-column label/value grid.
     pub(super) fn kv(&mut self, items: &[(&str, String)]) {
         let cw = (self.w - 20.0) / 2.0;
