@@ -33,11 +33,14 @@ pub struct Params {
     sources: SourceOptions,
 }
 
+/// How soon after the last sample a module that just became visible is sampled.
+const PROMPT: Duration = Duration::from_millis(250);
+
 impl Params {
-    pub fn new(cfg: &Config) -> Self {
+    pub fn new(cfg: &Config, flyout_open: bool) -> Self {
         Self {
             interval_ms: cfg.interval_ms,
-            active: Module::ALL.map(|m| cfg.is_active(m)),
+            active: Module::ALL.map(|m| cfg.is_active(m, flyout_open)),
             sources: cfg.source_options(),
         }
     }
@@ -45,14 +48,17 @@ impl Params {
     fn is_active(&self, m: Module) -> bool {
         Module::ALL.iter().position(|&x| x == m).is_some_and(|i| self.active[i])
     }
+
+    /// Whether some module is active here that was not in `before`.
+    fn activates(&self, before: &Params) -> bool {
+        Module::ALL.iter().any(|&m| self.is_active(m) && !before.is_active(m))
+    }
 }
 
 struct State {
     params: Params,
     latest: Option<Snapshot>,
     stop: bool,
-    /// Bumped on config change so the waiting loop re-evaluates its deadline.
-    generation: u64,
 }
 
 struct Shared {
@@ -68,10 +74,8 @@ pub struct Sampler {
 impl Sampler {
     /// Posts `msg` to `notify` whenever a new snapshot is ready.
     pub fn start(params: Params, notify: HWND, msg: u32) -> Self {
-        let shared = Arc::new(Shared {
-            state: Mutex::new(State { params, latest: None, stop: false, generation: 0 }),
-            cv: Condvar::new(),
-        });
+        let shared =
+            Arc::new(Shared { state: Mutex::new(State { params, latest: None, stop: false }), cv: Condvar::new() });
         let hwnd = notify.0 as isize;
         let sh = shared.clone();
         let thread = std::thread::Builder::new().name("busy-sampler".into()).spawn(move || run(sh, hwnd, msg)).ok();
@@ -80,9 +84,9 @@ impl Sampler {
 
     pub fn set_params(&self, params: Params) {
         let mut st = lock(&self.shared.state);
-        st.params = params;
-        st.generation += 1;
-        self.shared.cv.notify_all();
+        if std::mem::replace(&mut st.params, params) != params {
+            self.shared.cv.notify_all();
+        }
     }
 
     pub fn take(&self) -> Option<Snapshot> {
@@ -133,17 +137,16 @@ fn run(shared: Arc<Shared>, hwnd: isize, msg: u32) {
             if st.stop {
                 break;
             }
-            let deadline = started + Duration::from_millis(st.params.interval_ms as u64);
+            let mut deadline = started + Duration::from_millis(st.params.interval_ms as u64);
+            // A module that just became visible (flyout opened, module enabled) should fill in promptly.
+            if st.params.activates(&params) {
+                deadline = deadline.min(started + PROMPT);
+            }
             let now = Instant::now();
             if now >= deadline {
                 break;
             }
-            let generation = st.generation;
             st = shared.cv.wait_timeout(st, deadline - now).unwrap_or_else(PoisonError::into_inner).0;
-            // A config change may enable modules that should appear promptly.
-            if st.generation != generation && started.elapsed() >= Duration::from_millis(250) {
-                break;
-            }
         }
     }
     drop(sources);
@@ -166,10 +169,21 @@ mod tests {
             }
         }
         cfg.opt_in.third_party_sensors = true;
-        let p = Params::new(&cfg);
+        let p = Params::new(&cfg, true);
         assert_eq!(p.interval_ms, 2000);
         assert!(p.sources.third_party_sensors);
         assert!(!p.is_active(Module::Disk));
         assert!(Module::ALL.iter().filter(|&&m| m != Module::Disk).all(|&m| p.is_active(m)));
+    }
+
+    #[test]
+    fn flyout_only_modules_follow_the_flyout() {
+        let cfg = Config::default();
+        let (closed, open) = (Params::new(&cfg, false), Params::new(&cfg, true));
+        assert!(closed.is_active(Module::Cpu) && !closed.is_active(Module::Processes));
+        assert!(open.is_active(Module::Processes));
+        assert!(open.activates(&closed));
+        assert!(!closed.activates(&open));
+        assert!(!open.activates(&open));
     }
 }

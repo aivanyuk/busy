@@ -61,7 +61,7 @@ config writer thread ◀── latest Config ───────────�
 
 - One fresh `Snapshot` per tick; each source fills only its part. Sources are ordered: the GPU source runs before the Sensors source (they share state via `Rc<RefCell<_>>`, which is why `Source` has no `Send` bound).
 - Sources are constructed **on** the sampler thread after `CoInitializeEx(COINIT_MULTITHREADED)` and never leave it.
-- Sources skipped when `Config::is_active(module)` is false.
+- Sources skipped when `Config::is_active(module, flyout_open)` is false: a module is sampled for its taskbar cell, and for its flyout section only while the flyout is open.
 - Settings reach sources only as `SourceOptions` (`Config::source_options()`), carried in `sampler::Params`: the sampler calls `Source::configure` on every source before the first tick and whenever the options change, on the sampler thread. Sources never see the `Config`.
 - Rates are computed inside sources from deltas; the first sample may have zero rates.
 - A config from another thread (the settings window's `on_apply`) is parked in a latest-wins slot and applied on `WM_APP_CONFIG`.
@@ -112,7 +112,7 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 
 | Gap | Rule |
 |---|---|
-| Flyout-only modules are sampled with the flyout closed; nothing pauses on lock or display off. | Performance: sample only what is visible |
+| Nothing pauses on lock or display off. | Performance: sample only what is visible |
 | HWiNFO reopens and copies its mapping every tick; processes, GPU and network rebuild their maps every tick. | Performance: reuse buffers |
 | About 2 `SAFETY` comments for about 200 `unsafe` blocks. | Security: `SAFETY` comments |
 | LHM row count and string lengths, and the config file size, are unbounded. | Security: foreign data |
