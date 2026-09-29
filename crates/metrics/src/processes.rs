@@ -1,6 +1,7 @@
 use crate::util::Clock;
 use busy_core::{Module, ProcEntry, Snapshot, Source, TOP_N};
 use std::collections::HashMap;
+use std::ops::Range;
 use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SystemProcessInformation};
 use windows::Win32::Foundation::STATUS_INFO_LENGTH_MISMATCH;
 use windows::Win32::System::Threading::{ALL_PROCESSOR_GROUPS, GetActiveProcessorCount};
@@ -56,6 +57,9 @@ pub struct Processes {
     ncpu: f64,
     /// (pid, create time) -> (cpu 100ns, io bytes)
     prev: HashMap<(usize, i64), (i64, i64)>,
+    /// This sample's counters; swapped with `prev` afterwards so both allocations are reused.
+    cur: HashMap<(usize, i64), (i64, i64)>,
+    rows: Vec<Row>,
 }
 
 impl Default for Processes {
@@ -65,16 +69,35 @@ impl Default for Processes {
             clock: Clock::default(),
             ncpu: unsafe { GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) }.max(1) as f64,
             prev: HashMap::new(),
+            cur: HashMap::new(),
+            rows: Vec::new(),
         }
     }
 }
 
-struct Row<'a> {
+struct Row {
     pid: u32,
-    name: &'a [u16],
+    /// Image name, in u16 units of `buf` (the kernel points `ImageName.Buffer` into the same buffer).
+    name: Range<usize>,
     cpu: f32,
     mem: u64,
     io: f64,
+}
+
+/// `buf` as UTF-16 units, for image names.
+fn words(buf: &[u64]) -> &[u16] {
+    // SAFETY: u64 storage is valid, and more than aligned, as four times as many u16s.
+    unsafe { std::slice::from_raw_parts(buf.as_ptr().cast::<u16>(), buf.len() * 4) }
+}
+
+/// Where an entry's image name lies in `buf`, in u16 units; empty unless it lies wholly inside.
+fn name_range(buf: &[u64], ptr: *const u16, len_bytes: u16) -> Range<usize> {
+    let start = (ptr as usize).wrapping_sub(buf.as_ptr() as usize);
+    let end = start.saturating_add(len_bytes as usize);
+    if ptr.is_null() || !start.is_multiple_of(2) || end > buf.len() * 8 {
+        return 0..0;
+    }
+    start / 2..end / 2
 }
 
 impl Processes {
@@ -105,8 +128,8 @@ impl Source for Processes {
             return;
         }
         let dt = self.clock.tick();
-        let mut prev = std::mem::take(&mut self.prev);
-        let mut rows = Vec::with_capacity(prev.len() + 16);
+        self.cur.clear();
+        self.rows.clear();
         let base = self.buf.as_ptr().cast::<u8>();
         let end = self.buf.len() * 8;
         let mut off = 0usize;
@@ -116,16 +139,11 @@ impl Source for Processes {
                 let cpu = p.user_time + p.kernel_time;
                 let io = p.read_xfer + p.write_xfer + p.other_xfer;
                 let key = (p.pid, p.create_time);
-                let (dcpu, dio) = prev.remove(&key).map_or((0, 0), |(c, i)| ((cpu - c).max(0), (io - i).max(0)));
-                self.prev.insert(key, (cpu, io));
-                let name = if p.name_buf.is_null() {
-                    &[][..]
-                } else {
-                    unsafe { std::slice::from_raw_parts(p.name_buf, p.name_len as usize / 2) }
-                };
-                rows.push(Row {
+                let (dcpu, dio) = self.prev.get(&key).map_or((0, 0), |&(c, i)| ((cpu - c).max(0), (io - i).max(0)));
+                self.cur.insert(key, (cpu, io));
+                self.rows.push(Row {
                     pid: p.pid as u32,
-                    name,
+                    name: name_range(&self.buf, p.name_buf, p.name_len),
                     cpu: dt.map_or(0.0, |dt| (dcpu as f64 / (dt * 1e7 * self.ncpu) * 100.0).min(100.0) as f32),
                     mem: if p.ws_private > 0 { p.ws_private as u64 } else { p.ws as u64 },
                     io: dt.map_or(0.0, |dt| dio as f64 / dt),
@@ -136,13 +154,16 @@ impl Source for Processes {
             }
             off += p.next as usize;
         }
-        let top = |rows: &mut Vec<Row>, key: fn(&Row) -> f64| -> Vec<ProcEntry> {
+        std::mem::swap(&mut self.prev, &mut self.cur);
+        let words = words(&self.buf);
+        let rows = &mut self.rows;
+        let top = |rows: &mut Vec<Row>, key: &dyn Fn(&Row) -> f64| -> Vec<ProcEntry> {
             rows.sort_unstable_by(|a, b| key(b).total_cmp(&key(a)));
             rows.iter()
                 .take(TOP_N)
                 .map(|r| ProcEntry {
                     pid: r.pid,
-                    name: String::from_utf16_lossy(r.name),
+                    name: String::from_utf16_lossy(&words[r.name.clone()]),
                     cpu_pct: r.cpu,
                     mem_bytes: r.mem,
                     io_bps: r.io,
@@ -150,11 +171,32 @@ impl Source for Processes {
                 })
                 .collect()
         };
-        snap.top.by_cpu = top(&mut rows, |r| r.cpu as f64);
+        snap.top.by_cpu = top(rows, &|r| r.cpu as f64);
         // Task Manager hides the compression store from its process list; it's shown under Memory instead.
-        snap.top.by_mem = top(&mut rows, |r| {
-            if r.name.iter().copied().eq("Memory Compression".encode_utf16()) { -1.0 } else { r.mem as f64 }
+        snap.top.by_mem = top(rows, &|r| {
+            if words[r.name.clone()].iter().copied().eq("Memory Compression".encode_utf16()) {
+                -1.0
+            } else {
+                r.mem as f64
+            }
         });
-        snap.top.by_disk = top(&mut rows, |r| r.io);
+        snap.top.by_disk = top(rows, &|r| r.io);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::name_range;
+
+    #[test]
+    fn name_range_stays_inside_the_buffer() {
+        let buf = vec![0u64; 4];
+        let at = |bytes: usize| buf.as_ptr().cast::<u8>().wrapping_add(bytes).cast::<u16>();
+        assert_eq!(name_range(&buf, at(8), 6), 4..7);
+        assert_eq!(name_range(&buf, at(26), 6), 13..16);
+        assert_eq!(name_range(&buf, at(28), 6), 0..0, "runs past the end");
+        assert_eq!(name_range(&buf, at(3), 2), 0..0, "odd offset");
+        assert_eq!(name_range(&buf, std::ptr::null(), 2), 0..0);
+        assert_eq!(name_range(&buf, at(8).wrapping_sub(16), 2), 0..0, "before the buffer");
     }
 }
