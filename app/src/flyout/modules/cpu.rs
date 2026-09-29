@@ -3,15 +3,15 @@ use crate::ctx::Ctx;
 use crate::fmt;
 use crate::select;
 use crate::tone::{self, SECOND};
-use busy_core::{ModuleCfg, SensorPick};
+use busy_core::{Module, ModuleCfg, SensorPick};
 
 /// Design `fly('cpu')`: utilization over time with the System share as a second line, the System / User /
 /// Idle split, every logical processor, and the busiest processes.
 pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
-    let Some(c) = &ctx.snap.cpu else { return Detail::waiting("CPU") };
+    let Some(c) = &ctx.snap.cpu else { return Detail::waiting(Module::Cpu) };
     let (t, hist) = (ctx.theme, ctx.hist);
     let (color, second) = (t.color(tone::module(mc)), t.color(SECOND));
-    let mut d = Detail::new("CPU");
+    let mut d = Detail::new(Module::Cpu);
     d.sub = c.name.trim().to_string();
     if c.physical_cores > 0 && c.logical_cores > 0 {
         d.sub = format!("{} · {} cores, {} threads", d.sub, c.physical_cores, c.logical_cores);

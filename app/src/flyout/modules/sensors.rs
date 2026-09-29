@@ -3,13 +3,13 @@ use crate::ctx::Ctx;
 use crate::render::nice_max;
 use crate::tone;
 use crate::{fmt, select};
-use busy_core::{ModuleCfg, SensorKind, SensorReading};
+use busy_core::{Module, ModuleCfg, SensorKind, SensorReading};
 
 /// Design `fly('sens')`: the reading the cell shows over time, every temperature as a bar, and the other
 /// readings (fans, power, clocks) as stats. No process list.
 pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
     let (snap, cfg, t, hist) = (ctx.snap, ctx.cfg, ctx.theme, ctx.hist);
-    let mut d = Detail::new("Sensors");
+    let mut d = Detail::new(Module::Sensors);
     d.sub = "Temperatures, fans and power".into();
     if snap.sensors.is_empty() {
         d.note = Some(

@@ -4,8 +4,9 @@
 //! sampling runs on the sampler thread and config saves on the config writer thread.
 
 use crate::ctx::Ctx;
-use crate::flyout::Flyout;
+use crate::flyout::{Action, Flyout};
 use crate::history::History;
+use crate::launch;
 use crate::menu::{self, Command};
 use crate::render::Gfx;
 use crate::sampler::{Params, Sampler};
@@ -57,6 +58,8 @@ struct App {
     writer: Worker<Config>,
     /// Reads the theme's registry values off the UI thread.
     theme_reader: Worker<ThemeMode>,
+    /// Starts Task Manager off the UI thread (the shell may block).
+    launcher: Worker<()>,
     hist: History,
     snap: Snapshot,
     theme: Theme,
@@ -136,6 +139,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
         writer: Worker::start("busy-config", |cfg: Config| {
             let _ = cfg.save();
         }),
+        launcher: Worker::start("busy-launch", |()| launch::task_manager()),
         theme_reader: Worker::start("busy-theme", |mode| {
             *lock(&RESOLVED) = Some(Theme::resolve(mode));
             post(WM_APP_THEME);
@@ -192,7 +196,7 @@ fn on_event(ev: Event) {
             with(|a| a.flyout_event(|f, ctx| f.on_mouse(ctx, p)));
         }
         Event::FlyoutClick(x, y) => {
-            with(|a| a.flyout_event(|f, ctx| f.on_click(ctx, x, y)));
+            with(|a| a.flyout_click(x, y));
         }
         Event::FlyoutPaint => {
             with(|a| a.flyout_event(Flyout::render));
@@ -426,14 +430,25 @@ impl App {
         }
     }
 
-    fn open_settings(&mut self) {
-        busy_settings::open(self.main, &self.cfg, Box::new(submit_config));
+    /// `page`: the module whose row to select.
+    fn open_settings(&mut self, page: Option<Module>) {
+        busy_settings::open(self.main, &self.cfg, Box::new(submit_config), page);
+    }
+
+    /// A click on a flyout footer button: both close the flyout first, like the system flyouts' links.
+    fn flyout_click(&mut self, x: f32, y: f32) {
+        let Some(action) = self.flyout.as_ref().and_then(|f| f.on_click(x, y)) else { return };
+        self.hide_flyout();
+        match action {
+            Action::TaskManager => self.launcher.submit(()),
+            Action::Settings(m) => self.open_settings(Some(m)),
+        }
     }
 
     fn on_command(&mut self, cmd: Command) {
         let mut cfg = self.cfg.clone();
         match cmd {
-            Command::Settings => return self.open_settings(),
+            Command::Settings => return self.open_settings(None),
             Command::Exit => return post_close(),
             Command::Anchor(anchor) => cfg.anchor = anchor,
             Command::Toggle(m) => {

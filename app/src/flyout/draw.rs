@@ -1,6 +1,7 @@
 //! Lays out and paints a `Detail` as the design's detailed flyout (`isDetailed`), 360 DIPs wide. Without a
 //! canvas it only measures, so the window can be sized before the first paint.
 
+use super::Action;
 use super::detail::{Chart, Detail};
 use crate::fmt;
 use crate::render::{Align, Canvas, Gfx, Rect};
@@ -84,6 +85,8 @@ impl GraphHit {
 pub(super) struct Drawn {
     pub(super) height: f32,
     pub(super) graphs: Vec<GraphHit>,
+    /// The footer's buttons.
+    pub(super) hits: Vec<(Rect, Action)>,
 }
 
 struct Pen<'a> {
@@ -94,6 +97,7 @@ struct Pen<'a> {
     mouse: Option<(f32, f32)>,
     y: f32,
     graphs: Vec<GraphHit>,
+    hits: Vec<(Rect, Action)>,
 }
 
 /// Lays out `d` from the top (scrolled by `scroll`), painting when `cv` is given.
@@ -106,7 +110,7 @@ pub(super) fn draw(
     scroll: f32,
     mouse: Option<(f32, f32)>,
 ) -> Drawn {
-    let mut p = Pen { cv, gfx, t, f, mouse, y: PAD - scroll, graphs: Vec::new() };
+    let mut p = Pen { cv, gfx, t, f, mouse, y: PAD - scroll, graphs: Vec::new(), hits: Vec::new() };
     p.header(d);
     if let Some(n) = &d.note {
         p.gap();
@@ -138,7 +142,8 @@ pub(super) fn draw(
     if !d.procs.is_empty() {
         p.procs(d);
     }
-    Drawn { height: p.y + scroll, graphs: p.graphs }
+    p.footer(d.title, d.module);
+    Drawn { height: p.y + scroll, graphs: p.graphs, hits: p.hits }
 }
 
 impl Pen<'_> {
@@ -338,6 +343,37 @@ impl Pen<'_> {
             self.y += 4.0;
         }
         self.y += 12.0;
+    }
+
+    /// `footer` band: the "Open Task Manager" link on the left, the "<Module> settings" button on the right.
+    fn footer(&mut self, title: &str, m: busy_core::Module) {
+        let t = self.t;
+        let h = 1.0 + 10.0 + 32.0 + 10.0;
+        if let Some(cv) = self.cv {
+            cv.fill(Rect::new(0.0, self.y, WIDTH, h), t.footer);
+            cv.fill(Rect::new(0.0, self.y, WIDTH, 1.0), t.line);
+        }
+        let y = self.y + 11.0;
+        let hot = |r: Rect| self.mouse.is_some_and(|(x, y)| r.contains(x, y));
+        let link = "Open Task Manager";
+        let lr = Rect::new(8.0, y, self.gfx.text_width(&self.f.stat, link) + 20.0, 32.0);
+        let label = format!("{title} settings");
+        let bw = self.gfx.text_width(&self.f.stat, &label) + 28.0;
+        let br = Rect::new(WIDTH - 12.0 - bw, y, bw, 32.0);
+        if let Some(cv) = self.cv {
+            if hot(lr) {
+                cv.round(lr, 4.0, t.hover);
+            }
+            cv.round(br, 4.0, if hot(br) { t.active } else { t.ctl });
+            cv.round_outline(br, 4.0, t.ctl_line);
+            // The design's darker bottom border.
+            cv.fill(Rect::new(br.x + 4.0, br.bottom() - 1.0, br.w - 8.0, 1.0), t.ctl_bottom);
+        }
+        self.text(link, &self.f.stat, lr, t.link, Align::Center);
+        self.text(&label, &self.f.stat, br, t.fg, Align::Center);
+        self.hits.push((lr, Action::TaskManager));
+        self.hits.push((br, Action::Settings(m)));
+        self.y += h;
     }
 
     /// Titled process rows: icon tile, name, value.

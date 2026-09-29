@@ -3,18 +3,18 @@ use crate::ctx::Ctx;
 use crate::render::nice_max;
 use crate::tone::{self, SECOND};
 use crate::{fmt, select};
-use busy_core::{ModuleCfg, RateUnit, SensorPick};
+use busy_core::{Module, ModuleCfg, RateUnit, SensorPick};
 
 /// Design `fly('disk')`: active time, read/write rates over time, every volume's fill, response time and
 /// temperature, and the processes doing the most I/O.
 pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
     let snap = ctx.snap;
     if snap.disks.is_empty() && snap.volumes.is_empty() {
-        return Detail::waiting("Disk");
+        return Detail::waiting(Module::Disk);
     }
     let (t, hist) = (ctx.theme, ctx.hist);
     let (color, second) = (t.color(tone::module(mc)), t.color(SECOND));
-    let mut d = Detail::new("Disk");
+    let mut d = Detail::new(Module::Disk);
     if let Some(first) = snap.disks.first() {
         d.sub = match snap.disks.len() {
             1 => first.name.clone(),

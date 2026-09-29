@@ -7,13 +7,15 @@ Standalone check: `cargo run -p busy-settings --example demo` (set `BUSY_FORCE_D
 ## API (called from the app's UI thread)
 
 ```rust
-pub fn open(_owner: HWND, cfg: &Config, on_apply: Box<dyn Fn(Config)>); // opens or focuses
+pub fn open(_owner: HWND, cfg: &Config, on_apply: Box<dyn Fn(Config)>, page: Option<Module>); // opens or focuses; `page` selects that module's row
 pub fn is_open() -> bool;
 pub fn is_dialog_message(msg: &MSG) -> bool; // call before TranslateMessage/DispatchMessage
 pub mod autostart { pub fn is_enabled() -> bool; pub fn set(enabled: bool) -> windows::core::Result<()>; }
 ```
 
 - Window is unowned top-level with its own taskbar button (the app's HWND is a child of explorer's taskbar — can't own).
+- `page` is how a flyout's "<Module> settings" button lands on its module: the row is selected (and scrolled into view) after the window is created or focused.
+- The "Show in flyout" checkbox edits `ModuleCfg::flyout`, which since per-module flyouts only matters for Processes (its top-process lists); the Phase 4 window replaces this one.
 - `on_apply` fires only when the config actually changed; the **caller** persists it (`Config::save`).
 - The window applies autostart itself, on its registry worker (`window/worker.rs`): Apply/OK with a changed Start with Windows disables OK/Apply until the write is read back, then finishes (OK closes). On registry failure it shows a message box and reflects the real registry state in `cfg.autostart`. Cancel/Esc during the write closes once it lands.
 - `autostart::{is_enabled, set}` block on the registry: call them off a UI thread (the window calls them only from its worker).

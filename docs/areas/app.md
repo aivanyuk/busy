@@ -51,6 +51,7 @@ Content follows the design's detailed layout (`isDetailed`, 360 DIPs). `flyout/m
 - Network: the interface `options.network.interface` picks, in `options.network.units`, as on the cell: rates from `select::net_rates`, and the interface it describes from `select::net_interface` (the named one, else the first connected one of the chosen kind, for Auto the connected physical one moving the most). Sub line "Wi‑Fi · SSID" or "Ethernet · adapter"; stats Interface (medium · Wi-Fi band or link speed), Signal (RSSI with a real minus sign, else the driver's %, "Wired" for Ethernet), IPv4, and Received/Sent, which are the physical-adapter totals whatever the interface choice. No process list (per-process network is an opt-in).
 - Battery: charge over time; the big label is the time left ("1 h 15 min remaining") or the state; State, Power draw (Charge rate while charging), Health (full / design capacity), Cycle count, Design capacity, Full charge. No "Power usage" list (SRUM opt-in).
 - Sensors: the reading the cell shows (`select::taskbar_sensor`) as the big value and chart (0–100 °C, or 0–212 °F, for a temperature); every temperature as a bar ("hardware · name" when readings come from several parts); the other readings (fans, power, voltages) as stats. Without readings it explains why (the third-party opt-in is off, or no tool is running).
+- Footer (`footer` band under a `line`): "Open Task Manager" (`link`, `hover` under the pointer) and "<Module> settings" (`ctl` face, `ctl_line` border, `ctl_bottom` bottom edge, `active` under the pointer). Both close the flyout first. Task Manager starts on the launcher worker (`ShellExecuteW`, which handles its highest-available elevation where `CreateProcessW` fails, by full System32 path so nothing is looked up on a search path); settings opens with `busy_settings::open(…, Some(module))`, which selects that module's row, also in a window already open. The buttons are the flyout's hit rects, so hovering them repaints only on entering or leaving one.
 - Top-process lists follow Processes' `flyout` flag; the icon is the design's `tile` placeholder (extracting real icons would mean file I/O on the UI thread).
 
 ## Theme
@@ -73,7 +74,7 @@ Segoe UI Variable Text (fallback Segoe UI). Numbers use tabular figures (design 
 ## Integration points
 
 - Sources: `sampler.rs` `build_sources()` — `busy_metrics::sources()` then `busy_sensors::sources()` (GPU before Sensors).
-- Settings: context menu "Settings…" → `busy_settings::open(main, &cfg, Box::new(submit_config))`; the message loop calls `busy_settings::is_dialog_message` first.
+- Settings: context menu "Settings…" → `busy_settings::open(main, &cfg, Box::new(submit_config), None)`, a flyout's settings button with `Some(module)`; the message loop calls `busy_settings::is_dialog_message` first.
 
 ## Gotchas
 

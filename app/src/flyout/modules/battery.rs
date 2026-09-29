@@ -2,14 +2,14 @@ use super::super::detail::{Chart, Detail, Value, series_span};
 use crate::ctx::Ctx;
 use crate::fmt;
 use crate::tone;
-use busy_core::ModuleCfg;
+use busy_core::{Module, ModuleCfg};
 
 /// Design `fly('bat')`: charge over time, time left, and the battery's state and health. The per-app "Power
 /// usage" list needs the SRUM opt-in and is left out.
 pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
-    let Some(b) = &ctx.snap.battery else { return Detail::waiting("Battery") };
+    let Some(b) = &ctx.snap.battery else { return Detail::waiting(Module::Battery) };
     let (t, hist) = (ctx.theme, ctx.hist);
-    let mut d = Detail::new("Battery");
+    let mut d = Detail::new(Module::Battery);
     let wh = |mwh: u32| format!("{:.1} Wh", mwh as f32 / 1000.0);
     d.sub = match b.design_capacity_mwh.filter(|&c| c > 0) {
         Some(c) => format!("Internal battery · {} design", wh(c)),

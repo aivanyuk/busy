@@ -8,7 +8,7 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, MSG, TranslateMessage};
 
 fn main() {
-    busy_settings::open(HWND::default(), &Config::load(), Box::new(|c| println!("{c:#?}")));
+    busy_settings::open(HWND::default(), &Config::load(), Box::new(|c| println!("{c:#?}")), None);
     let mut msg = MSG::default();
     while busy_settings::is_open() && unsafe { GetMessageW(&mut msg, None, 0, 0) }.as_bool() {
         if !busy_settings::is_dialog_message(&msg) {
