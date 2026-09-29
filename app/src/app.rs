@@ -6,7 +6,6 @@
 use crate::ctx::Ctx;
 use crate::flyout::Flyout;
 use crate::history::{History, capacity};
-use crate::persist::Writer;
 use crate::render::Gfx;
 use crate::sampler::{Params, Sampler};
 use crate::select::pinned_sensor;
@@ -14,6 +13,7 @@ use crate::sync::lock;
 use crate::taskbar::Taskbar;
 use crate::theme::Theme;
 use crate::win::{self, Event, register_class};
+use crate::worker::Worker;
 use busy_core::{Anchor, Config, Module, Snapshot};
 use std::cell::RefCell;
 use std::sync::Mutex;
@@ -47,7 +47,7 @@ struct App {
     main: HWND,
     cfg: Config,
     sampler: Sampler,
-    writer: Writer<Config>,
+    writer: Worker<Config>,
     hist: History,
     snap: Snapshot,
     theme: Theme,
@@ -113,7 +113,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
     let app = App {
         main,
         sampler: Sampler::start(Params::new(&cfg), main, WM_APP_SNAPSHOT),
-        writer: Writer::start("busy-config", |cfg: Config| {
+        writer: Worker::start("busy-config", |cfg: Config| {
             let _ = cfg.save();
         }),
         hist: History::new(capacity(cfg.history_secs, cfg.interval_ms)),

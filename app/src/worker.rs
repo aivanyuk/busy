@@ -1,23 +1,24 @@
-//! The config writer thread: every save goes through it, one at a time, latest value wins.
+//! Latest-value worker threads: each runs one job at a time on the newest value submitted, skipping
+//! values superseded before their turn. The config writer is one.
 
 use std::sync::mpsc::{Sender, channel};
 use std::thread::JoinHandle;
 
-pub(crate) struct Writer<T: Send + 'static> {
+pub(crate) struct Worker<T: Send + 'static> {
     tx: Option<Sender<T>>,
     thread: Option<JoinHandle<()>>,
 }
 
-impl<T: Send + 'static> Writer<T> {
-    /// Runs `write` on a dedicated thread for each submitted value, skipping values superseded before
-    /// their turn. Serialising the writes keeps two saves from racing on the same temp file.
-    pub(crate) fn start(name: &str, mut write: impl FnMut(T) + Send + 'static) -> Self {
+impl<T: Send + 'static> Worker<T> {
+    /// Runs `job` on a dedicated thread for each submitted value, skipping values superseded before
+    /// their turn. For the config writer, serialising keeps two saves from racing on the same temp file.
+    pub(crate) fn start(name: &str, mut job: impl FnMut(T) + Send + 'static) -> Self {
         let (tx, rx) = channel::<T>();
         let thread = std::thread::Builder::new()
             .name(name.into())
             .spawn(move || {
                 while let Ok(v) = rx.recv() {
-                    write(rx.try_iter().last().unwrap_or(v));
+                    job(rx.try_iter().last().unwrap_or(v));
                 }
             })
             .ok();
@@ -32,7 +33,7 @@ impl<T: Send + 'static> Writer<T> {
     }
 }
 
-impl<T: Send + 'static> Drop for Writer<T> {
+impl<T: Send + 'static> Drop for Worker<T> {
     /// Flushes the pending value. Joins: the owner must have destroyed the taskbar widget first.
     fn drop(&mut self) {
         self.tx = None;
@@ -44,15 +45,15 @@ impl<T: Send + 'static> Drop for Writer<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::Writer;
+    use super::Worker;
     use std::sync::{Arc, Mutex};
 
     #[test]
-    fn writes_in_order_and_flushes_the_latest_on_drop() {
+    fn runs_in_order_and_flushes_the_latest_on_drop() {
         let seen = Arc::new(Mutex::new(Vec::new()));
         let w = {
             let seen = seen.clone();
-            Writer::start("test-writer", move |v: u32| seen.lock().unwrap().push(v))
+            Worker::start("test-worker", move |v: u32| seen.lock().unwrap().push(v))
         };
         for v in 1..=100 {
             w.submit(v);

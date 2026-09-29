@@ -8,7 +8,6 @@ mod fake;
 mod flyout;
 mod fmt;
 mod history;
-mod persist;
 mod render;
 mod sampler;
 mod select;
@@ -16,6 +15,7 @@ mod sync;
 mod taskbar;
 mod theme;
 mod win;
+mod worker;
 
 use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError};
 use windows::Win32::System::Threading::CreateMutexW;
