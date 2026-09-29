@@ -2,9 +2,11 @@
 
 mod config;
 mod migrate;
+mod opt_in;
 mod options;
 pub use config::*;
 pub use migrate::CONFIG_VERSION;
+pub use opt_in::*;
 pub use options::*;
 
 /// A data collector. Constructed and driven exclusively on the sampler thread,
