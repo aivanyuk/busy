@@ -2,6 +2,7 @@ use crate::util::Every;
 use busy_core::{DiskInfo, Module, Snapshot, Source, VolumeInfo};
 use busy_win::from_wide;
 use busy_win::pdh::{ArrayBuf, Counter, Query};
+use std::collections::HashMap;
 use windows::Win32::Storage::FileSystem::{
     GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDriveStringsW, GetVolumeInformationW,
 };
@@ -16,6 +17,8 @@ pub struct Disk {
     buf: ArrayBuf,
     volumes: Vec<VolumeInfo>,
     vol_refresh: Every,
+    /// Since-boot (read, written) bytes per disk number when the disk was first seen.
+    base: HashMap<u32, (u64, u64)>,
 }
 
 struct Pdh {
@@ -23,6 +26,7 @@ struct Pdh {
     read: Counter,
     write: Counter,
     idle: Counter,
+    response: Counter,
 }
 
 /// PDH instances are "<disk#> <letters>" (e.g. "2 C: H:"); the number is stable while letters can change.
@@ -46,6 +50,21 @@ fn slot<'a>(disks: &'a mut Vec<DiskInfo>, n: usize, name: &str) -> Option<&'a mu
     Some(d)
 }
 
+/// Turns the since-boot counts in `d` into counts since the disk was first seen.
+fn since_start(base: &mut HashMap<u32, (u64, u64)>, d: &mut DiskInfo) {
+    let (Some(r), Some(w), Ok(n)) = (d.read_total, d.written_total, disk_number(&d.name).parse()) else {
+        (d.read_total, d.written_total) = (None, None);
+        return;
+    };
+    let b = base.entry(n).or_insert((r, w));
+    // A smaller count means another disk now has this number.
+    if r < b.0 || w < b.1 {
+        *b = (r, w);
+    }
+    d.read_total = Some(r - b.0);
+    d.written_total = Some(w - b.1);
+}
+
 impl Pdh {
     fn open() -> Option<Self> {
         let q = Query::open()?;
@@ -54,12 +73,14 @@ impl Pdh {
             read: add("Disk Read Bytes/sec")?,
             write: add("Disk Write Bytes/sec")?,
             idle: add("% Idle Time")?,
+            response: add("Avg. Disk sec/Transfer")?,
             q,
         };
         s.q.collect().then_some(s)
     }
 
     /// Refreshes `disks` from one collection; false (contents unspecified) if a counter could not be read.
+    /// Totals are cumulative since boot.
     fn read(&self, disks: &mut Vec<DiskInfo>, buf: &mut ArrayBuf) -> bool {
         if !self.q.collect() {
             return false;
@@ -84,7 +105,19 @@ impl Pdh {
         };
         let ok = ok
             && set(self.write, |d, v| d.write_bps = v)
-            && set(self.idle, |d, i| d.active_pct = (100.0 - i).clamp(0.0, 100.0) as f32);
+            && set(self.idle, |d, i| d.active_pct = (100.0 - i).clamp(0.0, 100.0) as f32)
+            && set(self.response, |d, s| d.avg_response_ms = Some((s * 1000.0) as f32));
+        // The raw value of a bytes/sec counter is the running byte count; unreadable leaves the totals None.
+        for (c, f) in [
+            (self.read, (|d, v| d.read_total = Some(v)) as fn(&mut DiskInfo, u64)),
+            (self.write, |d, v| d.written_total = Some(v)),
+        ] {
+            c.each_raw(buf, |name, v| {
+                if let (Some(d), Ok(v)) = (disks.iter_mut().find(|d| d.name == name), u64::try_from(v)) {
+                    f(d, v);
+                }
+            });
+        }
         disks.sort_unstable_by_key(|d| disk_number(&d.name).parse::<u32>().unwrap_or(u32::MAX));
         ok
     }
@@ -99,6 +132,7 @@ impl Disk {
             buf: ArrayBuf::default(),
             volumes: Vec::new(),
             vol_refresh: Every::default(),
+            base: HashMap::new(),
         }
     }
 }
@@ -113,7 +147,10 @@ impl Source for Disk {
             self.pdh = Pdh::open();
         }
         match self.pdh.as_ref().map(|p| p.read(&mut self.disks, &mut self.buf)) {
-            Some(true) => snap.disks.clone_from(&self.disks),
+            Some(true) => {
+                self.disks.iter_mut().for_each(|d| since_start(&mut self.base, d));
+                snap.disks.clone_from(&self.disks);
+            }
             Some(false) => {
                 // Rebuild the query later in case the counter set was reset.
                 self.pdh = None;
@@ -177,5 +214,22 @@ mod tests {
         disks.truncate(names.len());
         assert_eq!(disks.iter().map(|d| d.name.as_str()).collect::<Vec<_>>(), names);
         assert!(slot(&mut disks, 9, "x").is_none());
+    }
+
+    #[test]
+    fn totals_since_first_seen() {
+        let mut base = HashMap::new();
+        let mut at = |name: &str, r, w| {
+            let mut d = DiskInfo { name: name.into(), read_total: r, written_total: w, ..Default::default() };
+            since_start(&mut base, &mut d);
+            (d.read_total, d.written_total)
+        };
+        assert_eq!(at("1 C:", Some(1000), Some(500)), (Some(0), Some(0)));
+        // Letters changed, same disk number: keeps counting.
+        assert_eq!(at("1 C: D:", Some(1500), Some(700)), (Some(500), Some(200)));
+        // Counts went backwards: another disk took the number, restart from it.
+        assert_eq!(at("1 E:", Some(10), Some(20)), (Some(0), Some(0)));
+        assert_eq!(at("1 E:", None, Some(30)), (None, None));
+        assert_eq!(at("x E:", Some(10), Some(20)), (None, None));
     }
 }
