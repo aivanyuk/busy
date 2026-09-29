@@ -1,6 +1,6 @@
 # busy (app)
 
-`app/` — the binary. Files: `main.rs` (single instance, `--open-flyout` debug flag), `app.rs` (state, config, message routing — the only module that changes state), `win.rs` (window-class registration, `win::Event` routing), `ctx.rs` (read-only render context), `sampler.rs`, `worker.rs` (latest-value worker threads: config writer), `select.rs` (what to show: pinned sensor), `sync.rs` (poison-tolerant lock), `history.rs`, `fake.rs` (synthetic Source for UI dev), `taskbar/` (`mod.rs` window and placement, `explorer.rs` taskbar probing and slot, `cells.rs` per-module cells, `surface.rs` DIB), `flyout/` (`mod.rs` window, `painter.rs` layout primitives, `sections.rs` per-module sections), `render.rs` (D2D/DWrite helpers), `theme.rs`, `fmt.rs`. Manifest: `app/app.manifest` embedded by `app/build.rs` via `/MANIFEST:EMBED /MANIFESTINPUT` (PerMonitorV2, comctl32 v6, supportedOS Win8/10 — required for layered child windows).
+`app/` — the binary. Files: `main.rs` (single instance, `--open-flyout` debug flag), `app.rs` (state, config, message routing — the only module that changes state), `win.rs` (window-class registration, `win::Event` routing), `ctx.rs` (read-only render context), `sampler.rs`, `worker.rs` (latest-value worker threads: config writer, theme reader), `select.rs` (what to show: pinned sensor), `sync.rs` (poison-tolerant lock), `history.rs`, `fake.rs` (synthetic Source for UI dev), `taskbar/` (`mod.rs` window and placement, `explorer.rs` taskbar probing and slot, `cells.rs` per-module cells, `surface.rs` DIB), `flyout/` (`mod.rs` window, `painter.rs` layout primitives, `sections.rs` per-module sections), `render.rs` (D2D/DWrite helpers), `theme.rs`, `fmt.rs`. Manifest: `app/app.manifest` embedded by `app/build.rs` via `/MANIFEST:EMBED /MANIFESTINPUT` (PerMonitorV2, comctl32 v6, supportedOS Win8/10 — required for layered child windows).
 
 Verified on Windows 11 build 26200.9457 (25H2), 3840×2160 @ 200 %, centered taskbar icons. Release exe ~500 KB.
 
@@ -33,7 +33,7 @@ Verified on Windows 11 build 26200.9457 (25H2), 3840×2160 @ 200 %, centered tas
 
 ## Theme
 
-Taskbar follows `SystemUsesLightTheme` (not `AppsUseLightTheme`) unless `Config.theme` overrides. Reacts to `WM_SETTINGCHANGE` "ImmersiveColorSet". Accent from DWM colorization / registry.
+Taskbar follows `SystemUsesLightTheme` (not `AppsUseLightTheme`) unless `Config.theme` overrides. Reacts to `WM_SETTINGCHANGE` "ImmersiveColorSet" and `WM_DWMCOLORIZATIONCOLORCHANGED`. Accent from DWM colorization / registry. The registry reads run on the theme reader thread (`WM_APP_THEME` brings the result back), except the first resolution at startup, before the widget exists.
 
 ## Integration points
 

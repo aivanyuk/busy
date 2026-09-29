@@ -74,6 +74,7 @@ Every thread the app starts is listed here.
 | UI | **Never** — input queue is attached to explorer's taskbar thread via cross-process parenting | windows, D2D resources, `Config`, history |
 | Sampler | Yes (PDH, WMI, NtQuerySystemInformation) | all `Source`s, COM MTA |
 | Config writer | Yes (file I/O) | the one `config.json` writer; writes the latest submitted `Config`, older pending ones are dropped |
+| Theme reader | Yes (registry) | resolves `Theme` (light/dark, accent) on theme broadcasts and config changes, posts it back |
 | Debug dump (debug builds, per render) | Yes (file I/O) | one `taskbar.bmp` write |
 
 Rules:
@@ -111,7 +112,7 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 |---|---|
 | `crates/settings/src/window.rs` is 977 lines and mixes the window procedure, layout and control state. | Layering: one concern per file |
 | The PDH wrapper exists twice (`busy-metrics` `pdh.rs`, `busy-sensors` `gpu.rs`); `gpu.rs` and `hwinfo.rs` close handles by hand. | Layering: one implementation |
-| `Theme::resolve` reads the registry on `WM_SETTINGCHANGE`; the settings window reads and writes autostart on the UI thread. | Threads: no registry in a handler |
+| The settings window reads and writes autostart, and reads the app theme, on the UI thread. | Threads: no registry in a handler |
 | Flyout-only modules are sampled with the flyout closed; nothing pauses on lock or display off. | Performance: sample only what is visible |
 | HWiNFO reopens and copies its mapping every tick; processes, GPU, disk and network rebuild their maps every tick. | Performance: reuse buffers |
 | The taskbar redraws every snapshot and every watch tick; the flyout repaints on every mouse move. | Performance: redraw only on change |
