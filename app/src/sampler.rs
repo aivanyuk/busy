@@ -31,22 +31,25 @@ pub struct Params {
     active: [bool; Module::ALL.len()],
     /// Handed to every source through `Source::configure` when it changes.
     sources: SourceOptions,
+    /// Nothing is visible (session locked, display off): sample nothing until that ends.
+    paused: bool,
 }
 
 /// How soon after the last sample a module that just became visible is sampled.
 const PROMPT: Duration = Duration::from_millis(250);
 
 impl Params {
-    pub fn new(cfg: &Config, flyout_open: bool) -> Self {
+    pub fn new(cfg: &Config, flyout_open: bool, paused: bool) -> Self {
         Self {
             interval_ms: cfg.interval_ms,
             active: Module::ALL.map(|m| cfg.is_active(m, flyout_open)),
             sources: cfg.source_options(),
+            paused,
         }
     }
 
     fn is_active(&self, m: Module) -> bool {
-        Module::ALL.iter().position(|&x| x == m).is_some_and(|i| self.active[i])
+        !self.paused && Module::ALL.iter().position(|&x| x == m).is_some_and(|i| self.active[i])
     }
 
     /// Whether some module is active here that was not in `before`.
@@ -109,9 +112,11 @@ fn run(shared: Arc<Shared>, hwnd: isize, msg: u32) {
     let mut sources = build_sources();
     let mut configured = None;
     loop {
-        let started = Instant::now();
         let params = {
-            let st = lock(&shared.state);
+            let mut st = lock(&shared.state);
+            while st.params.paused && !st.stop {
+                st = shared.cv.wait(st).unwrap_or_else(PoisonError::into_inner);
+            }
             if st.stop {
                 break;
             }
@@ -123,6 +128,7 @@ fn run(shared: Arc<Shared>, hwnd: isize, msg: u32) {
             }
             configured = Some(params.sources);
         }
+        let started = Instant::now();
         let mut snap = Snapshot::default();
         for s in sources.iter_mut().filter(|s| params.is_active(s.module())) {
             s.sample(&mut snap);
@@ -134,7 +140,7 @@ fn run(shared: Arc<Shared>, hwnd: isize, msg: u32) {
 
         let mut st = lock(&shared.state);
         loop {
-            if st.stop {
+            if st.stop || st.params.paused {
                 break;
             }
             let mut deadline = started + Duration::from_millis(st.params.interval_ms as u64);
@@ -169,7 +175,7 @@ mod tests {
             }
         }
         cfg.opt_in.third_party_sensors = true;
-        let p = Params::new(&cfg, true);
+        let p = Params::new(&cfg, true, false);
         assert_eq!(p.interval_ms, 2000);
         assert!(p.sources.third_party_sensors);
         assert!(!p.is_active(Module::Disk));
@@ -179,11 +185,19 @@ mod tests {
     #[test]
     fn flyout_only_modules_follow_the_flyout() {
         let cfg = Config::default();
-        let (closed, open) = (Params::new(&cfg, false), Params::new(&cfg, true));
+        let (closed, open) = (Params::new(&cfg, false, false), Params::new(&cfg, true, false));
         assert!(closed.is_active(Module::Cpu) && !closed.is_active(Module::Processes));
         assert!(open.is_active(Module::Processes));
         assert!(open.activates(&closed));
         assert!(!closed.activates(&open));
         assert!(!open.activates(&open));
+    }
+
+    #[test]
+    fn paused_samples_nothing_and_resuming_is_prompt() {
+        let cfg = Config::default();
+        let (paused, resumed) = (Params::new(&cfg, true, true), Params::new(&cfg, true, false));
+        assert!(Module::ALL.iter().all(|&m| !paused.is_active(m)));
+        assert!(resumed.activates(&paused));
     }
 }

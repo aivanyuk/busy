@@ -20,6 +20,13 @@ use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use windows::Win32::Foundation::*;
+use windows::Win32::System::Power::{
+    HPOWERNOTIFY, POWERBROADCAST_SETTING, RegisterPowerSettingNotification, UnregisterPowerSettingNotification,
+};
+use windows::Win32::System::RemoteDesktop::{
+    NOTIFY_FOR_THIS_SESSION, WTSRegisterSessionNotification, WTSUnRegisterSessionNotification,
+};
+use windows::Win32::System::SystemServices::GUID_CONSOLE_DISPLAY_STATE;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{PCWSTR, Result, w};
 
@@ -32,6 +39,8 @@ const WM_APP_THEME: u32 = WM_APP + 5;
 const TIMER_WATCH: usize = 1;
 
 static MAIN: AtomicIsize = AtomicIsize::new(0);
+/// `RegisterPowerSettingNotification` handle for the display state, unregistered with the main window.
+static DISPLAY_NOTIFY: AtomicIsize = AtomicIsize::new(0);
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
 /// Config handed over from another thread / the settings window, applied on WM_APP_CONFIG.
 static PENDING: Mutex<Option<Config>> = Mutex::new(None);
@@ -56,6 +65,10 @@ struct App {
     taskbar: Option<Taskbar>,
     flyout: Option<Flyout>,
     open_flyout: bool,
+    /// The session is locked (`WTS_SESSION_LOCK`).
+    locked: bool,
+    /// The console display is off (`GUID_CONSOLE_DISPLAY_STATE` = 0).
+    display_off: bool,
 }
 
 /// Runs `f` on the app state unless it is already borrowed (re-entrant message); then returns None.
@@ -108,12 +121,19 @@ pub fn run(open_flyout: bool) -> Result<()> {
         // Lets the broadcast through UIPI if we happen to run elevated.
         let _ = ChangeWindowMessageFilterEx(main, msg, MSGFLT_ALLOW, None);
         SetTimer(Some(main), TIMER_WATCH, 1000, None);
+        // Lock/unlock and display on/off pause the sampler. Registration sends the current display state at once.
+        let _ = WTSRegisterSessionNotification(main, NOTIFY_FOR_THIS_SESSION);
+        if let Ok(h) =
+            RegisterPowerSettingNotification(HANDLE(main.0), &GUID_CONSOLE_DISPLAY_STATE, DEVICE_NOTIFY_WINDOW_HANDLE)
+        {
+            DISPLAY_NOTIFY.store(h.0, Ordering::Relaxed);
+        }
     }
     let theme = Theme::resolve(cfg.theme);
     let flyout = Flyout::create(&gfx, main, &theme);
     let app = App {
         main,
-        sampler: Sampler::start(Params::new(&cfg, false), main, WM_APP_SNAPSHOT),
+        sampler: Sampler::start(Params::new(&cfg, false, false), main, WM_APP_SNAPSHOT),
         writer: Worker::start("busy-config", |cfg: Config| {
             let _ = cfg.save();
         }),
@@ -129,6 +149,8 @@ pub fn run(open_flyout: bool) -> Result<()> {
         gfx,
         cfg,
         open_flyout,
+        locked: false,
+        display_off: false,
     };
     APP.with(|a| *a.borrow_mut() = Some(app));
 
@@ -225,13 +247,41 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             WM_DISPLAYCHANGE => {
                 with(App::render_all);
             }
+            WM_WTSSESSION_CHANGE if matches!(wp.0 as u32, WTS_SESSION_LOCK | WTS_SESSION_UNLOCK) => {
+                let locked = wp.0 as u32 == WTS_SESSION_LOCK;
+                with(|a| {
+                    a.locked = locked;
+                    a.sync_sampler();
+                });
+            }
+            WM_POWERBROADCAST => {
+                if wp.0 as u32 == PBT_POWERSETTINGCHANGE
+                    && let Some(on) = display_state(lp)
+                {
+                    with(|a| {
+                        a.display_off = !on;
+                        a.sync_sampler();
+                    });
+                }
+                return LRESULT(1);
+            }
             WM_ENDSESSION if wp.0 != 0 => {
                 APP.with(|a| a.try_borrow_mut().map(|mut a| a.take()).ok());
             }
             WM_CLOSE => {
                 let _ = DestroyWindow(hwnd);
             }
-            WM_DESTROY => PostQuitMessage(0),
+            WM_DESTROY => {
+                // The unregister calls are RPCs to system services: our child of explorer's taskbar goes first,
+                // so a slow one can't stall the taskbar's input queue.
+                with(App::drop_windows);
+                let _ = WTSUnRegisterSessionNotification(hwnd);
+                let notify = DISPLAY_NOTIFY.swap(0, Ordering::Relaxed);
+                if notify != 0 {
+                    let _ = UnregisterPowerSettingNotification(HPOWERNOTIFY(notify));
+                }
+                PostQuitMessage(0);
+            }
             m if m == TASKBAR_CREATED.load(Ordering::Relaxed) => {
                 with(App::recreate_taskbar);
             }
@@ -245,12 +295,17 @@ impl Drop for App {
     /// Windows go first: until our child of explorer's taskbar is gone, the sampler join below
     /// (the `sampler` field's drop, possibly waiting out a WMI call) would freeze the user's taskbar.
     fn drop(&mut self) {
-        self.taskbar = None;
-        self.flyout = None;
+        self.drop_windows();
     }
 }
 
 impl App {
+    /// Destroys the taskbar widget, then the flyout. Also called before anything on the way out may block.
+    fn drop_windows(&mut self) {
+        self.taskbar = None;
+        self.flyout = None;
+    }
+
     fn on_snapshot(&mut self) {
         let Some(snap) = self.sampler.take() else { return };
         let sensor = taskbar_sensor(&snap, &self.cfg).map(|s| s.value);
@@ -327,10 +382,11 @@ impl App {
         self.sync_active();
     }
 
-    /// Tells the sampler what is visible now, so it samples flyout-only modules only while the flyout is open.
+    /// Tells the sampler what is visible now: flyout-only modules only while the flyout is open, and nothing
+    /// while the session is locked or the display is off.
     fn sync_sampler(&self) {
         let flyout_open = self.flyout.as_ref().is_some_and(Flyout::is_visible);
-        self.sampler.set_params(Params::new(&self.cfg, flyout_open));
+        self.sampler.set_params(Params::new(&self.cfg, flyout_open, self.locked || self.display_off));
     }
 
     /// The widget shows `--active` while its flyout is open (design: the open module's cell); redrawn only when
@@ -390,6 +446,24 @@ impl App {
             }
         }
         self.apply_config(cfg, true);
+    }
+}
+
+/// Whether a `PBT_POWERSETTINGCHANGE` for `GUID_CONSOLE_DISPLAY_STATE` says the display is on (dimmed counts
+/// as on); `None` for any other setting.
+fn display_state(lp: LPARAM) -> Option<bool> {
+    let p = lp.0 as *const POWERBROADCAST_SETTING;
+    if p.is_null() {
+        return None;
+    }
+    // SAFETY: for PBT_POWERSETTINGCHANGE the system passes a POWERBROADCAST_SETTING valid for this message,
+    // with `DataLength` bytes of data from `Data`; the length is checked before the unaligned read.
+    unsafe {
+        let s = &*p;
+        if s.PowerSetting != GUID_CONSOLE_DISPLAY_STATE || (s.DataLength as usize) < size_of::<u32>() {
+            return None;
+        }
+        Some(std::ptr::addr_of!(s.Data).cast::<u32>().read_unaligned() != 0)
     }
 }
 
