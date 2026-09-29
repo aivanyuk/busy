@@ -114,8 +114,20 @@ impl Source for Fake {
                     })
                     .collect();
                 snap.volumes = vec![
-                    VolumeInfo { mount: "C:".into(), label: "Windows".into(), total: 1862 * GB, free: 713 * GB },
-                    VolumeInfo { mount: "D:".into(), label: "Data".into(), total: 3726 * GB, free: 402 * GB },
+                    VolumeInfo {
+                        mount: "C:".into(),
+                        label: "Windows".into(),
+                        total: 1862 * GB,
+                        free: 713 * GB,
+                        ..Default::default()
+                    },
+                    VolumeInfo {
+                        mount: "D:".into(),
+                        label: "Data".into(),
+                        total: 3726 * GB,
+                        free: 402 * GB,
+                        ..Default::default()
+                    },
                 ];
             }
             Module::Network => {

@@ -40,6 +40,10 @@ fn sources_sample_without_panicking() {
         assert!(d.read_total.is_none_or(|b| b < 1 << 40) && d.written_total.is_none_or(|b| b < 1 << 40), "{d:?}");
     }
     assert!(snap.volumes.iter().all(|v| v.free <= v.total));
+    assert!(snap.volumes.iter().filter(|v| v.is_system).count() <= 1);
+    for v in &snap.volumes {
+        assert!(v.disk_index.is_none_or(|i| snap.disks.iter().any(|d| d.index == Some(i))), "{v:?}");
+    }
     assert!(!snap.top.by_mem.is_empty());
     assert!(snap.top.by_cpu.iter().all(|p| (0.0..=100.0).contains(&p.cpu_pct)));
 }
