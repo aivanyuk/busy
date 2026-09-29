@@ -28,6 +28,7 @@ pub trait Source {
 ## Config
 
 - `Config::load()` never fails: missing/invalid file → defaults, then `normalize()` (dedup modules, append missing ones, clamp interval 250..10000 ms and history 10..3600 s).
+- Schema version: `version` (`CONFIG_VERSION` = 2, `migrate.rs`). A file without it is v1 (the schema before the design migration); `normalize()` runs `Config::migrate()` first and stamps the current version. v1 → v2: `onboarded = true` (an existing file means an existing user, so first-run setup is skipped), Disk `Text` → `Io` (v1's Disk text cell showed read/write rates). A fresh install (no file) or an unreadable file gets `Config::default()`: v2, `onboarded = false`.
 - `modules` order is display order; each has `taskbar`, `flyout`, `style` (Text/Graph/Bar/Io).
 - Per-module appearance (all optional in JSON): `show_label` (default true), `color` (palette index `0..PALETTE_LEN`, `None` = `Module::default_color()`, design `MODS.color`; out-of-range → `None`), `color_by_load` (load colors instead of the module color), `interval_s` (1..=10 s, `None` = general `interval_ms`; read through `Config::module_interval_ms`).
 - `Module::allowed_styles()` lists the styles a module can use on the taskbar, preferred first (design `MODS.styles`): CPU/GPU Graph·Text·Bar, Memory Bar·Text·Graph, Disk Io·Text·Bar, Network Io·Graph, Battery Text·Bar, Sensors Text·Graph. `normalize()` coerces a disallowed style to the first allowed one. Processes allows none: it is flyout-only and `normalize()` clears its `taskbar`.
