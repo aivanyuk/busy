@@ -1,6 +1,6 @@
 //! Schema migrations, run by `Config::normalize` on every loaded or submitted config.
 
-use crate::{CellStyle, Config, Module};
+use crate::{CellStyle, Config, Module, SensorPick};
 
 /// Schema version written by this build. v1 = before the design migration (no `version` field).
 pub const CONFIG_VERSION: u32 = 2;
@@ -8,16 +8,21 @@ pub const CONFIG_VERSION: u32 = 2;
 impl Config {
     /// Brings a config written by any older schema up to `CONFIG_VERSION`.
     pub(crate) fn migrate(&mut self) {
+        let pinned = std::mem::take(&mut self.legacy_pinned_sensor);
         if self.version < 2 {
-            self.migrate_v1();
+            self.migrate_v1(pinned);
         }
         self.version = CONFIG_VERSION;
     }
 
     /// v1 → v2. Anyone with a v1 file already uses busy, so first-run setup is skipped. v1's Disk "Text"
     /// cell showed read/write rates, which is the design's `Io` style (its Disk `Text` is the drive's fill).
-    fn migrate_v1(&mut self) {
+    /// `pinned_sensor` becomes `SensorPick::Named`; empty meant hottest CPU, which is the `Cpu` default.
+    fn migrate_v1(&mut self, pinned_sensor: String) {
         self.onboarded = true;
+        if !pinned_sensor.is_empty() {
+            self.options.sensors.sensor = SensorPick::Named(pinned_sensor);
+        }
         for m in self.modules.iter_mut().filter(|m| m.module == Module::Disk && m.style == CellStyle::Text) {
             m.style = CellStyle::Io;
         }
@@ -85,6 +90,22 @@ mod tests {
         assert_eq!(m(Module::Memory).style, CellStyle::Bar);
         assert!(!m(Module::Memory).flyout && !m(Module::Battery).taskbar);
         assert!(m(Module::Cpu).show_label && m(Module::Cpu).color.is_none());
+        assert_eq!(cfg.options.sensors.sensor, SensorPick::Named("CPU/Package".into()));
+        assert!(cfg.legacy_pinned_sensor.is_empty());
+        assert!(!serde_json::to_string(&cfg).unwrap().contains("pinned_sensor"));
+    }
+
+    #[test]
+    fn v1_empty_pinned_sensor_means_cpu() {
+        let cfg = load_str(r#"{"pinned_sensor": ""}"#);
+        assert_eq!(cfg.options.sensors.sensor, SensorPick::Cpu);
+    }
+
+    #[test]
+    fn v2_file_ignores_a_stray_pinned_sensor() {
+        let cfg = load_str(r#"{"version": 2, "options": {"sensors": {"sensor": "Gpu"}}, "pinned_sensor": "a/b"}"#);
+        assert_eq!(cfg.options.sensors.sensor, SensorPick::Gpu);
+        assert!(cfg.legacy_pinned_sensor.is_empty());
     }
 
     #[test]

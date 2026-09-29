@@ -3,7 +3,7 @@
 use super::controls::{checked, combo_fill, combo_set, combo_value, send, set_check, set_text, window_string};
 use super::worker::{Job, Reply};
 use super::{Ui, show};
-use busy_core::{Anchor, CellStyle, Config, Module, TempUnit, ThemeMode};
+use busy_core::{Anchor, CellStyle, Config, Module, SensorPick, TempUnit, ThemeMode};
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{HSTRING, PWSTR, w};
@@ -67,8 +67,8 @@ impl Ui {
         send(self.ctl.spin, UDM_SETRANGE32, -OFFSET_RANGE as usize, OFFSET_RANGE as isize);
         send(self.ctl.spin, UDM_SETPOS32, 0, cfg.offset_px.clamp(-OFFSET_RANGE, OFFSET_RANGE) as isize);
         set_text(self.ctl.offset, &cfg.offset_px.to_string());
-        set_text(self.ctl.sensor, &cfg.pinned_sensor);
-        let cue = HSTRING::from("hardware/name \u{2014} empty = hottest CPU");
+        set_text(self.ctl.sensor, &sensor_text(&cfg.options.sensors.sensor));
+        let cue = HSTRING::from("hardware/name, gpu or storage \u{2014} empty = hottest CPU");
         send(self.ctl.sensor, EM_SETCUEBANNER, 0, cue.as_ptr() as isize);
         // Shows the saved setting until the worker has read the registry.
         set_check(self.ctl.autostart, cfg.autostart);
@@ -94,7 +94,7 @@ impl Ui {
             _ => ThemeMode::System,
         };
         c.temp_unit = if combo_value(self.ctl.unit) == Some(1) { TempUnit::Fahrenheit } else { TempUnit::Celsius };
-        c.pinned_sensor = window_string(self.ctl.sensor).trim().to_string();
+        c.options.sensors.sensor = parse_sensor(&window_string(self.ctl.sensor));
         c.autostart = checked(self.ctl.autostart);
         c
     }
@@ -143,8 +143,9 @@ impl Ui {
         if window_string(self.ctl.offset).trim() != c.offset_px.to_string() {
             set_text(self.ctl.offset, &c.offset_px.to_string());
         }
-        if window_string(self.ctl.sensor) != c.pinned_sensor {
-            set_text(self.ctl.sensor, &c.pinned_sensor);
+        let sensor = sensor_text(&c.options.sensors.sensor);
+        if window_string(self.ctl.sensor) != sensor {
+            set_text(self.ctl.sensor, &sensor);
         }
         self.syncing.set(false);
         *self.applied.borrow_mut() = c.clone();
@@ -196,6 +197,25 @@ impl Ui {
                 self.finish(c, close);
             }
         }
+    }
+}
+
+/// The sensor edit box: "hardware/name" picks one reading, `gpu`/`storage` the hottest of that part.
+fn parse_sensor(text: &str) -> SensorPick {
+    match text.trim() {
+        "" => SensorPick::Cpu,
+        t if t.eq_ignore_ascii_case("gpu") => SensorPick::Gpu,
+        t if t.eq_ignore_ascii_case("storage") => SensorPick::Storage,
+        t => SensorPick::Named(t.to_string()),
+    }
+}
+
+fn sensor_text(pick: &SensorPick) -> String {
+    match pick {
+        SensorPick::Cpu => String::new(),
+        SensorPick::Gpu => "gpu".into(),
+        SensorPick::Storage => "storage".into(),
+        SensorPick::Named(s) => s.clone(),
     }
 }
 

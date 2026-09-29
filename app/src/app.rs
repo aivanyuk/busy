@@ -8,7 +8,7 @@ use crate::flyout::Flyout;
 use crate::history::{History, capacity};
 use crate::render::Gfx;
 use crate::sampler::{Params, Sampler};
-use crate::select::pinned_sensor;
+use crate::select::taskbar_sensor;
 use crate::sync::lock;
 use crate::taskbar::Taskbar;
 use crate::theme::Theme;
@@ -258,7 +258,7 @@ impl Drop for App {
 impl App {
     fn on_snapshot(&mut self) {
         let Some(snap) = self.sampler.take() else { return };
-        let sensor = pinned_sensor(&snap, &self.cfg).map(|s| s.value);
+        let sensor = taskbar_sensor(&snap, &self.cfg).map(|s| s.value);
         self.hist.push(&snap, sensor);
         self.snap = snap;
         self.render_all();

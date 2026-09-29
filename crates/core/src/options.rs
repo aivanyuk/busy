@@ -11,6 +11,7 @@ pub struct ModuleOptions {
     pub disk: DiskOptions,
     pub network: NetOptions,
     pub battery: BatteryOptions,
+    pub sensors: SensorOptions,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -76,6 +77,27 @@ impl Default for BatteryOptions {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SensorOptions {
+    /// Reading shown on the taskbar Sensors cell.
+    pub sensor: SensorPick,
+}
+
+/// JSON: `"Cpu"`, `"Gpu"`, `"Storage"` or `{"Named": "<hardware>/<name>"}`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SensorPick {
+    /// Hottest CPU temperature, else the hottest temperature.
+    #[default]
+    Cpu,
+    /// Hottest GPU temperature.
+    Gpu,
+    /// Hottest drive (NVMe/SSD/HDD) temperature.
+    Storage,
+    /// One reading, matched as "hardware/name"; falls back to `Cpu` while it is absent.
+    Named(String),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,15 +109,19 @@ mod tests {
         assert_eq!(o.disk.drive, None);
         assert_eq!((o.network.units, &o.network.interface), (RateUnit::Bytes, &NetInterface::Auto));
         assert!(o.battery.show_remaining);
+        assert_eq!(o.sensors.sensor, SensorPick::Cpu);
     }
 
     #[test]
     fn json_shape() {
-        let o: ModuleOptions =
-            serde_json::from_str(r#"{"network": {"interface": {"Named": "Wi-Fi 2"}, "units": "Bits"}, "battery": {}}"#)
-                .unwrap();
+        let o: ModuleOptions = serde_json::from_str(
+            r#"{"network": {"interface": {"Named": "Wi-Fi 2"}, "units": "Bits"},
+                "sensors": {"sensor": "Storage"}, "battery": {}}"#,
+        )
+        .unwrap();
         assert_eq!(o.network.interface, NetInterface::Named("Wi-Fi 2".into()));
         assert_eq!(o.network.units, RateUnit::Bits);
+        assert_eq!(o.sensors.sensor, SensorPick::Storage);
         assert!(o.battery.show_remaining);
         assert_eq!(o.cpu, CpuOptions::default());
     }
@@ -107,6 +133,7 @@ mod tests {
             disk: DiskOptions { drive: Some("D:".into()) },
             network: NetOptions { units: RateUnit::Bits, interface: NetInterface::Ethernet },
             battery: BatteryOptions { show_remaining: false },
+            sensors: SensorOptions { sensor: SensorPick::Named("GPU/Hot Spot".into()) },
         };
         let back: ModuleOptions = serde_json::from_str(&serde_json::to_string(&o).unwrap()).unwrap();
         assert_eq!(o, back);

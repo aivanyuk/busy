@@ -166,7 +166,7 @@ impl Painter<'_> {
                 }
             }
             Module::Sensors => {
-                let pinned = select::pinned_sensor(snap, ctx.cfg);
+                let pinned = select::taskbar_sensor(snap, ctx.cfg);
                 let v = pinned.map(|s| fmt::sensor(s.value, s.kind, unit)).unwrap_or_default();
                 let vc = pinned.filter(|s| s.kind == SensorKind::Temperature).map_or(t.text, |s| t.temp(s.value));
                 self.header("Sensors", &v, vc);

@@ -122,8 +122,10 @@ pub struct Config {
     pub history_secs: u32,
     pub temp_unit: TempUnit,
     pub options: ModuleOptions,
-    /// Sensor to show on the taskbar Sensors cell, matched as "hardware/name". Empty = hottest CPU temp.
-    pub pinned_sensor: String,
+    /// v1's `pinned_sensor` ("hardware/name", empty = hottest CPU). Only read: `normalize()` moves it to
+    /// `options.sensors.sensor` and it is never written back.
+    #[serde(rename = "pinned_sensor", skip_serializing)]
+    pub legacy_pinned_sensor: String,
 }
 
 impl Default for Config {
@@ -150,7 +152,7 @@ impl Default for Config {
             history_secs: 120,
             temp_unit: TempUnit::Celsius,
             options: ModuleOptions::default(),
-            pinned_sensor: String::new(),
+            legacy_pinned_sensor: String::new(),
         }
     }
 }
@@ -401,6 +403,7 @@ mod tests {
             ..cfg.modules[2].clone()
         };
         cfg.options.network.interface = crate::NetInterface::Named("Ethernet 2".into());
+        cfg.options.sensors.sensor = crate::SensorPick::Gpu;
         let back: Config = serde_json::from_str(&serde_json::to_string(&cfg).unwrap()).unwrap();
         assert_eq!(cfg, back);
     }
