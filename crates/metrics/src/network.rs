@@ -34,6 +34,9 @@ pub struct Network {
     known: HashSet<u64>,
     addrs: HashMap<u64, Vec<String>>,
     prev: HashMap<u64, (u64, u64)>,
+    /// This sample's counters; swapped with `prev` afterwards so both allocations are reused.
+    cur: HashMap<u64, (u64, u64)>,
+    rows: Vec<Row>,
     rx_total: u64,
     tx_total: u64,
     wlan: Wlan,
@@ -110,20 +113,19 @@ impl Source for Network {
             }
         }
         let dt = self.clock.tick();
-        let mut prev = std::mem::take(&mut self.prev);
-        let rows: Vec<_> = self
-            .candidates
-            .iter()
-            .filter_map(|&luid| {
-                let r = entry(luid)?;
-                self.prev.insert(r.luid, (r.rx, r.tx));
-                // New interface or counter reset yields 0 for this interval.
-                let (drx, dtx) = prev
-                    .remove(&r.luid)
-                    .map_or((0, 0), |(prx, ptx)| (r.rx.saturating_sub(prx), r.tx.saturating_sub(ptx)));
-                Some(Row { rx: drx, tx: dtx, ..r })
-            })
-            .collect();
+        self.cur.clear();
+        // Taken for the sample (refresh_wifi borrows all of self) and put back after, keeping its allocation.
+        let mut rows = std::mem::take(&mut self.rows);
+        let (prev, cur) = (&self.prev, &mut self.cur);
+        rows.extend(self.candidates.iter().filter_map(|&luid| {
+            let r = entry(luid)?;
+            cur.insert(r.luid, (r.rx, r.tx));
+            // New interface or counter reset yields 0 for this interval.
+            let (drx, dtx) =
+                prev.get(&r.luid).map_or((0, 0), |&(prx, ptx)| (r.rx.saturating_sub(prx), r.tx.saturating_sub(ptx)));
+            Some(Row { rx: drx, tx: dtx, ..r })
+        }));
+        std::mem::swap(&mut self.prev, &mut self.cur);
         let any_hw = rows.iter().any(|r| r.connected && r.flags & HARDWARE != 0);
         let (mut drx, mut dtx) = (0, 0);
         for r in rows.iter().filter(|r| r.connected && (r.flags & HARDWARE != 0 || !any_hw)) {
@@ -135,7 +137,7 @@ impl Source for Network {
         self.refresh_wifi(&rows);
         let rate = |b: u64| dt.map_or(0.0, |dt| b as f64 / dt);
         let mut interfaces: Vec<_> = rows
-            .into_iter()
+            .drain(..)
             .filter_map(|r| {
                 let ipv4 = self.addrs.get(&r.luid).cloned().unwrap_or_default();
                 let hw = r.flags & HARDWARE != 0;
@@ -152,6 +154,7 @@ impl Source for Network {
                 })
             })
             .collect();
+        self.rows = rows;
         interfaces.sort_by_key(|i| !i.connected);
         snap.net = Some(NetInfo {
             rx_bps: rate(drx),
