@@ -5,13 +5,13 @@ edition.workspace = true
 
 [dependencies]
 busy-core.workspace = true
+busy-win.workspace = true
 windows = { workspace = true, features = [
     "Wdk_Graphics_Direct3D",
     "Wdk_System_SystemInformation",
     "Win32_Foundation",
     "Win32_Graphics_Dxgi",
     "Win32_System_Com",
-    "Win32_System_LibraryLoader",
     "Win32_System_Memory",
     "Win32_System_Ole",
     "Win32_System_Performance",

@@ -112,7 +112,7 @@ Existing code that does not yet meet the rules above. A PR that fixes one remove
 | `taskbar.rs` and `flyout.rs` call back into `crate::app`; `Taskbar`/`Flyout` expose `pub` fields; `pinned_sensor` lives in `app.rs`. | Layering: app modules |
 | `taskbar.rs` (595 lines) and `flyout.rs` (800) mix window procedure, layout and painting; `crates/settings/src/window.rs` is 977 lines. | Layering: one concern per file |
 | The sampler receives the whole `Config`. | Layering: workers get only what they use |
-| Wide strings, registry reads, the PDH wrapper and the DLL loader are implemented separately in `app`, `busy-metrics`, `busy-sensors` and `busy-settings`. | Layering: one implementation |
+| The PDH wrapper exists twice (`busy-metrics` `pdh.rs`, `busy-sensors` `gpu.rs`); `gpu.rs` and `hwinfo.rs` close handles by hand. | Layering: one implementation |
 | `Theme::resolve` reads the registry on `WM_SETTINGCHANGE`; the settings window reads and writes autostart on the UI thread. | Threads: no registry in a handler |
 | Flyout-only modules are sampled with the flyout closed; nothing pauses on lock or display off. | Performance: sample only what is visible |
 | HWiNFO reopens and copies its mapping every tick; processes, GPU, disk and network rebuild their maps every tick. | Performance: reuse buffers |

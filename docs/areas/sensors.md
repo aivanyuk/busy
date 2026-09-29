@@ -20,7 +20,7 @@ Precedence for `snap.sensors`: LHM → HWiNFO → NVML/ADL/WDDM readings (the la
 
 ## Security rules
 
-- DLLs: `LoadLibraryExW(name, LOAD_LIBRARY_SEARCH_SYSTEM32)` only; resolve with `GetProcAddress`; absence is normal and silent.
+- DLLs: through `busy_win::Dll` only (`LoadLibraryExW(name, LOAD_LIBRARY_SEARCH_SYSTEM32)`, symbols via `GetProcAddress`); absence is normal and silent.
 - Shared memory / WMI data is untrusted input: validate every offset, size, count before reading.
 
 ## Measured cost (debug, RTX 3080)
