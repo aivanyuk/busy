@@ -7,20 +7,19 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use busy_core::{GpuInfo, Module, ProcEntry, SensorKind, SensorReading, Snapshot, Source, TOP_N};
+use busy_win::pdh::{ArrayBuf, Counter, PDH_FMT_NOCAP100, Query};
 use windows::Wdk::Graphics::Direct3D::*;
 use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SYSTEM_INFORMATION_CLASS};
 use windows::Win32::Foundation::{CloseHandle, LUID};
 use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE, IDXGIFactory1};
-use windows::Win32::System::Performance::*;
 use windows::Win32::System::Threading::{
     OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
-use windows::core::{PWSTR, w};
+use windows::core::PWSTR;
 
 use crate::{Shared, adl::Adl, nvml::Nvml, reading};
 
 const REENUM: Duration = Duration::from_secs(60);
-const PDH_FMT_NOCAP100: u32 = 0x8000;
 
 /// Sensor-ish GPU values, from one backend.
 #[derive(Default, Clone, Copy)]
@@ -174,56 +173,23 @@ fn enumerate() -> Vec<Adapter> {
 }
 
 struct Pdh {
-    q: PDH_HQUERY,
-    engine: PDH_HCOUNTER,
-    dedicated: PDH_HCOUNTER,
-    shared: PDH_HCOUNTER,
+    q: Query,
+    engine: Counter,
+    dedicated: Counter,
+    shared: Counter,
 }
 
 impl Pdh {
     fn open() -> Option<Self> {
-        unsafe {
-            let mut q = PDH_HQUERY::default();
-            if PdhOpenQueryW(None, 0, &mut q) != 0 {
-                return None;
-            }
-            let mut p =
-                Pdh { q, engine: Default::default(), dedicated: Default::default(), shared: Default::default() };
-            let ok = PdhAddEnglishCounterW(q, w!(r"\GPU Engine(*)\Utilization Percentage"), 0, &mut p.engine) == 0
-                && PdhAddEnglishCounterW(q, w!(r"\GPU Adapter Memory(*)\Dedicated Usage"), 0, &mut p.dedicated) == 0
-                && PdhAddEnglishCounterW(q, w!(r"\GPU Adapter Memory(*)\Shared Usage"), 0, &mut p.shared) == 0;
-            // Prime the rate counter.
-            (ok && PdhCollectQueryData(q) == 0).then_some(p)
-        }
-    }
-}
-
-impl Drop for Pdh {
-    fn drop(&mut self) {
-        unsafe { PdhCloseQuery(self.q) };
-    }
-}
-
-/// Calls `f(instance, value)` for each valid instance of a wildcard counter.
-fn pdh_array(c: PDH_HCOUNTER, fmt: u32, buf: &mut Vec<u64>, mut f: impl FnMut(&str, &PDH_FMT_COUNTERVALUE)) {
-    let (mut size, mut count) = (0u32, 0u32);
-    unsafe {
-        if PdhGetFormattedCounterArrayW(c, PDH_FMT(fmt), &mut size, &mut count, None) != PDH_MORE_DATA {
-            return;
-        }
-        buf.resize(size as usize / 8 + 1, 0);
-        if PdhGetFormattedCounterArrayW(c, PDH_FMT(fmt), &mut size, &mut count, Some(buf.as_mut_ptr().cast())) != 0 {
-            return;
-        }
-        let items = std::slice::from_raw_parts(buf.as_ptr().cast::<PDH_FMT_COUNTERVALUE_ITEM_W>(), count as usize);
-        for it in items {
-            // PDH_CSTATUS_VALID_DATA / PDH_CSTATUS_NEW_DATA
-            if it.FmtValue.CStatus <= 1
-                && let Ok(name) = it.szName.to_string()
-            {
-                f(&name, &it.FmtValue);
-            }
-        }
+        let q = Query::open()?;
+        let p = Self {
+            engine: q.add(r"\GPU Engine(*)\Utilization Percentage")?,
+            dedicated: q.add(r"\GPU Adapter Memory(*)\Dedicated Usage")?,
+            shared: q.add(r"\GPU Adapter Memory(*)\Shared Usage")?,
+            q,
+        };
+        // Prime the rate counter.
+        p.q.collect().then_some(p)
     }
 }
 
@@ -292,7 +258,7 @@ pub struct GpuSource {
     nvml: Option<Nvml>,
     adl: Option<Adl>,
     names: HashMap<u32, String>,
-    buf: Vec<u64>,
+    buf: ArrayBuf,
 }
 
 impl GpuSource {
@@ -305,7 +271,7 @@ impl GpuSource {
             nvml: None,
             adl: None,
             names: HashMap::new(),
-            buf: Vec::new(),
+            buf: ArrayBuf::default(),
         }
     }
 
@@ -360,10 +326,9 @@ impl Source for GpuSource {
         let mut dedicated: HashMap<u64, u64> = HashMap::new();
         let mut shared_mem: HashMap<u64, u64> = HashMap::new();
         if let Some(p) = &self.pdh
-            && unsafe { PdhCollectQueryData(p.q) } == 0
+            && p.q.collect()
         {
-            pdh_array(p.engine, PDH_FMT_DOUBLE.0 | PDH_FMT_NOCAP100, &mut self.buf, |name, v| {
-                let v = unsafe { v.Anonymous.doubleValue };
+            p.engine.each_double(PDH_FMT_NOCAP100, &mut self.buf, |name, v| {
                 let (Some(luid), Some(eng), Some(pid)) = (
                     parse_luid(name),
                     field(name, "_eng_").and_then(|s| s.parse().ok()),
@@ -379,9 +344,9 @@ impl Source for GpuSource {
                 *procs.entry((pid, luid, eng)).or_default() += v;
             });
             for (c, map) in [(p.dedicated, &mut dedicated), (p.shared, &mut shared_mem)] {
-                pdh_array(c, PDH_FMT_LARGE.0, &mut self.buf, |name, v| {
+                c.each_large(&mut self.buf, |name, v| {
                     if let Some(luid) = parse_luid(name) {
-                        *map.entry(luid).or_default() += unsafe { v.Anonymous.largeValue }.max(0) as u64;
+                        *map.entry(luid).or_default() += v.max(0) as u64;
                     }
                 });
             }
