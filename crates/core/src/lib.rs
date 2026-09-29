@@ -136,14 +136,21 @@ pub struct DiskInfo {
     /// Bytes read / written since the disk was first sampled (busy start or hot-plug).
     pub read_total: Option<u64>,
     pub written_total: Option<u64>,
+    /// Physical disk number (`\\.\PhysicalDriveN`), the leading number of `name`.
+    pub index: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct VolumeInfo {
+    /// Drive letter with colon, e.g. "C:".
     pub mount: String,
     pub label: String,
     pub total: u64,
     pub free: u64,
+    /// `DiskInfo.index` of the physical disk holding this volume (the lowest one if it spans several).
+    pub disk_index: Option<u32>,
+    /// Holds the Windows directory.
+    pub is_system: bool,
 }
 
 #[derive(Clone, Debug, Default)]

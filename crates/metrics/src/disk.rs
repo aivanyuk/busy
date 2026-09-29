@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use windows::Win32::Storage::FileSystem::{
     GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDriveStringsW, GetVolumeInformationW,
 };
+use windows::Win32::System::SystemInformation::GetSystemWindowsDirectoryW;
 use windows::Win32::System::WindowsProgramming::DRIVE_FIXED;
 use windows::core::PCWSTR;
 
@@ -17,6 +18,8 @@ pub struct Disk {
     buf: ArrayBuf,
     volumes: Vec<VolumeInfo>,
     vol_refresh: Every,
+    /// Drive of the Windows directory ("C:"), fixed for the session.
+    system: Option<String>,
     /// Since-boot (read, written) bytes per disk number when the disk was first seen.
     base: HashMap<u32, (u64, u64)>,
 }
@@ -46,13 +49,24 @@ fn slot<'a>(disks: &'a mut Vec<DiskInfo>, n: usize, name: &str) -> Option<&'a mu
         }
     }
     let d = disks.get_mut(n)?;
-    *d = DiskInfo { name: std::mem::take(&mut d.name), ..Default::default() };
+    *d = DiskInfo { index: disk_number(&d.name).parse().ok(), name: std::mem::take(&mut d.name), ..Default::default() };
     Some(d)
+}
+
+/// Sets each volume's physical disk from the letters in the PDH instance names. A volume spanning disks is
+/// listed under each of them; the lowest disk number wins (`disks` is sorted by number).
+fn map_volumes(disks: &[DiskInfo], volumes: &mut [VolumeInfo]) {
+    for v in volumes {
+        v.disk_index = disks
+            .iter()
+            .find(|d| d.name.split(' ').skip(1).any(|l| l.eq_ignore_ascii_case(&v.mount)))
+            .and_then(|d| d.index);
+    }
 }
 
 /// Turns the since-boot counts in `d` into counts since the disk was first seen.
 fn since_start(base: &mut HashMap<u32, (u64, u64)>, d: &mut DiskInfo) {
-    let (Some(r), Some(w), Ok(n)) = (d.read_total, d.written_total, disk_number(&d.name).parse()) else {
+    let (Some(r), Some(w), Some(n)) = (d.read_total, d.written_total, d.index) else {
         (d.read_total, d.written_total) = (None, None);
         return;
     };
@@ -118,7 +132,7 @@ impl Pdh {
                 }
             });
         }
-        disks.sort_unstable_by_key(|d| disk_number(&d.name).parse::<u32>().unwrap_or(u32::MAX));
+        disks.sort_unstable_by_key(|d| d.index.unwrap_or(u32::MAX));
         ok
     }
 }
@@ -133,6 +147,7 @@ impl Disk {
             volumes: Vec::new(),
             vol_refresh: Every::default(),
             base: HashMap::new(),
+            system: system_drive(),
         }
     }
 }
@@ -146,9 +161,14 @@ impl Source for Disk {
         if self.pdh.is_none() && self.reopen.due(10) {
             self.pdh = Pdh::open();
         }
+        if self.vol_refresh.due(10) {
+            self.volumes = volumes(self.system.as_deref());
+        }
         match self.pdh.as_ref().map(|p| p.read(&mut self.disks, &mut self.buf)) {
             Some(true) => {
                 self.disks.iter_mut().for_each(|d| since_start(&mut self.base, d));
+                // Re-applied on every read: drive letters can move between disks.
+                map_volumes(&self.disks, &mut self.volumes);
                 snap.disks.clone_from(&self.disks);
             }
             Some(false) => {
@@ -158,14 +178,21 @@ impl Source for Disk {
             }
             None => {}
         }
-        if self.vol_refresh.due(10) {
-            self.volumes = volumes();
-        }
         snap.volumes.clone_from(&self.volumes);
     }
 }
 
-fn volumes() -> Vec<VolumeInfo> {
+/// "C:" for a Windows directory of `C:\Windows`.
+fn system_drive() -> Option<String> {
+    let mut win = [0u16; 261];
+    // SAFETY: `win` is a writable buffer whose length the slice parameter passes.
+    let n = unsafe { GetSystemWindowsDirectoryW(Some(&mut win)) } as usize;
+    // A result longer than the buffer is the required size, not a path.
+    let dir = from_wide(win.get(..n)?);
+    Some(dir.get(..2)?.to_owned()).filter(|d| d.ends_with(':'))
+}
+
+fn volumes(system: Option<&str>) -> Vec<VolumeInfo> {
     let mut buf = [0u16; 512];
     let n = unsafe { GetLogicalDriveStringsW(Some(&mut buf)) } as usize;
     buf[..n.min(buf.len())]
@@ -181,11 +208,15 @@ fn volumes() -> Vec<VolumeInfo> {
             unsafe { GetDiskFreeSpaceExW(p, None, Some(&mut total), Some(&mut free)) }.ok()?;
             let mut label = [0u16; 261];
             let _ = unsafe { GetVolumeInformationW(p, Some(&mut label), None, None, None, None) };
+            let mount = from_wide(&root).trim_end_matches('\\').to_owned();
             Some(VolumeInfo {
-                mount: from_wide(&root).trim_end_matches('\\').to_owned(),
+                is_system: system.is_some_and(|s| s.eq_ignore_ascii_case(&mount)),
+                mount,
                 label: from_wide(&label),
                 total,
                 free,
+                // Filled from the PDH instance names on each successful disk read.
+                disk_index: None,
             })
         })
         .collect()
@@ -220,7 +251,8 @@ mod tests {
     fn totals_since_first_seen() {
         let mut base = HashMap::new();
         let mut at = |name: &str, r, w| {
-            let mut d = DiskInfo { name: name.into(), read_total: r, written_total: w, ..Default::default() };
+            let index = disk_number(name).parse().ok();
+            let mut d = DiskInfo { name: name.into(), read_total: r, written_total: w, index, ..Default::default() };
             since_start(&mut base, &mut d);
             (d.read_total, d.written_total)
         };
@@ -231,5 +263,24 @@ mod tests {
         assert_eq!(at("1 E:", Some(10), Some(20)), (Some(0), Some(0)));
         assert_eq!(at("1 E:", None, Some(30)), (None, None));
         assert_eq!(at("x E:", Some(10), Some(20)), (None, None));
+    }
+
+    #[test]
+    fn volumes_map_to_disks() {
+        let disk =
+            |name: &str| DiskInfo { name: name.into(), index: disk_number(name).parse().ok(), ..Default::default() };
+        // Sorted by number, as Pdh::read leaves them; "D:" spans disks 0 and 2.
+        let disks = [disk("0 D:"), disk("1"), disk("2 C: H: D:"), disk("x E:")];
+        let mut vols: Vec<_> = ["C:", "c:", "D:", "E:", "H:", "Z:", "H"]
+            .map(|m| VolumeInfo { mount: m.into(), ..Default::default() })
+            .into();
+        map_volumes(&disks, &mut vols);
+        let got: Vec<_> = vols.iter().map(|v| v.disk_index).collect();
+        assert_eq!(got, [Some(2), Some(2), Some(0), None, Some(2), None, None]);
+    }
+
+    #[test]
+    fn system_drive_is_a_letter() {
+        assert!(system_drive().is_some_and(|d| d.len() == 2 && d.ends_with(':')));
     }
 }
