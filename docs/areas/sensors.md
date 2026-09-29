@@ -33,6 +33,8 @@ Precedence for `snap.sensors`: LHM → HWiNFO → NVML/ADL/WDDM readings (the la
 
 GPU steady 3–5 ms (PDH 2.5–4 ms, NVML 0.5 ms). Sensors µs when nothing is present. Startup ~0.4–0.8 s.
 
+Release, `dump_sensors 60`, median per sample: GPU ~2 ms and 39 heap allocations (about 680 while the per-sample maps and PDH instance names were allocated every tick; each per-process engine instance cost one `String`).
+
 ## Gotchas
 
 - Unelevated `OpenProcess` fails for some processes (e.g. dwm.exe) → name fallback via `NtQuerySystemInformation(SystemProcessIdInformation)`.
