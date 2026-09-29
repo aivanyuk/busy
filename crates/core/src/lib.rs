@@ -47,6 +47,11 @@ impl Module {
         Module::Processes,
     ];
 
+    /// Position in `Module::ALL`, for per-module tables (`[T; Module::ALL.len()]`).
+    pub const fn index(self) -> usize {
+        self as usize
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             Module::Cpu => "CPU",
@@ -306,6 +311,13 @@ pub const TOP_N: usize = 5;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn index_is_the_position_in_all() {
+        for (i, m) in Module::ALL.into_iter().enumerate() {
+            assert_eq!(m.index(), i, "{m:?}");
+        }
+    }
 
     #[test]
     fn clear_drops_only_that_module() {
