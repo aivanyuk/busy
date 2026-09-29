@@ -35,6 +35,9 @@ pub enum TempUnit {
     Fahrenheit,
 }
 
+/// Number of colors in the module palette (design `PAL`).
+pub const PALETTE_LEN: u8 = 6;
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ModuleCfg {
     pub module: Module,
@@ -46,6 +49,38 @@ pub struct ModuleCfg {
     pub flyout: bool,
     #[serde(default = "text")]
     pub style: CellStyle,
+    /// Small caption above the value on the taskbar cell.
+    #[serde(default = "yes")]
+    pub show_label: bool,
+    /// Palette index `0..PALETTE_LEN`; `None` = `Module::default_color()`.
+    #[serde(default)]
+    pub color: Option<u8>,
+    /// Shift green → amber → red as the value rises, instead of the module color.
+    #[serde(default)]
+    pub color_by_load: bool,
+    /// Update interval in seconds (1..=10); `None` = the general `Config::interval_ms`.
+    #[serde(default)]
+    pub interval_s: Option<u32>,
+}
+
+impl ModuleCfg {
+    pub fn new(module: Module, taskbar: bool, style: CellStyle) -> Self {
+        Self {
+            module,
+            taskbar,
+            flyout: true,
+            style,
+            show_label: true,
+            color: None,
+            color_by_load: false,
+            interval_s: None,
+        }
+    }
+
+    /// Palette index in effect.
+    pub fn color_index(&self) -> u8 {
+        self.color.unwrap_or(self.module.default_color())
+    }
 }
 
 fn yes() -> bool {
@@ -83,7 +118,7 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        let m = |module, taskbar, style| ModuleCfg { module, taskbar, flyout: true, style };
+        let m = ModuleCfg::new;
         Self {
             interval_ms: 1000,
             modules: vec![
@@ -94,7 +129,7 @@ impl Default for Config {
                 m(Module::Disk, false, CellStyle::Text),
                 m(Module::Sensors, false, CellStyle::Text),
                 m(Module::Battery, false, CellStyle::Text),
-                ModuleCfg { module: Module::Processes, taskbar: false, flyout: true, style: CellStyle::Text },
+                m(Module::Processes, false, CellStyle::Text),
             ],
             anchor: Anchor::NearTray,
             offset_px: 0,
@@ -120,6 +155,17 @@ impl Module {
             Module::Battery => &[Text, Bar],
             Module::Sensors => &[Text, Graph],
             Module::Processes => &[],
+        }
+    }
+
+    /// Palette index used when `ModuleCfg::color` is `None` (design `MODS.color`).
+    pub fn default_color(self) -> u8 {
+        match self {
+            Module::Cpu | Module::Network | Module::Processes => 0,
+            Module::Gpu => 1,
+            Module::Memory | Module::Battery => 2,
+            Module::Disk => 3,
+            Module::Sensors => 4,
         }
     }
 }
@@ -163,6 +209,8 @@ impl Config {
             }
         }
         for m in &mut self.modules {
+            m.color = m.color.filter(|&c| c < PALETTE_LEN);
+            m.interval_s = m.interval_s.map(|s| s.clamp(1, 10));
             let allowed = m.module.allowed_styles();
             match allowed.first() {
                 None => m.taskbar = false,
@@ -176,6 +224,11 @@ impl Config {
 
     pub fn module(&self, m: Module) -> Option<&ModuleCfg> {
         self.modules.iter().find(|c| c.module == m)
+    }
+
+    /// Update interval of a module: its own override, else the general interval.
+    pub fn module_interval_ms(&self, m: Module) -> u32 {
+        self.module(m).and_then(|c| c.interval_s).map_or(self.interval_ms, |s| s.saturating_mul(1000))
     }
 
     /// Whether a module needs sampling at all.
@@ -263,10 +316,7 @@ mod tests {
     #[test]
     fn module_entry_missing_fields_gets_defaults() {
         let cfg: Config = serde_json::from_str(r#"{"modules": [{"module": "Gpu", "taskbar": true}]}"#).unwrap();
-        assert_eq!(
-            cfg.modules,
-            vec![ModuleCfg { module: Module::Gpu, taskbar: true, flyout: true, style: CellStyle::Text }]
-        );
+        assert_eq!(cfg.modules, vec![ModuleCfg::new(Module::Gpu, true, CellStyle::Text)]);
     }
 
     #[test]
@@ -279,16 +329,63 @@ mod tests {
         let mut cfg: Config = serde_json::from_str(json).unwrap();
         cfg.normalize();
         assert_eq!(cfg.interval_ms, 2000);
-        assert_eq!(
-            cfg.modules[0],
-            ModuleCfg { module: Module::Cpu, taskbar: false, flyout: false, style: CellStyle::Bar }
-        );
+        assert_eq!(cfg.modules[0], ModuleCfg { flyout: false, ..ModuleCfg::new(Module::Cpu, false, CellStyle::Bar) });
         assert_eq!(cfg.modules.len(), Module::ALL.len());
     }
 
     #[test]
+    fn module_appearance_defaults() {
+        for m in Config::default().modules {
+            assert!(m.show_label && !m.color_by_load, "{:?}", m.module);
+            assert_eq!((m.color, m.interval_s), (None, None));
+        }
+        let cfg = Config::default();
+        let color = |m| cfg.module(m).map(ModuleCfg::color_index);
+        assert_eq!(color(Module::Cpu), Some(0));
+        assert_eq!(color(Module::Gpu), Some(1));
+        assert_eq!(color(Module::Memory), Some(2));
+        assert_eq!(color(Module::Disk), Some(3));
+        assert_eq!(color(Module::Sensors), Some(4));
+        assert!(Module::ALL.iter().all(|m| m.default_color() < PALETTE_LEN));
+    }
+
+    #[test]
+    fn normalize_drops_bad_color_and_clamps_module_interval() {
+        let mut cfg = Config::default();
+        cfg.modules[0].color = Some(PALETTE_LEN);
+        cfg.modules[0].interval_s = Some(0);
+        cfg.modules[1].color = Some(5);
+        cfg.modules[1].interval_s = Some(3600);
+        cfg.normalize();
+        assert_eq!((cfg.modules[0].color, cfg.modules[0].interval_s), (None, Some(1)));
+        assert_eq!((cfg.modules[1].color, cfg.modules[1].interval_s), (Some(5), Some(10)));
+    }
+
+    #[test]
+    fn module_interval_overrides_general() {
+        let mut cfg = Config { interval_ms: 2000, ..Config::default() };
+        cfg.modules[0].interval_s = Some(5);
+        assert_eq!(cfg.module_interval_ms(cfg.modules[0].module), 5000);
+        assert_eq!(cfg.module_interval_ms(cfg.modules[1].module), 2000);
+    }
+
+    #[test]
+    fn module_without_new_fields_loads_with_defaults() {
+        let m: ModuleCfg =
+            serde_json::from_str(r#"{"module":"Memory","taskbar":true,"flyout":false,"style":"Bar"}"#).unwrap();
+        assert_eq!(m, ModuleCfg { flyout: false, ..ModuleCfg::new(Module::Memory, true, CellStyle::Bar) });
+    }
+
+    #[test]
     fn json_roundtrip() {
-        let cfg = Config { offset_px: -42, theme: ThemeMode::Dark, ..Config::default() };
+        let mut cfg = Config { offset_px: -42, theme: ThemeMode::Dark, ..Config::default() };
+        cfg.modules[2] = ModuleCfg {
+            show_label: false,
+            color: Some(4),
+            color_by_load: true,
+            interval_s: Some(5),
+            ..cfg.modules[2].clone()
+        };
         let back: Config = serde_json::from_str(&serde_json::to_string(&cfg).unwrap()).unwrap();
         assert_eq!(cfg, back);
     }

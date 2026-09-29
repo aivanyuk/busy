@@ -29,6 +29,7 @@ pub trait Source {
 
 - `Config::load()` never fails: missing/invalid file → defaults, then `normalize()` (dedup modules, append missing ones, clamp interval 250..10000 ms and history 10..3600 s).
 - `modules` order is display order; each has `taskbar`, `flyout`, `style` (Text/Graph/Bar/Io).
+- Per-module appearance (all optional in JSON): `show_label` (default true), `color` (palette index `0..PALETTE_LEN`, `None` = `Module::default_color()`, design `MODS.color`; out-of-range → `None`), `color_by_load` (load colors instead of the module color), `interval_s` (1..=10 s, `None` = general `interval_ms`; read through `Config::module_interval_ms`).
 - `Module::allowed_styles()` lists the styles a module can use on the taskbar, preferred first (design `MODS.styles`): CPU/GPU Graph·Text·Bar, Memory Bar·Text·Graph, Disk Io·Text·Bar, Network Io·Graph, Battery Text·Bar, Sensors Text·Graph. `normalize()` coerces a disallowed style to the first allowed one. Processes allows none: it is flyout-only and `normalize()` clears its `taskbar`.
 - Adding a field: give it a default in `impl Default for Config` — `#[serde(default)]` keeps old files loading. Add a test.
 - A new `ModuleCfg` field needs its own `#[serde(default…)]` (the struct has no `Default`: `module` is required). A `modules` entry that still fails to parse — an unknown `Module` or `CellStyle` from a newer build, a hand-edit — is dropped on load and `normalize()` re-adds that module with its default; before, one bad entry reset the whole file.
