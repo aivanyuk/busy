@@ -1,89 +1,122 @@
 //! The window procedure and its message dispatch.
 
-use super::controls::ID_OK;
+use super::layout::{MIN_H, MIN_W};
 use super::worker::{Job, WM_APP_REPLY};
-use super::{UI, Ui, ui};
-use crate::dark;
+use super::{UI, Ui, frame, ui};
 use windows::Win32::Foundation::*;
-use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus};
+use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, PAINTSTRUCT};
+use windows::Win32::UI::Controls::WM_MOUSELEAVE;
+use windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::PCWSTR;
 
+fn x_of(l: LPARAM) -> i32 {
+    (l.0 & 0xFFFF) as i16 as i32
+}
+
+fn y_of(l: LPARAM) -> i32 {
+    ((l.0 >> 16) & 0xFFFF) as i16 as i32
+}
+
 impl Ui {
     fn handle(&self, m: u32, w: WPARAM, l: LPARAM) -> Option<LRESULT> {
-        unsafe {
-            match m {
-                WM_COMMAND => {
-                    self.command(w.0 as u16, (w.0 >> 16) as u16 as u32);
-                    Some(LRESULT(0))
+        match m {
+            WM_NCCALCSIZE if w.0 != 0 => Some(frame::calc_size(self.hwnd, w, l, self.dpi.get())),
+            WM_NCHITTEST => Some(frame::hit_test(self.hwnd, l, self.dpi.get(), self.view.borrow().w)),
+            WM_PAINT => {
+                let mut ps = PAINTSTRUCT::default();
+                // SAFETY: our window; BeginPaint/EndPaint pair around the draw.
+                unsafe {
+                    BeginPaint(self.hwnd, &mut ps);
+                    self.render();
+                    let _ = EndPaint(self.hwnd, &ps);
                 }
-                WM_NOTIFY => self.notify(l),
-                WM_CTLCOLORSTATIC | WM_CTLCOLORBTN | WM_CTLCOLOREDIT | WM_CTLCOLORLISTBOX => {
-                    let hdc = HDC(w.0 as _);
-                    let field = m == WM_CTLCOLOREDIT || m == WM_CTLCOLORLISTBOX;
-                    if self.dark.get() {
-                        SetTextColor(hdc, dark::TEXT);
-                        SetBkColor(hdc, if field { dark::FIELD } else { dark::BG });
-                        Some(LRESULT((if field { self.field } else { self.bg }).0 as isize))
-                    } else if !field {
-                        SetTextColor(hdc, COLORREF(GetSysColor(COLOR_WINDOWTEXT)));
-                        SetBkColor(hdc, COLORREF(GetSysColor(COLOR_BTNFACE)));
-                        Some(LRESULT(self.bg_brush().0 as isize))
-                    } else {
-                        None
-                    }
-                }
-                WM_ERASEBKGND => {
-                    let mut rc = RECT::default();
-                    let _ = GetClientRect(self.hwnd, &mut rc);
-                    FillRect(HDC(w.0 as _), &rc, self.bg_brush());
-                    Some(LRESULT(1))
-                }
-                // Lets IsDialogMessage treat Enter as OK.
-                DM_GETDEFID => Some(LRESULT(((DC_HASDEFID << 16) | ID_OK as u32) as isize)),
-                WM_ACTIVATE => {
-                    if w.0 as u16 as u32 == WA_INACTIVE {
-                        let f = GetFocus();
-                        if IsChild(self.hwnd, f).as_bool() {
-                            self.focus.set(f);
-                        }
-                    } else {
-                        let _ = SetFocus(Some(self.focus.get()));
-                    }
-                    Some(LRESULT(0))
-                }
-                WM_DPICHANGED => {
-                    self.dpi.set(w.0 as u16 as u32);
-                    self.set_font();
-                    let (cw, ch) = self.layout();
-                    let (ww, wh) = self.frame_size(cw, ch);
-                    let r = &*(l.0 as *const RECT);
-                    let _ = SetWindowPos(self.hwnd, None, r.left, r.top, ww, wh, SWP_NOZORDER | SWP_NOACTIVATE);
-                    Some(LRESULT(0))
-                }
-                WM_SETTINGCHANGE => {
-                    if l.0 != 0 && PCWSTR(l.0 as _).to_string().is_ok_and(|s| s == "ImmersiveColorSet") {
-                        self.worker.submit(Job::Theme);
-                    }
-                    None
-                }
-                WM_APP_REPLY => {
-                    for r in self.worker.replies() {
-                        self.on_reply(r);
-                    }
-                    Some(LRESULT(0))
-                }
-                WM_CLOSE => {
-                    self.close();
-                    Some(LRESULT(0))
-                }
-                WM_NCDESTROY => {
-                    UI.take();
-                    None
-                }
-                _ => None,
+                Some(LRESULT(0))
             }
+            WM_ERASEBKGND => Some(LRESULT(1)),
+            WM_SIZE => {
+                self.resized();
+                Some(LRESULT(0))
+            }
+            WM_GETMINMAXINFO => {
+                let s = self.scale();
+                // SAFETY: for WM_GETMINMAXINFO, lParam points to a MINMAXINFO valid for the message.
+                let mmi = unsafe { &mut *(l.0 as *mut MINMAXINFO) };
+                mmi.ptMinTrackSize = POINT { x: (MIN_W * s) as i32, y: (MIN_H * s) as i32 };
+                Some(LRESULT(0))
+            }
+            WM_MOUSEMOVE => {
+                self.on_move(x_of(l), y_of(l));
+                Some(LRESULT(0))
+            }
+            WM_MOUSELEAVE => {
+                self.on_leave();
+                Some(LRESULT(0))
+            }
+            WM_LBUTTONDOWN => {
+                self.on_down(x_of(l), y_of(l));
+                Some(LRESULT(0))
+            }
+            WM_LBUTTONUP => {
+                self.on_up(x_of(l), y_of(l));
+                Some(LRESULT(0))
+            }
+            WM_MOUSEWHEEL => {
+                self.on_wheel((w.0 >> 16) as u16 as i16);
+                Some(LRESULT(0))
+            }
+            WM_KEYDOWN if w.0 as u16 == VK_ESCAPE.0 => {
+                self.on_escape();
+                Some(LRESULT(0))
+            }
+            WM_DPICHANGED => {
+                self.dpi.set(w.0 as u16 as u32);
+                // SAFETY: for WM_DPICHANGED, lParam points to the suggested window RECT.
+                let r = unsafe { *(l.0 as *const RECT) };
+                // SAFETY: our window; the rect comes from the system.
+                unsafe {
+                    let _ = SetWindowPos(
+                        self.hwnd,
+                        None,
+                        r.left,
+                        r.top,
+                        r.right - r.left,
+                        r.bottom - r.top,
+                        SWP_NOZORDER | SWP_NOACTIVATE,
+                    );
+                }
+                self.resized();
+                Some(LRESULT(0))
+            }
+            WM_SETTINGCHANGE => {
+                // SAFETY: for WM_SETTINGCHANGE, a non-null lParam is a NUL-terminated string.
+                if l.0 != 0 && unsafe { PCWSTR(l.0 as _).to_string() }.is_ok_and(|s| s == "ImmersiveColorSet") {
+                    self.worker.submit(Job::Theme);
+                }
+                None
+            }
+            WM_APP_REPLY => {
+                for r in self.worker.replies() {
+                    self.on_reply(r);
+                }
+                Some(LRESULT(0))
+            }
+            WM_ACTIVATE if w.0 as u16 as u32 == WA_INACTIVE => {
+                // An open popup closes with the window's activation, like a system dropdown.
+                if self.view.borrow_mut().popup.take().is_some() {
+                    self.invalidate();
+                }
+                None
+            }
+            WM_CLOSE => {
+                self.close();
+                Some(LRESULT(0))
+            }
+            WM_NCDESTROY => {
+                UI.take();
+                None
+            }
+            _ => None,
         }
     }
 }
@@ -92,5 +125,6 @@ pub(super) extern "system" fn wndproc(h: HWND, m: u32, w: WPARAM, l: LPARAM) -> 
     if let Some(r) = ui().filter(|u| u.hwnd == h).and_then(|u| u.handle(m, w, l)) {
         return r;
     }
+    // SAFETY: default handling with the message's own parameters.
     unsafe { DefWindowProcW(h, m, w, l) }
 }
