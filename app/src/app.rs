@@ -30,7 +30,7 @@ const WM_APP_CONFIG: u32 = WM_APP + 3;
 const WM_APP_FLYOUT_DEACTIVATED: u32 = WM_APP + 4;
 const WM_APP_THEME: u32 = WM_APP + 5;
 /// The settings window shows a module's page (`wParam` = `Module::index` + 1) or none (0).
-const WM_APP_SETTINGS_PAGE: u32 = WM_APP + 6;
+pub(crate) const WM_APP_SETTINGS_PAGE: u32 = WM_APP + 6;
 
 const TIMER_WATCH: usize = 1;
 
@@ -74,7 +74,12 @@ fn with<R>(f: impl FnOnce(&mut App) -> R) -> Option<R> {
     APP.with(|a| a.try_borrow_mut().ok().and_then(|mut g| g.as_mut().map(f)))
 }
 
-fn main_hwnd() -> HWND {
+/// Lends the latest readings and history, unless the app state is borrowed (a re-entrant message).
+pub(crate) fn with_readings(f: impl FnOnce(&Snapshot, &History)) {
+    with(|a| f(&a.snap, &a.hist));
+}
+
+pub(crate) fn main_hwnd() -> HWND {
     HWND(MAIN.load(Ordering::Relaxed) as _)
 }
 
@@ -88,26 +93,6 @@ fn post(msg: u32) {
 pub fn submit_config(cfg: Config) {
     *lock(&PENDING) = Some(cfg);
     post(WM_APP_CONFIG);
-}
-
-/// The settings window's view of the app. `page` is also called inside `busy_settings::open`, while the state
-/// is borrowed, so configs and pages arrive as posted messages; readings are lent only when the state is free.
-struct SettingsHost;
-
-impl busy_settings::Host for SettingsHost {
-    fn apply(&self, cfg: Config) {
-        submit_config(cfg);
-    }
-
-    fn page(&self, m: Option<Module>) {
-        // SAFETY: PostMessageW only queues a message to our own window.
-        let wp = WPARAM(m.map_or(0, |m| m.index() + 1));
-        let _ = unsafe { PostMessageW(Some(main_hwnd()), WM_APP_SETTINGS_PAGE, wp, LPARAM(0)) };
-    }
-
-    fn with_data(&self, f: &mut dyn FnMut(&Snapshot, &History)) {
-        with(|a| f(&a.snap, &a.hist));
-    }
 }
 
 pub fn run(open_flyout: bool) -> Result<()> {
@@ -451,7 +436,7 @@ impl App {
 
     /// `page`: the module whose page to show.
     fn open_settings(&mut self, page: Option<Module>) {
-        busy_settings::open(self.main, &self.cfg, std::rc::Rc::new(SettingsHost), page);
+        busy_settings::open(self.main, &self.cfg, std::rc::Rc::new(crate::host::SettingsHost), page);
     }
 
     /// A click on a flyout footer button: both close the flyout first, like the system flyouts' links.
