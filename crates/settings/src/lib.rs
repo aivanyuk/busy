@@ -36,6 +36,13 @@ pub fn open(_owner: HWND, cfg: &Config, host: Rc<dyn Host>, page: Option<Module>
     window::open(cfg, host, page);
 }
 
+/// Opens setup (onboarding; design "FIRST RUN") in the settings window, or turns the open window into it.
+/// Choices apply live through [`Host::apply`]; finishing it (Skip, Start monitoring or Close) applies a config
+/// with `onboarded` set and closes the window. The host opens it at startup while `onboarded` is false.
+pub fn setup(cfg: &Config, host: Rc<dyn Host>) {
+    window::setup(cfg, host);
+}
+
 /// The host applied `cfg`, from the window or anywhere else (the widget's menu): the window shows it.
 pub fn sync(cfg: &Config) {
     window::sync(cfg);

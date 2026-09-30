@@ -8,10 +8,14 @@ use super::model::{Control, Edit, Item};
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 
 impl Ui {
-    /// `WM_KEYDOWN` (and `WM_SYSKEYDOWN` with `alt`); false leaves the key to the default handling.
-    pub(super) fn on_key(&self, vk: VIRTUAL_KEY, alt: bool) -> bool {
+    /// `WM_KEYDOWN` (and `WM_SYSKEYDOWN` with `alt`; `repeat` for an auto-repeat); false leaves the key to the
+    /// default handling.
+    pub(super) fn on_key(&self, vk: VIRTUAL_KEY, alt: bool, repeat: bool) -> bool {
         // SAFETY: reads the calling thread's keyboard state.
         let shift = unsafe { GetKeyState(VK_SHIFT.0 as i32) } < 0;
+        if self.in_setup() {
+            return self.setup_key(vk, alt, repeat);
+        }
         if alt && vk != VK_DOWN {
             return false;
         }
@@ -169,7 +173,7 @@ impl Ui {
     /// `WM_CHAR`: typing goes to the search box while it has the focus.
     pub(super) fn on_char(&self, c: u16) -> bool {
         let mut v = self.view.borrow_mut();
-        if v.focus != Some(Target::Search) {
+        if self.in_setup() || v.focus != Some(Target::Search) {
             return false;
         }
         // Printable characters only (no control characters, no halves of a surrogate pair), and a sane length.

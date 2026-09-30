@@ -9,9 +9,10 @@
 - `input.rs` — pointer input: hover, clicks, wheel; a click on a control becomes a `model::Edit`; `keys.rs` — keyboard input and focus.
 - `live.rs` — following the host: `sync` (configs it applied) and `refresh` (new readings: the preview, the machine lists); `clock.rs` — the preview's time and date in the user's formats.
 - `uia/` — UI Automation: `node.rs` (the elements, their roles, names and state, read from the `View`; pure and tested), `provider.rs` (the COM providers, answering from a published `Tree`), `mod.rs` (`WM_GETOBJECT`, publishing each frame, requests, events).
+- `setup/` — setup (onboarding), the window's other mode: `mod.rs` (what it shows, layout, hit-testing, Tab stops), `paint.rs`, `input.rs` (entering setup, pointer, keyboard, finishing).
 - `frame.rs` — the custom title bar and the non-client handling behind it; `wndproc.rs` — the window procedure; `worker.rs` — registry thread (autostart read/write, app theme); `dump.rs` — debug-only frame dump.
 
-Standalone check: `cargo run -p busy-settings --example demo` (set `BUSY_FORCE_DARK=1` / `0` to force a theme). The demo's host lends fixed synthetic readings, so previews and machine lists show without the app; applied configs are printed, not saved.
+Standalone check: `cargo run -p busy-settings --example demo` (set `BUSY_FORCE_DARK=1` / `0` to force a theme, `BUSY_SETUP=1` to open setup). The demo's host lends fixed synthetic readings, so previews and machine lists show without the app; applied configs are printed, not saved.
 
 ## API (called from the app's UI thread)
 
@@ -22,6 +23,7 @@ pub trait Host {
     fn with_data(&self, f: &mut dyn FnMut(&Snapshot, &History));    // lend readings for a frame (may skip)
 }
 pub fn open(_owner: HWND, cfg: &Config, host: Rc<dyn Host>, page: Option<Module>); // opens or focuses; `page` shows that module's page
+pub fn setup(cfg: &Config, host: Rc<dyn Host>);  // opens setup (onboarding), or turns the open window into it
 pub fn sync(cfg: &Config);                       // the host applied a config (from anywhere): show it
 pub fn refresh(snap: &Snapshot, hist: &History); // new readings: preview and machine lists
 pub fn is_open() -> bool;
@@ -49,6 +51,16 @@ pub mod autostart { pub fn is_enabled() -> bool; pub fn set(enabled: bool) -> wi
 - Search ("Find a setting"; the design draws the box but gives it no behaviour): while the query isn't blank, the content is "Search results" — every page's rows whose page name, title or description contains it, in any case, under their page's name, with a count as subtitle — and no nav item is selected. Rows found there edit their own module. Picking a nav item ends the search. The box shows the query, a caret and WinUI's 2-DIP accent bottom edge while it has the focus; the query is capped at 64 characters.
 - Dropdowns list the design's options; a current value that isn't one of them (a hand-edited file, a drive that is gone) is kept as an extra option, so opening the window never changes a setting.
 - The popup opens 4 below its button (above it without room), at least as wide as the button, and scrolls by wheel when its options don't fit. A click outside it only closes it; Esc closes it, and without a popup Esc closes the window.
+
+## Setup (onboarding)
+
+Design "FIRST RUN" (`Meterbar.dc.html` onboarding): pick readings, pick a side, done. It is the window's second mode (`Mode::Setup`), sharing its render target, worker, theme and frame; the app opens it at startup while `Config::onboarded` is false (`busy_settings::setup`).
+- Fixed 680-DIP client, height from the content (about 553 with the subtitle on one line), centered on the primary work area; no resize border, no maximize, Close only; title "busy". A minimized or maximized window is restored before it is measured; after a DPI change the window keeps its place and is sized to the layout again (the suggested size is for a standard frame).
+- "Your PC’s vitals, right on the taskbar" (28/600) and its subtitle (14 `--fg2`, wrapping); "Show on taskbar": a 3-column grid of 52-high reading cards (radius 6, `--card`, border `--accent` when checked), one per module with a cell in taskbar order, each a 20-DIP checkbox, the name and the module's reading (`busy_ui::cell::sample`, 12/600 in its palette color, live); "Position": two radio cards, next to the tray (default) or at the left edge; the footer (`--footer`, a `--line` top edge) with Start with Windows, Skip and Start monitoring (accent).
+- Every choice applies live (`Host::apply`), so the taskbar behind the window follows it, as the design means. The host samples every card's module while setup is up (`Host::shown`). Start with Windows shows and writes the registry through the worker, like the Settings toggle; it starts as the registry has it (unchecked on a fresh install; the design checks it).
+- Skip, Start monitoring, Close, Esc and Enter all finish the same way: the choices stay, `onboarded` is set, the window closes (after a pending autostart write lands; the page takes no input meanwhile). A held Space, Enter or Esc acts once, so the Enter that pressed "Run setup" doesn't finish it as it repeats. Start with Windows is drawn in `--fg3` while the registry is busy. Closing it any other way (the app exiting) leaves `onboarded` false, so it comes back on the next start.
+- Keyboard: Tab / Shift+Tab over the cards, the position group (one stop), Start with Windows, Skip, Start monitoring; Space checks, picks or presses the focused one; arrows move among the cards (3 wide) and pick the neighbouring position. The first card has the focus when it opens, without the ring.
+- While setup is up, a flyout's "<Module> settings" only brings it forward.
 
 ## Keyboard
 
