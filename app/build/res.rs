@@ -1,6 +1,8 @@
 //! A compiled resource (`.res`) file: the format `rc.exe` writes and link.exe reads. Holds the version
-//! information (`RT_VERSION` 1).
+//! information (`RT_VERSION` 1) and the icon (`RT_GROUP_ICON` 1, its images `RT_ICON` 1..).
 
+const RT_ICON: u16 = 3;
+const RT_GROUP_ICON: u16 = 14;
 const RT_VERSION: u16 = 16;
 /// English (US), the language of the strings below.
 const LANG: u16 = 0x0409;
@@ -88,14 +90,27 @@ fn version_info(version: &str, copyright: &str) -> Vec<u8> {
     node("VS_VERSION_INFO", &fixed, fixed.len() as u16, false, &[string_info, var_info])
 }
 
-/// The whole `.res` file for `version` and the `copyright` line.
-pub fn file(version: &str, copyright: &str) -> Vec<u8> {
+/// The whole `.res` file for `version`, the `copyright` line and the icon's `images` (size, `RT_ICON` data).
+pub fn file(version: &str, copyright: &str, images: &[(u32, Vec<u8>)]) -> Vec<u8> {
     // A .res file starts with an empty resource that marks it as 32-bit.
     let mut out = Vec::new();
     out.extend_from_slice(&0u32.to_le_bytes());
     out.extend_from_slice(&32u32.to_le_bytes());
     u16s(&mut out, &[0xFFFF, 0, 0xFFFF, 0]);
     out.extend_from_slice(&[0; 16]);
+    let mut group = Vec::new();
+    u16s(&mut group, &[0, 1, images.len() as u16]);
+    for (i, (size, data)) in images.iter().enumerate() {
+        let id = i as u16 + 1;
+        resource(&mut out, RT_ICON, id, data);
+        // 256 is written as 0.
+        let side = if *size >= 256 { 0 } else { *size as u8 };
+        group.extend_from_slice(&[side, side, 0, 0]);
+        u16s(&mut group, &[1, 32]);
+        group.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        u16s(&mut group, &[id]);
+    }
+    resource(&mut out, RT_GROUP_ICON, 1, &group);
     resource(&mut out, RT_VERSION, 1, &version_info(version, copyright));
     out
 }
