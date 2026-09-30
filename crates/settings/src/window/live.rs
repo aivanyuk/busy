@@ -33,6 +33,9 @@ pub(crate) fn sync(cfg: &Config) {
 pub(crate) fn refresh(snap: &Snapshot, hist: &History) {
     let Some(u) = ui() else { return };
     u.update_choices(Choices::from_snapshot(snap));
+    if u.in_setup() {
+        return u.setup_samples(snap);
+    }
     let Page::Module(m) = u.view.borrow().page else { return };
     let shown = {
         let (cfg, theme) = (u.cfg.borrow(), u.theme());
@@ -46,6 +49,20 @@ pub(crate) fn refresh(snap: &Snapshot, hist: &History) {
 }
 
 impl Ui {
+    /// Setup's cards: each module's reading, redrawn when one changes.
+    pub(super) fn setup_samples(&self, snap: &Snapshot) {
+        let samples: Vec<_> = {
+            let cfg = self.cfg.borrow();
+            super::setup::cards(&cfg).into_iter().map(|(m, _)| cell::sample(snap, &cfg, m)).collect()
+        };
+        let mut v = self.setup.borrow_mut();
+        if v.samples != samples {
+            v.samples = samples;
+            drop(v);
+            self.invalidate();
+        }
+    }
+
     /// Takes the machine's lists from new readings. A list that came back empty (its module isn't sampled
     /// right now) keeps the last one, and nothing changes under an open popup.
     fn update_choices(&self, new: Choices) {

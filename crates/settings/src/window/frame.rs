@@ -15,8 +15,9 @@ const BTN_W: f32 = 46.0;
 /// Close-button hover (design: hard-coded `#C42B1C` with white glyph, as Windows).
 const CLOSE_HOT: u32 = 0xC42B1C;
 
-/// The Settings window's caption buttons.
+/// The caption buttons of the Settings window, and of setup (the design's onboarding has Close only).
 pub(super) const ALL: &[Target] = &[Target::Min, Target::Max, Target::Close];
+pub(super) const CLOSE: &[Target] = &[Target::Close];
 
 /// The caption button under `x` in a window `w` DIPs wide, right to left: Close, Max, Min (of `buttons`).
 pub(super) fn button_at(w: f32, x: f32, buttons: &[Target]) -> Option<Target> {
@@ -137,5 +138,8 @@ mod tests {
         assert_eq!(button_at(1000.0, 870.0, ALL), Some(Target::Min));
         assert_eq!(button_at(1000.0, 861.0, ALL), None);
         assert_eq!(button_at(1000.0, 1000.0, ALL), None);
+        // Setup has Close only: where Maximize would be is caption.
+        assert_eq!(button_at(680.0, 679.0, CLOSE), Some(Target::Close));
+        assert_eq!(button_at(680.0, 630.0, CLOSE), None);
     }
 }

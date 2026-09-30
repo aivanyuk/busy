@@ -38,6 +38,7 @@ mod layout;
 mod live;
 mod model;
 mod paint;
+mod setup;
 mod uia;
 mod wndproc;
 mod worker;
@@ -58,6 +59,30 @@ pub fn hwnd() -> Option<HWND> {
 
 pub(crate) use live::{refresh, sync};
 
+/// What the window shows: the Settings pages, or setup (onboarding).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Mode {
+    Settings,
+    Setup,
+}
+
+/// Opens the window in setup, or turns the open window into it.
+pub fn setup(cfg: &Config, host: Rc<dyn Host>) {
+    if ui().is_none() {
+        let _ = create(cfg, host);
+    }
+    if let Some(u) = ui() {
+        u.enter_setup();
+        // SAFETY: `u.hwnd` is our live window.
+        unsafe {
+            if IsIconic(u.hwnd).as_bool() {
+                let _ = ShowWindow(u.hwnd, SW_RESTORE);
+            }
+            let _ = SetForegroundWindow(u.hwnd);
+        }
+    }
+}
+
 pub fn open(cfg: &Config, host: Rc<dyn Host>, page: Option<Module>) {
     if let Some(u) = ui() {
         // SAFETY: `u.hwnd` is our live window.
@@ -70,7 +95,10 @@ pub fn open(cfg: &Config, host: Rc<dyn Host>, page: Option<Module>) {
     } else {
         let _ = create(cfg, host);
     }
-    if let (Some(u), Some(m)) = (ui(), page) {
+    // Setup stays up until it is finished: a flyout's "<Module> settings" only brings it forward.
+    if let (Some(u), Some(m)) = (ui(), page)
+        && !u.in_setup()
+    {
         u.show_page(Page::Module(m));
     }
 }
@@ -101,6 +129,8 @@ struct Ui {
     pressed: Cell<Option<layout::Target>>,
     /// `TrackMouseEvent` is armed for `WM_MOUSELEAVE`.
     tracking: Cell<bool>,
+    mode: Cell<Mode>,
+    setup: RefCell<setup::View>,
     uia: uia::State,
 }
 
@@ -171,6 +201,8 @@ fn create(cfg: &Config, host: Rc<dyn Host>) -> Result<()> {
         pending: Cell::new(None),
         pressed: Cell::new(None),
         tracking: Cell::new(false),
+        mode: Cell::new(Mode::Settings),
+        setup: RefCell::new(setup::View::default()),
         uia: uia::State::default(),
     });
     UI.set(Some(ui.clone()));
@@ -415,21 +447,29 @@ impl Ui {
             maximized,
             autostart_busy: self.autostart_busy(),
         };
+        let setup = self.in_setup().then(|| self.setup.borrow());
+        let paint = |cv: &Canvas| match &setup {
+            Some(sv) => setup::paint(cv, sv, &state),
+            None => paint::paint(cv, &view, &state),
+        };
         // SAFETY: the render target is a live COM object; drawing happens between BeginDraw and EndDraw.
         unsafe { rt.BeginDraw() };
         if let Ok(cv) = Canvas::new(rt, &self.gfx) {
-            paint::paint(&cv, &view, &state);
+            paint(&cv);
         }
         // SAFETY: pairs the BeginDraw above.
         if unsafe { rt.EndDraw(None, None) } == Err(D2DERR_RECREATE_TARGET.into()) {
             *self.rt.borrow_mut() = None;
         }
         #[cfg(debug_assertions)]
-        dump::frame(&self.gfx, _size, self.dpi.get(), |cv| paint::paint(cv, &view, &state));
+        dump::frame(&self.gfx, _size, self.dpi.get(), paint);
     }
 
-    /// The client size changed (or the DPI): the layout follows the new width.
+    /// The client size changed (or the DPI): the layout follows the new width. Setup's size is fixed.
     fn resized(&self) {
+        if self.in_setup() {
+            return self.invalidate();
+        }
         let mut rc = RECT::default();
         // SAFETY: our live window; `rc` is a valid out-pointer.
         unsafe {

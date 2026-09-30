@@ -59,6 +59,10 @@ pub(super) struct Fonts {
     pub(super) body: IDWriteTextFormat,
     pub(super) strong: IDWriteTextFormat,
     pub(super) small: IDWriteTextFormat,
+    /// Setup's reading values: 12 px semibold.
+    pub(super) small_strong: IDWriteTextFormat,
+    /// Setup's subtitle: 14 px, wrapping.
+    pub(super) body_wrap: IDWriteTextFormat,
     /// Card descriptions: 12 px, wrapping.
     pub(super) desc: IDWriteTextFormat,
     pub(super) sub: IDWriteTextFormat,
@@ -76,6 +80,8 @@ impl Fonts {
             body: gfx.format(14.0, false)?,
             strong: gfx.format(14.0, true)?,
             small: gfx.format(12.0, false)?,
+            small_strong: gfx.format_weight(12.0, DWRITE_FONT_WEIGHT_SEMI_BOLD)?,
+            body_wrap: gfx.wrapping(14.0)?,
             desc: gfx.wrapping(12.0)?,
             sub: gfx.format(13.0, false)?,
             title: gfx.format_weight(28.0, DWRITE_FONT_WEIGHT_SEMI_BOLD)?,

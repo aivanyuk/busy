@@ -152,7 +152,12 @@ pub fn run(open_flyout: bool) -> Result<()> {
         display_off: false,
         shown: Vec::new(),
     };
+    let first_run = (!app.cfg.onboarded).then(|| app.cfg.clone());
     APP.with(|a| *a.borrow_mut() = Some(app));
+    // First run: setup (onboarding) opens once the widget is embedded, until it is finished.
+    if let Some(cfg) = first_run {
+        busy_settings::setup(&cfg, std::rc::Rc::new(crate::host::SettingsHost));
+    }
 
     let mut msg = MSG::default();
     unsafe {

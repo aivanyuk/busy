@@ -23,6 +23,9 @@ impl Ui {
     fn handle(&self, m: u32, w: WPARAM, l: LPARAM) -> Option<LRESULT> {
         match m {
             WM_NCCALCSIZE if w.0 != 0 => Some(frame::calc_size(self.hwnd, w, l, self.dpi.get())),
+            WM_NCHITTEST if self.in_setup() => {
+                Some(frame::hit_test(self.hwnd, l, self.dpi.get(), (super::setup::W, frame::CLOSE), false))
+            }
             WM_NCHITTEST => {
                 Some(frame::hit_test(self.hwnd, l, self.dpi.get(), (self.view.borrow().w, frame::ALL), true))
             }
@@ -42,7 +45,7 @@ impl Ui {
                 self.resized();
                 Some(LRESULT(0))
             }
-            WM_GETMINMAXINFO => {
+            WM_GETMINMAXINFO if !self.in_setup() => {
                 let s = self.scale();
                 // SAFETY: for WM_GETMINMAXINFO, lParam points to a MINMAXINFO valid for the message.
                 let mmi = unsafe { &mut *(l.0 as *mut MINMAXINFO) };
@@ -71,7 +74,7 @@ impl Ui {
             }
             WM_CHAR => self.on_char(w.0 as u16).then_some(LRESULT(0)),
             WM_KEYDOWN | WM_SYSKEYDOWN => {
-                self.on_key(VIRTUAL_KEY(w.0 as u16), m == WM_SYSKEYDOWN).then_some(LRESULT(0))
+                self.on_key(VIRTUAL_KEY(w.0 as u16), m == WM_SYSKEYDOWN, l.0 >> 30 & 1 != 0).then_some(LRESULT(0))
             }
             WM_DPICHANGED => {
                 self.dpi.set(w.0 as u16 as u32);
@@ -88,6 +91,10 @@ impl Ui {
                         r.bottom - r.top,
                         SWP_NOZORDER | SWP_NOACTIVATE,
                     );
+                }
+                if self.in_setup() {
+                    // The suggested size is for a standard frame: keep its position, size to the layout.
+                    self.fit_setup(false);
                 }
                 self.resized();
                 Some(LRESULT(0))
@@ -118,7 +125,11 @@ impl Ui {
                 None
             }
             WM_CLOSE => {
-                self.close();
+                if self.in_setup() {
+                    self.finish_setup();
+                } else {
+                    self.close();
+                }
                 Some(LRESULT(0))
             }
             WM_DESTROY => {
