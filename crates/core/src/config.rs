@@ -128,6 +128,10 @@ pub struct Config {
     /// `options.sensors.sensor` and it is never written back.
     #[serde(rename = "pinned_sensor", skip_serializing)]
     pub legacy_pinned_sensor: String,
+    /// Read from a file a newer busy wrote (a later `version`): used as far as this build understands it, but
+    /// never saved over (`save` refuses), so going back a version loses nothing. Not stored.
+    #[serde(skip)]
+    pub newer: bool,
 }
 
 impl Default for Config {
@@ -156,6 +160,7 @@ impl Default for Config {
             options: ModuleOptions::default(),
             opt_in: OptIn::default(),
             legacy_pinned_sensor: String::new(),
+            newer: false,
         }
     }
 }
@@ -195,15 +200,23 @@ impl Config {
 
     /// Loads config; missing/invalid file yields defaults. Ensures every module appears exactly once.
     pub fn load() -> Self {
-        let mut cfg: Config = Self::path()
-            .and_then(|p| std::fs::read(p).ok())
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default();
+        Self::path().and_then(|p| std::fs::read(p).ok()).map_or_else(Self::default, |b| Self::from_json(&b))
+    }
+
+    /// A config file's contents, normalized; invalid JSON yields defaults. Marks a file from a newer busy.
+    pub fn from_json(bytes: &[u8]) -> Self {
+        let mut cfg: Config = serde_json::from_slice(bytes).unwrap_or_default();
+        let newer = cfg.version > CONFIG_VERSION;
         cfg.normalize();
+        cfg.newer = newer;
         cfg
     }
 
+    /// Writes the config file, unless it came from a newer busy (`newer`): that file is left as it is.
     pub fn save(&self) -> std::io::Result<()> {
+        if self.newer {
+            return Err(std::io::Error::other("the config file is from a newer busy; not saved over"));
+        }
         let p = Self::path().ok_or_else(|| std::io::Error::other("APPDATA not set"))?;
         if let Some(dir) = p.parent() {
             std::fs::create_dir_all(dir)?;

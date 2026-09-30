@@ -40,9 +40,7 @@ mod tests {
     use super::*;
 
     fn load_str(json: &str) -> Config {
-        let mut cfg: Config = serde_json::from_str(json).unwrap();
-        cfg.normalize();
-        cfg
+        Config::from_json(json.as_bytes())
     }
 
     #[test]
