@@ -19,7 +19,7 @@ Definition of done for any change: fmt clean, clippy clean with `-D warnings`, t
 
 ## Hard rules
 
-- No new crates beyond `windows`, `serde`, `serde_json` without explicit user approval. No kernel drivers, no admin requirement.
+- No new crates beyond `windows` (with its `windows-core`, only for COM's `#[implement]`), `serde`, `serde_json` without explicit user approval. No kernel drivers, no admin requirement.
 - Vendor DLLs load only from System32 (`LoadLibraryExW` + `LOAD_LIBRARY_SEARCH_SYSTEM32`).
 - The UI thread never blocks: our taskbar window is a child of explorer's `Shell_TrayWnd`, so a stalled UI thread freezes the user's taskbar.
 - `Source::sample()` never panics.

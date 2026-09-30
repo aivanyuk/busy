@@ -190,7 +190,7 @@ Authority: `docs/testing.md` § Layers and § What to test when; `docs/areas/cor
 
 | ID | Assertion | Trigger |
 | --- | --- | --- |
-| D1 | **No crate beyond `windows`, `serde`, `serde_json`** — in `[dependencies]`, `[dev-dependencies]` or `[build-dependencies]`, direct or via `[workspace.dependencies]` — without explicit maintainer approval and a reason in the PR. A new workspace crate of our own is not a new dependency. | Any `Cargo.toml` dependency change, a new `Cargo.lock` package |
+| D1 | **No crate beyond `windows`, `serde`, `serde_json`** (and `windows-core`, `windows`' own core, as a direct dependency only where `#[implement]` needs it) — in `[dependencies]`, `[dev-dependencies]` or `[build-dependencies]`, direct or via `[workspace.dependencies]` — without explicit maintainer approval and a reason in the PR. A new workspace crate of our own is not a new dependency. | Any `Cargo.toml` dependency change, a new `Cargo.lock` package |
 | D2 | `windows` features are added to the crate that needs them, not to `[workspace.dependencies]`. | `features = [...]` change |
 | D3 | A dependency bump or toolchain change is its own commit, typed `build`, ahead of the change that needs it. | `Cargo.toml` version change, `rust-toolchain.toml` |
 | D4 | The release version lives in root `Cargo.toml` `[workspace.package]`; a release is a `vX.Y.Z` tag on `main`. | `version` change |
