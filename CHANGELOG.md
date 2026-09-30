@@ -14,6 +14,7 @@ The first release.
 - Start with Windows, which keeps working when busy.exe is moved.
 - Opt-in data sources, off until you turn them on, each with its risk stated: third-party sensor tools (LibreHardwareMonitor, HWiNFO) for CPU temperatures, fans and power.
 - Light and dark themes following Windows, or set in Settings.
+- The version in Settings → General → About, with a button to the releases page.
 
 ### Security
 - No administrator rights, no driver, no network access. DLLs load from System32 only.

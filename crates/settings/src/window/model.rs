@@ -99,12 +99,18 @@ pub(super) enum Control {
 pub(super) enum Command {
     /// Turns the window into setup (onboarding).
     RunSetup,
+    /// Opens the releases page (`RELEASES`) in the browser.
+    Releases,
 }
+
+/// Where busy is downloaded from.
+pub(super) const RELEASES: &str = "https://github.com/aivanyuk/busy/releases";
 
 impl Command {
     pub(super) fn label(self) -> &'static str {
         match self {
             Command::RunSetup => "Run setup",
+            Command::Releases => "Releases",
         }
     }
 }
@@ -211,6 +217,12 @@ fn general_rows(cfg: &Config) -> Vec<Item> {
         Item::Order(
             cfg.modules.iter().filter(|c| c.module != Module::Processes).map(|c| (c.module, c.taskbar)).collect(),
         ),
+        Item::Header("About"),
+        Item::Row(Row {
+            title: "Version",
+            desc: format!("busy {}", env!("CARGO_PKG_VERSION")),
+            control: Control::Button(Command::Releases),
+        }),
     ]
 }
 
@@ -325,9 +337,20 @@ mod tests {
         let items = items(Page::General, &cfg, &Choices::default());
         assert_eq!(
             rows(&items),
-            ["Start with Windows", "Widget position", "Offset", "Default update interval", "History", "Theme", "Setup"]
+            [
+                "Start with Windows",
+                "Widget position",
+                "Offset",
+                "Default update interval",
+                "History",
+                "Theme",
+                "Setup",
+                "Version"
+            ]
         );
-        let Some(Item::Order(order)) = items.last() else { panic!("no order list") };
+        let Some(Item::Order(order)) = items.iter().find(|i| matches!(i, Item::Order(_))) else {
+            panic!("no order list")
+        };
         assert_eq!(order.len(), Module::ALL.len() - 1);
         assert!(order.iter().all(|&(m, _)| m != Module::Processes));
         assert_eq!(order[0], (Module::Cpu, true));

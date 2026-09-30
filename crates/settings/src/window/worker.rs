@@ -1,10 +1,14 @@
-//! Registry reads and writes for the window, on a thread of its own. The window runs on the host's UI
-//! thread, whose input queue is attached to explorer's taskbar, so it never waits on the registry.
+//! Registry reads and writes, and opening links, for the window, on a thread of its own. The window runs on
+//! the host's UI thread, whose input queue is attached to explorer's taskbar, so it never waits on the
+//! registry or on the shell starting a browser.
 
 use crate::{autostart, dark};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
-use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_APP};
+use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx};
+use windows::Win32::UI::Shell::ShellExecuteW;
+use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, SW_SHOWNORMAL, WM_APP};
+use windows::core::{HSTRING, w};
 
 /// Posted to the window when replies are ready; the window drains [`Worker::replies`].
 pub(super) const WM_APP_REPLY: u32 = WM_APP + 1;
@@ -15,6 +19,8 @@ pub(super) enum Job {
     /// Re-reads the Windows app mode after a theme broadcast.
     Theme,
     SetAutostart(bool),
+    /// Opens an https URL in the default browser. No reply.
+    Open(String),
 }
 
 pub(super) enum Reply {
@@ -32,15 +38,32 @@ pub(super) enum Reply {
     },
 }
 
-fn run(job: Job) -> Reply {
-    match job {
+fn run(job: Job) -> Option<Reply> {
+    Some(match job {
         Job::Read => Reply::Read { autostart: autostart::is_enabled(), system_dark: dark::system_dark() },
         Job::Theme => Reply::Theme { system_dark: dark::system_dark() },
         Job::SetAutostart(on) => {
             let error = autostart::set(on).err().map(|e| e.message());
             Reply::SetAutostart { error, autostart: autostart::is_enabled() }
         }
+        Job::Open(url) => {
+            open(&url);
+            return None;
+        }
+    })
+}
+
+/// Hands `url` to the shell, which starts the default browser; nothing else is ever opened. A failure (no
+/// browser registered) is ignored: the click just does nothing.
+fn open(url: &str) {
+    if !url.starts_with("https://") {
+        return;
     }
+    // SAFETY: plain call; the shell's COM extensions want an STA without OLE1 DDE. A repeated call on this
+    // thread returns S_FALSE; the thread never uninitializes, as it ends with the window.
+    let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) };
+    // SAFETY: the strings are NUL-terminated and outlive the call; no owner window, so no UI waits on it.
+    unsafe { ShellExecuteW(None, w!("open"), &HSTRING::from(url), None, None, SW_SHOWNORMAL) };
 }
 
 /// One thread per open window. Dropping the worker with the window ends the thread after its current
@@ -59,7 +82,8 @@ impl Worker {
             .name("busy-settings".into())
             .spawn(move || {
                 for job in job_rx {
-                    if reply_tx.send(run(job)).is_err() {
+                    let Some(reply) = run(job) else { continue };
+                    if reply_tx.send(reply).is_err() {
                         break;
                     }
                     // SAFETY: PostMessageW only queues a message; a destroyed window's handle makes it fail.
