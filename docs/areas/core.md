@@ -44,6 +44,10 @@ pub trait Source {
 - A new `ModuleCfg` field needs its own `#[serde(default…)]` (the struct has no `Default`: `module` is required). A `modules` entry that still fails to parse — an unknown `Module` or `CellStyle` from a newer build, a hand-edit — is dropped on load and `normalize()` re-adds that module with its default; before, one bad entry reset the whole file.
 - Adding a `Module` variant: update `Module::ALL`, `label()`, `Config::default()`, and every exhaustive `match` in app/settings.
 
+## Releases
+
+`release.rs` is the update check's pure half: `newer(current, body)` reads GitHub's `releases/latest` JSON (`tag_name`, `html_url`, `draft`, `prerelease` only) and returns a `Release { version, url }` only for a published, non-pre-release `vX.Y.Z` tag above `current`, whose page starts with `RELEASES_URL/`, so the link About opens can only be one of busy's release pages. Versions compare as three numbers; any suffix or missing part means "not a version". The request is the app's (`app/src/update.rs`).
+
 ## Changing core types
 
 Core is shared by four crates. Prefer additive changes (new `Option` fields). Removing/renaming a field is a cross-crate change — do it in one commit that builds the whole workspace.

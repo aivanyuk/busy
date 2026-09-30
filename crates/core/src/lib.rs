@@ -4,6 +4,7 @@ mod config;
 mod migrate;
 mod opt_in;
 mod options;
+pub mod release;
 pub use config::*;
 pub use migrate::CONFIG_VERSION;
 pub use opt_in::*;
