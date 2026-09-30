@@ -28,7 +28,7 @@ pub fn sync(cfg: &Config);                       // the host applied a config (f
 pub fn refresh(snap: &Snapshot, hist: &History); // new readings: preview and machine lists
 pub fn is_open() -> bool;
 pub fn is_dialog_message(msg: &MSG) -> bool; // always false now: the window handles its keys itself
-pub mod autostart { pub fn is_enabled() -> bool; pub fn set(enabled: bool) -> windows::core::Result<()>; }
+pub mod autostart { pub fn is_enabled() -> bool; pub fn set(enabled: bool) -> windows::core::Result<()>; pub fn repair() -> windows::core::Result<bool>; }
 ```
 
 - Window is unowned top-level with its own taskbar button (the app's HWND is a child of explorer's taskbar — can't own).
@@ -38,6 +38,7 @@ pub mod autostart { pub fn is_enabled() -> bool; pub fn set(enabled: bool) -> wi
 - Autostart is written by the window's registry worker (`window/worker.rs`): the toggle is drawn disabled until the first read, and again while a write is in flight; the value read back after the write goes into the config. On failure a message box says so. Closing during a write closes once it lands.
 - `autostart::{is_enabled, set}` block on the registry: call them off a UI thread (the window calls them only from its worker).
 - `autostart::is_enabled` also checks the Task Manager "disabled" flag (`StartupApproved\Run`); `set(true)` clears it, `set(false)` removes both values.
+- `autostart::repair` (called by the app at startup, on a thread of its own) points the Run entry at the running exe when the exe it names no longer exists, so moving busy.exe or replacing it with a download elsewhere keeps "Start with Windows". An entry naming another exe that still exists is left alone, so a development build never takes over an installed copy's autostart; Task Manager's flag is kept.
 
 ## Layout (design measures, in DIPs)
 
