@@ -4,7 +4,7 @@
 use super::choices::{self, Choices, Opt};
 use busy_core::{CellStyle, Config, Module};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum Page {
     General,
     Module(Module),

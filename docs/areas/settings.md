@@ -8,6 +8,7 @@
 - `controls/` — one file per control kind (`toggle`, `dropdown` with its popup, `segmented`, `swatch`, `preview`, `order` for the taskbar order list, `nav` for the nav column); each sizes and draws itself and names the part under the pointer.
 - `input.rs` — pointer input: hover, clicks, wheel; a click on a control becomes a `model::Edit`; `keys.rs` — keyboard input and focus.
 - `live.rs` — following the host: `sync` (configs it applied) and `refresh` (new readings: the preview, the machine lists); `clock.rs` — the preview's time and date in the user's formats.
+- `uia/` — UI Automation: `node.rs` (the elements, their roles, names and state, read from the `View`; pure and tested), `provider.rs` (the COM providers, answering from a published `Tree`), `mod.rs` (`WM_GETOBJECT`, publishing each frame, requests, events).
 - `frame.rs` — the custom title bar and the non-client handling behind it; `wndproc.rs` — the window procedure; `worker.rs` — registry thread (autostart read/write, app theme); `dump.rs` — debug-only frame dump.
 
 Standalone check: `cargo run -p busy-settings --example demo` (set `BUSY_FORCE_DARK=1` / `0` to force a theme). The demo's host lends fixed synthetic readings, so previews and machine lists show without the app; applied configs are printed, not saved.
@@ -57,6 +58,17 @@ pub mod autostart { pub fn is_enabled() -> bool; pub fn set(enabled: bool) -> wi
 - Page Up/Down scroll the page; a focused control is scrolled into view. Esc closes an open popup, else the window. Alt+F4 and Alt+Space go to the default handling.
 - The focus ring (WinUI's focus visual: 2-DIP `--fg`, 3 outside the target) shows only once the keyboard is used; a click moves the focus without it.
 
+## UI Automation
+
+Screen readers see the window through UIA (plan: basic roles and names). `WM_GETOBJECT` for `UiaRootObjectId` returns a root provider, a fragment root over the window's own (host) provider, whose children are, in reading order:
+- the caption buttons (Button: Minimize, Maximize or Restore, Close; invoked, not focusable, as they aren't Tab stops), the search box (Edit, with a Value that can be set), the nav items (ListItem; status On/Off and "selected");
+- the page title (Text; the subtitle as help text), section headers (Text), each row's control named by its title with the description as help text: toggle → CheckBox (Toggle), dropdown → ComboBox (read-only Value), segments and swatches → Group (read-only Value: the choice, "Color n of 8"); the taskbar order's usable ↑/↓ (Button, "Move CPU up");
+- while open, the popup (List) with its options (ListItem, "Selected" on the current one).
+
+Buttons, nav items and options have Invoke. Invoke, Toggle, SetFocus and SetValue are queued and posted to the window, so they run as the same key would from its message loop, never inside a UIA call: a toggle's Toggle on an opt-in shows the confirmation, SetFocus and SetValue close an open popup as a key would. A disabled control (the autostart toggle while the registry is busy) answers Invoke and Toggle with `UIA_E_ELEMENTNOTENABLED`.
+
+Nothing is built until a client first sends `WM_GETOBJECT`. From then on, after each frame (`WM_PAINT`), the window publishes its elements as a `node::Tree` and announces what changed since the last one: a structure change when the top-level elements differ (another page, a search, a row coming or going, a popup opening), the focus when it moved (the popup's cursor while it is open), else a change to the focused toggle or value as a property change (typing in the search box is value changes); focus and property events only while the window is in the foreground. Content elements are named by index plus a key (a hash of the page or search they were read from, the index and their name, also in the runtime id), so an element whose row went away, or whose popup closed, is "not available" rather than another row.
+
 ## Theme
 
 Resolution: `BUSY_FORCE_DARK` env → `Config.theme` → `AppsUseLightTheme` (the *app* mode, as the design's "Flyouts and this window" follows Windows apps), the last read on the worker at open and on each `ImmersiveColorSet` broadcast. The window stays hidden until that first read, so it never flashes the wrong theme. Colors are `busy_ui::theme::Theme::new(dark)`; DWM's immersive dark mode is set for the frame.
@@ -68,4 +80,6 @@ Resolution: `BUSY_FORCE_DARK` env → `Config.theme` → `AppsUseLightTheme` (th
 - Linker warning 81010002 on `<dpiAwareness>` is benign; silenced with `#![allow(linker_messages)]`.
 - Window icon loads from resource ID 1 of the exe (the app must embed its icon as ID 1).
 - Testing: post messages to the demo's own HWNDs; never SendKeys (focus may be elsewhere). Mouse coordinates posted from a DPI-unaware process (PowerShell) are scaled by Windows to the window's DPI, so post DIPs, not pixels. A posted `WM_MOUSEMOVE` shows no hover: `TrackMouseEvent` sees the real cursor elsewhere and sends `WM_MOUSELEAVE` at once. While the session is locked a screen capture shows the lock screen; debug builds write each frame to `settings.bmp` in `BUSY_DUMP=<dir>` instead. Remove autostart after testing.
+- UIA calls providers on its own threads (seen: every call but those inside `WM_GETOBJECT`), whether or not they are agile, as the UI thread has no COM apartment. The window's state is thread-local, so providers never touch it: they read the `Tree` published after each frame (an `Arc` behind a `Mutex` that only covers swapping or cloning it, with the scale; screen positions come from `ClientToScreen` at call time) and post what they are asked to do. No UIA thread ever waits on the UI thread, nor the other way round. When the window is destroyed the tree is cleared (every call then answers "not available") and all providers are disconnected.
+- Checking UIA: from Windows PowerShell, `System.Windows.Automation` (UIAutomationClient) reads the demo's tree, invokes patterns and, from a compiled C# handler, logs events; PowerShell scriptblocks as event handlers never run (UIA calls them on its threads). Accessibility Insights or Narrator do the same by hand.
 - Untested: dragging across monitors with different DPI; the autostart-failure message box (no safe way to make the `Run` key write fail).

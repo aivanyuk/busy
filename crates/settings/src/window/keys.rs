@@ -83,7 +83,7 @@ impl Ui {
     }
 
     /// Space/Enter on the focused target: what a click does, keeping the focus on the same thing.
-    fn press(&self, t: Target) {
+    pub(super) fn press(&self, t: Target) {
         match t {
             Target::Up(i) | Target::Down(i) => {
                 let up = matches!(t, Target::Up(_));

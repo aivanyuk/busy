@@ -8,7 +8,7 @@
 | `busy-win` | `crates/win` | Win32 plumbing used by more than one crate: wide strings, registry reads, the System32-only `Dll` loader, the PDH wrapper (`pdh`). |
 | `busy-metrics` | `crates/metrics` | Collectors: CPU, memory, disk, network, battery, top processes. |
 | `busy-sensors` | `crates/sensors` | GPU (DXGI/PDH/D3DKMT/NVML/ADL) and temperature/fan sensors (LHM WMI, HWiNFO shared memory). |
-| `busy-settings` | `crates/settings` | Settings window (custom-drawn with Direct2D), autostart registry. |
+| `busy-settings` | `crates/settings` | Settings window (custom-drawn with Direct2D, with UI Automation), autostart registry. |
 | `busy-ui` | `crates/ui` | What the windows show and how they draw it, shared by the app and the settings window: formatting, choices of what to show, rolling history, the design's colors, D2D/DWrite helpers, the taskbar cell. |
 | `busy` | `app` | Binary: sampler thread, history, taskbar widget, flyout, theme. |
 
