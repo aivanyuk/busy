@@ -81,7 +81,7 @@ Every thread the app starts is listed here.
 | Theme reader | Yes (registry) | resolves `Theme` (light or dark, from `SystemUsesLightTheme`) on theme broadcasts and config changes, posts it back |
 | Launcher | Yes (shell) | starts Task Manager for the flyout's "Open Task Manager" (`launch::task_manager`: `ShellExecuteW` with the System32 path, in its own STA) |
 | Autostart repair | Yes (registry, file system) | runs `autostart::repair` once at startup (a Run entry naming an exe that is gone now names this one); ends on its own, never joined |
-| Settings registry (one per open settings window) | Yes (registry) | reads autostart and `AppsUseLightTheme`, writes autostart, posts results to the window; ends with the window, never joined |
+| Settings registry (one per open settings window) | Yes (registry, shell) | reads autostart and `AppsUseLightTheme`, writes autostart, opens About's link (`ShellExecuteW`), posts results to the window; ends with the window, never joined |
 | Debug dump (debug builds, per render) | Yes (file I/O) | one `taskbar.bmp` or `settings.bmp` write |
 
 Rules:
