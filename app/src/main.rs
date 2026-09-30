@@ -13,6 +13,7 @@ mod presence;
 mod sampler;
 mod sync;
 mod taskbar;
+mod update;
 mod win;
 mod worker;
 

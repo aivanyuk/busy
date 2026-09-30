@@ -17,6 +17,10 @@ pub(super) const THIRD_PARTY: &str = "Reading LibreHardwareMonitor (WMI) / HWiNF
      published by another program you installed. Needed for CPU temps, fans, SSD temp/health, CPU power, \
      throttling.";
 
+/// The update check (`OptIn::update_check`): what it does and its risk, verbatim from docs/plans/release.md.
+pub(super) const UPDATE_CHECK: &str = "Contacts api.github.com once a day while busy runs, to see whether a newer \
+     release exists; GitHub sees your IP address. Nothing is downloaded or installed.";
+
 impl Page {
     pub(super) fn title(self) -> &'static str {
         match self {
@@ -99,12 +103,9 @@ pub(super) enum Control {
 pub(super) enum Command {
     /// Turns the window into setup (onboarding).
     RunSetup,
-    /// Opens the releases page (`RELEASES`) in the browser.
+    /// Opens the newer release's page when the update check found one, else the releases page.
     Releases,
 }
-
-/// Where busy is downloaded from.
-pub(super) const RELEASES: &str = "https://github.com/aivanyuk/busy/releases";
 
 impl Command {
     pub(super) fn label(self) -> &'static str {
@@ -128,6 +129,19 @@ pub(super) enum Flag {
     TopProcesses,
     /// `opt_in.third_party_sensors`; turning it on asks first.
     ThirdPartySensors,
+    /// `opt_in.update_check`; turning it on asks first.
+    UpdateCheck,
+}
+
+impl Flag {
+    /// An opt-in's risk, stated when it is turned on.
+    pub(super) fn risk(self) -> Option<&'static str> {
+        match self {
+            Flag::ThirdPartySensors => Some(THIRD_PARTY),
+            Flag::UpdateCheck => Some(UPDATE_CHECK),
+            _ => None,
+        }
+    }
 }
 
 /// A change the user made, applied to the config by `edit::apply`.
@@ -155,7 +169,7 @@ fn dropdown(title: &'static str, desc: impl Into<String>, (opts, i): (Vec<Opt>, 
 
 pub(super) fn items(page: Page, cfg: &Config, ch: &Choices) -> Vec<Item> {
     match page {
-        Page::General => general(cfg),
+        Page::General => general(cfg, ch),
         Page::Module(Module::Processes) => processes(cfg),
         Page::Module(m) => module(m, cfg, ch),
         Page::Advanced => advanced(cfg),
@@ -189,12 +203,21 @@ pub(super) fn search(query: &str, cfg: &Config, ch: &Choices) -> Vec<Item> {
 pub(super) const NEWER: &str =
     "These settings were saved by a newer version of busy. Changes apply now, but aren\u{2019}t saved.";
 
-fn general(cfg: &Config) -> Vec<Item> {
+fn general(cfg: &Config, ch: &Choices) -> Vec<Item> {
     let notice = cfg.newer.then_some(Item::Notice(NEWER));
-    notice.into_iter().chain(general_rows(cfg)).collect()
+    notice.into_iter().chain(general_rows(cfg, ch)).collect()
 }
 
-fn general_rows(cfg: &Config) -> Vec<Item> {
+/// About's line: this build's version, and a newer one when the update check found it.
+fn version(ch: &Choices) -> String {
+    let this = env!("CARGO_PKG_VERSION");
+    match &ch.newer {
+        Some(r) => format!("busy {this} \u{2014} {} is available", r.version),
+        None => format!("busy {this}"),
+    }
+}
+
+fn general_rows(cfg: &Config, ch: &Choices) -> Vec<Item> {
     vec![
         Item::Header("Behavior"),
         toggle("Start with Windows", "Launch busy when you sign in", Flag::Autostart, cfg.autostart),
@@ -218,11 +241,7 @@ fn general_rows(cfg: &Config) -> Vec<Item> {
             cfg.modules.iter().filter(|c| c.module != Module::Processes).map(|c| (c.module, c.taskbar)).collect(),
         ),
         Item::Header("About"),
-        Item::Row(Row {
-            title: "Version",
-            desc: format!("busy {}", env!("CARGO_PKG_VERSION")),
-            control: Control::Button(Command::Releases),
-        }),
+        Item::Row(Row { title: "Version", desc: version(ch), control: Control::Button(Command::Releases) }),
     ]
 }
 
@@ -300,6 +319,7 @@ fn advanced(cfg: &Config) -> Vec<Item> {
     vec![
         Item::Header("Opt-in sources"),
         toggle("Third-party sensor tools", THIRD_PARTY, Flag::ThirdPartySensors, cfg.opt_in.third_party_sensors),
+        toggle("Check for updates", UPDATE_CHECK, Flag::UpdateCheck, cfg.opt_in.update_check),
     ]
 }
 
@@ -318,6 +338,7 @@ fn updates(m: Module, cfg: &Config) -> [Item; 2] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use busy_core::release::Release;
 
     fn rows(items: &[Item]) -> Vec<&'static str> {
         items.iter().filter_map(|i| if let Item::Row(r) = i { Some(r.title) } else { None }).collect()
@@ -329,6 +350,16 @@ mod tests {
         assert!(!items(Page::General, &cfg, &Choices::default()).iter().any(|i| matches!(i, Item::Notice(_))));
         cfg.newer = true;
         assert!(matches!(items(Page::General, &cfg, &Choices::default())[0], Item::Notice(NEWER)));
+    }
+
+    #[test]
+    fn about_names_a_newer_release() {
+        let this = env!("CARGO_PKG_VERSION");
+        assert_eq!(version(&Choices::default()), format!("busy {this}"));
+        let newer =
+            Release { version: "9.0.0".into(), url: "https://github.com/aivanyuk/busy/releases/tag/v9.0.0".into() };
+        let ch = Choices { newer: Some(newer), ..Choices::default() };
+        assert_eq!(version(&ch), format!("busy {this} \u{2014} 9.0.0 is available"));
     }
 
     #[test]
@@ -348,6 +379,7 @@ mod tests {
                 "Version"
             ]
         );
+        assert!(matches!(items.last(), Some(Item::Row(Row { desc, .. })) if *desc == version(&Choices::default())));
         let Some(Item::Order(order)) = items.iter().find(|i| matches!(i, Item::Order(_))) else {
             panic!("no order list")
         };
@@ -385,7 +417,7 @@ mod tests {
         let mut cfg = Config::default();
         let ch = Choices::default();
         let off = items(Page::Advanced, &cfg, &ch);
-        assert_eq!(rows(&off), ["Third-party sensor tools"]);
+        assert_eq!(rows(&off), ["Third-party sensor tools", "Check for updates"]);
         let Some(Item::Row(Row { control: Control::Toggle(Flag::ThirdPartySensors, false), desc, .. })) = off.get(1)
         else {
             panic!("no opt-in toggle")
@@ -395,6 +427,9 @@ mod tests {
         let on = items(Page::Advanced, &cfg, &ch);
         assert!(matches!(on.get(1), Some(Item::Row(Row { control: Control::Toggle(_, true), .. }))));
         assert_eq!(rows(&search("hwinfo", &cfg, &ch)), ["Third-party sensor tools"]);
+        assert_eq!(rows(&search("github", &cfg, &ch)), ["Check for updates"]);
+        assert_eq!(Flag::UpdateCheck.risk(), Some(UPDATE_CHECK));
+        assert_eq!(Flag::Autostart.risk(), None);
     }
 
     #[test]

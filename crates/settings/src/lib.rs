@@ -9,6 +9,7 @@ pub mod autostart;
 mod dark;
 mod window;
 
+use busy_core::release::Release;
 use busy_core::{Config, Module, Snapshot};
 use busy_ui::history::History;
 use std::rc::Rc;
@@ -52,6 +53,12 @@ pub fn sync(cfg: &Config) {
 /// adapters and sensors in its dropdowns.
 pub fn refresh(snap: &Snapshot, hist: &History) {
     window::refresh(snap, hist);
+}
+
+/// The opt-in update check's answer: a newer release, or None (none found, or the check was turned off).
+/// General's About row names it and links to its page; kept for a window opened later.
+pub fn release(newer: Option<&Release>) {
+    window::release(newer);
 }
 
 /// Whether the settings window currently exists.

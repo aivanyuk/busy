@@ -10,6 +10,7 @@ use crate::presence;
 use crate::sampler::{Params, Sampler};
 use crate::sync::lock;
 use crate::taskbar::Taskbar;
+use crate::update::{self, Updates};
 use crate::win::{self, Event, register_class};
 use crate::worker::Worker;
 use busy_core::{Config, Module, Snapshot, ThemeMode};
@@ -31,6 +32,8 @@ const WM_APP_FLYOUT_DEACTIVATED: u32 = WM_APP + 4;
 const WM_APP_THEME: u32 = WM_APP + 5;
 /// The settings window shows these modules' live readings (`wParam`: bit `Module::index` of each).
 pub(crate) const WM_APP_SHOWN: u32 = WM_APP + 6;
+/// The update check found a newer release (`update::deliver`).
+pub(crate) const WM_APP_RELEASE: u32 = WM_APP + 7;
 
 const TIMER_WATCH: usize = 1;
 
@@ -67,6 +70,7 @@ struct App {
     display_off: bool,
     /// The modules whose live readings the settings window shows: sampled while shown.
     shown: Vec<Module>,
+    updates: Updates,
 }
 
 /// Runs `f` on the app state unless it is already borrowed (re-entrant message); then returns None.
@@ -141,6 +145,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
             post(WM_APP_THEME);
         }),
         hist: History::new(&cfg),
+        updates: Updates::start(cfg.opt_in.update_check),
         snap: Snapshot::default(),
         theme,
         taskbar: Taskbar::create(&gfx),
@@ -226,6 +231,7 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                     a.sync_sampler();
                 });
             }
+            WM_APP_RELEASE => update::deliver(),
             WM_APP_THEME => {
                 if let Some(t) = lock(&RESOLVED).take() {
                     with(|a| a.set_theme(t));
@@ -428,6 +434,7 @@ impl App {
         }
         let old = std::mem::replace(&mut self.cfg, cfg);
         self.sync_sampler();
+        self.updates.set(self.cfg.opt_in.update_check);
         self.hist.resize(&self.cfg);
         if old.theme != self.cfg.theme {
             self.refresh_theme();

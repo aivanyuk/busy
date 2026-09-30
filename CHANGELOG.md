@@ -15,6 +15,7 @@ The first release.
 - Opt-in data sources, off until you turn them on, each with its risk stated: third-party sensor tools (LibreHardwareMonitor, HWiNFO) for CPU temperatures, fans and power.
 - Light and dark themes following Windows, or set in Settings.
 - The version in Settings → General → About, with a button to the releases page.
+- An opt-in update check (Settings → Advanced, off by default): once a day it asks GitHub whether a newer release exists and names it in About. It never downloads or installs anything.
 
 ### Security
-- No administrator rights, no driver, no network access. DLLs load from System32 only.
+- No administrator rights, no driver. No network access unless you turn on the update check. DLLs load from System32 only.

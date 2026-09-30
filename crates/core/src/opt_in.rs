@@ -18,6 +18,8 @@ pub struct OptIn {
     pub memory_speed: bool,
     /// LibreHardwareMonitor (WMI) and HWiNFO (shared memory) readings: CPU temps, fans, power.
     pub third_party_sensors: bool,
+    /// Asks GitHub once a day whether a newer release exists (`release`); downloads nothing.
+    pub update_check: bool,
 }
 
 /// The settings sources act on, handed to them through `Source::configure`. Sources get this rather than the
@@ -46,7 +48,14 @@ mod tests {
     #[test]
     fn default_off() {
         let o = OptIn::default();
-        assert!(!(o.public_ip || o.process_network || o.app_battery || o.memory_speed || o.third_party_sensors));
+        assert!(
+            !(o.public_ip
+                || o.process_network
+                || o.app_battery
+                || o.memory_speed
+                || o.third_party_sensors
+                || o.update_check)
+        );
         assert_eq!(Config::default().opt_in, o);
         assert_eq!(load_str(r#"{"interval_ms": 2000}"#).opt_in, o);
     }
@@ -65,6 +74,7 @@ mod tests {
             app_battery: true,
             memory_speed: false,
             third_party_sensors: true,
+            update_check: true,
         };
         assert_eq!(serde_json::from_str::<OptIn>(&serde_json::to_string(&o).unwrap()).unwrap(), o);
     }

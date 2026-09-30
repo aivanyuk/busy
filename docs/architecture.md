@@ -23,7 +23,7 @@ Each crate may depend only on the crates in its row, and exposes only what its r
 | `busy-core` | `serde`, `serde_json` | Data types, `Source`, `Module`, `Config`. No Win32, no threads; its only I/O is `Config::load`/`save`. |
 | `busy-win` | `windows` | Win32 plumbing shared by more than one crate: wide strings, registry reads, the System32 DLL loader, the PDH wrapper. No `busy-*` dependency and no policy (it never decides *what* to read). |
 | `busy-metrics`, `busy-sensors` | `busy-core`, `busy-win` | `sources()` only (plus examples and tests). |
-| `busy-settings` | `busy-core`, `busy-win`, `busy-ui` | `Host`, `open`, `setup`, `sync`, `refresh`, `is_open`, `is_dialog_message`, `autostart` (`is_enabled`, `set`, `repair`). |
+| `busy-settings` | `busy-core`, `busy-win`, `busy-ui` | `Host`, `open`, `setup`, `sync`, `refresh`, `release`, `is_open`, `is_dialog_message`, `autostart` (`is_enabled`, `set`, `repair`). |
 | `busy-ui` | `busy-core`, `busy-win` | `fmt`, `select`, `history`, `tone`, `theme`, `render`, `ctx`, `cell`. |
 | `busy` | all of the above | The binary. |
 
@@ -80,6 +80,7 @@ Every thread the app starts is listed here.
 | Config writer | Yes (file I/O) | the one `config.json` writer; writes the latest submitted `Config`, older pending ones are dropped |
 | Theme reader | Yes (registry) | resolves `Theme` (light or dark, from `SystemUsesLightTheme`) on theme broadcasts and config changes, posts it back |
 | Launcher | Yes (shell) | starts Task Manager for the flyout's "Open Task Manager" (`launch::task_manager`: `ShellExecuteW` with the System32 path, in its own STA) |
+| Update check (only while `opt_in.update_check` is on) | Yes (network, up to 10 s per step) | `update::Updates`: one GET of GitHub's latest release at once and every 24 h (WinHTTP), a newer one posted back (`WM_APP_RELEASE`); idle on a channel while off; ends when the app drops it, never joined |
 | Autostart repair | Yes (registry, file system) | runs `autostart::repair` once at startup (a Run entry naming an exe that is gone now names this one); ends on its own, never joined |
 | Settings registry (one per open settings window) | Yes (registry, shell) | reads autostart and `AppsUseLightTheme`, writes autostart, opens About's link (`ShellExecuteW`), posts results to the window; ends with the window, never joined |
 | Debug dump (debug builds, per render) | Yes (file I/O) | one `taskbar.bmp` or `settings.bmp` write |

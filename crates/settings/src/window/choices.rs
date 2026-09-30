@@ -2,6 +2,7 @@
 //! among the design's options (a hand-edited file, a drive that is gone) is kept as an extra option, so opening
 //! the window never changes a setting by itself.
 
+use busy_core::release::Release;
 use busy_core::{
     Anchor, CellStyle, CpuBar, Module, NetInterface, RateUnit, SensorKind, SensorPick, Snapshot, TempUnit, ThemeMode,
 };
@@ -32,7 +33,7 @@ pub(super) struct Opt {
 }
 
 /// What the machine has, for the options that list it: drives, adapters, sensors. Empty until the window has
-/// readings.
+/// readings. Also a newer release of busy, when the host's update check found one (`crate::release`).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct Choices {
     /// (mount, label), e.g. ("D:", "Backup").
@@ -41,6 +42,8 @@ pub(super) struct Choices {
     pub(super) adapters: Vec<String>,
     /// Temperature readings as "hardware/name", the form `SensorPick::Named` matches.
     pub(super) sensors: Vec<String>,
+    /// Shown in General's About row; readings leave it alone.
+    pub(super) newer: Option<Release>,
 }
 
 impl Choices {
@@ -64,6 +67,7 @@ impl Choices {
                     .filter(|s| s.kind == SensorKind::Temperature)
                     .map(|s| format!("{}/{}", s.hardware, s.name)),
             ),
+            newer: None,
         }
     }
 }
@@ -313,6 +317,7 @@ mod tests {
             volumes: vec![("C:".into(), "Windows".into()), ("E:".into(), String::new())],
             adapters: vec!["Wi-Fi 2".into()],
             sensors: vec!["GPU/Hot Spot".into()],
+            newer: None,
         };
         assert_eq!(
             labels(drive(Some("E:"), &ch)),

@@ -57,7 +57,7 @@ pub fn hwnd() -> Option<HWND> {
     UI.with_borrow(|u| u.as_ref().map(|u| u.hwnd))
 }
 
-pub(crate) use live::{refresh, sync};
+pub(crate) use live::{refresh, release, sync};
 
 /// What the window shows: the Settings pages, or setup (onboarding).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -192,7 +192,7 @@ fn create(cfg: &Config, host: Rc<dyn Host>) -> Result<()> {
         cfg: RefCell::new(cfg.clone()),
         host,
         view: RefCell::new(View::new(Page::General)),
-        choices: RefCell::new(Choices::default()),
+        choices: RefCell::new(Choices { newer: live::newer(), ..Choices::default() }),
         cell_fonts,
         shown: RefCell::new(None),
         worker: Worker::start(hwnd),
@@ -289,7 +289,10 @@ impl Ui {
         if let Edit::Flag(Flag::Autostart, on) = e {
             return self.set_autostart(on);
         }
-        if e == Edit::Flag(Flag::ThirdPartySensors, true) && !self.confirm_opt_in(model::THIRD_PARTY) {
+        if let Edit::Flag(f, true) = e
+            && let Some(risk) = f.risk()
+            && !self.confirm_opt_in(risk)
+        {
             return;
         }
         let mut c = self.cfg.borrow().clone();
@@ -315,8 +318,7 @@ impl Ui {
     /// Asks before an opt-in source is turned on, stating its risk. The box is modal (its own message loop, so
     /// the UI thread keeps running); no borrow is held across it. False also when the window closed meanwhile.
     fn confirm_opt_in(&self, risk: &str) -> bool {
-        let msg =
-            HSTRING::from(format!("Turn on this data source?\n\n{risk}\n\nYou can turn it off again under Advanced."));
+        let msg = HSTRING::from(format!("Turn this on?\n\n{risk}\n\nYou can turn it off again under Advanced."));
         // SAFETY: our window as owner; the strings outlive the call.
         let yes = unsafe { MessageBoxW(Some(self.hwnd), &msg, w!("busy"), MB_ICONWARNING | MB_YESNO | MB_DEFBUTTON2) };
         // SAFETY: only checks whether the handle still names a window.
