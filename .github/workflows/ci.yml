@@ -24,6 +24,8 @@ jobs:
       # A CI tool, not a crate dependency. rust-cache keeps ~/.cargo/bin, so a cache hit skips the build.
       - run: cargo install cargo-audit --version 0.22.2 --locked
       - run: cargo audit
+      # The release zip ships THIRD-PARTY-LICENSES.txt: it must name every crate linked into busy.exe.
+      - run: bash tools/check-licenses.sh
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked

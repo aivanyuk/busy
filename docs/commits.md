@@ -67,4 +67,4 @@ Three files and one connector are the whole pipeline; the first two are meant to
 
 - `main` is always releasable and protected: PR required, CI green, linear history, no force pushes.
 - Delete the branch after merge.
-- Releases: tag `vX.Y.Z` on `main`; version in root `Cargo.toml` `[workspace.package]`.
+- Releases: tag `vX.Y.Z` on `main`; version in root `Cargo.toml` `[workspace.package]`. The steps, the changelog and the license file are in [releasing.md](releasing.md).
