@@ -30,6 +30,12 @@ pub(in crate::window) enum Node {
     /// The open dropdown of item `i`, and its option `k`.
     Popup(usize),
     Opt(usize, usize),
+    /// Setup: a reading card, a position, Start with Windows, Skip, Start monitoring.
+    Card(usize),
+    Place(usize),
+    Startup,
+    Skip,
+    Start,
 }
 
 /// The element's UIA control type.
@@ -43,6 +49,7 @@ pub(in crate::window) enum Role {
     List,
     ListItem,
     Text,
+    RadioButton,
 }
 
 /// What a screen reader is told about an element.
@@ -58,6 +65,8 @@ pub(in crate::window) struct Info {
     pub(in crate::window) value: Option<String>,
     /// A toggle's state (Toggle pattern).
     pub(in crate::window) toggle: Option<bool>,
+    /// A radio button's state (SelectionItem pattern).
+    pub(in crate::window) selected: Option<bool>,
     /// Can be invoked (Invoke pattern): buttons, nav items, options.
     pub(in crate::window) invoke: bool,
     pub(in crate::window) focusable: bool,
@@ -67,7 +76,10 @@ pub(in crate::window) struct Info {
 impl Node {
     /// Whether it is part of the content, which scrolls and changes with the page.
     pub(in crate::window) fn in_content(self) -> bool {
-        !matches!(self, Node::Min | Node::Max | Node::Close | Node::Search | Node::Nav(_))
+        matches!(
+            self,
+            Node::Title | Node::Header(_) | Node::Ctl(_) | Node::Up(_) | Node::Down(_) | Node::Popup(_) | Node::Opt(..)
+        )
     }
 
     /// Three numbers that tell elements apart, for the runtime id (with the key).
@@ -90,6 +102,11 @@ impl Node {
             Node::Down(i) => [10, i as i32, 0],
             Node::Popup(i) => [11, i as i32, 0],
             Node::Opt(i, k) => [12, i as i32, k as i32],
+            Node::Card(i) => [13, i as i32, 0],
+            Node::Place(i) => [14, i as i32, 0],
+            Node::Startup => [15, 0, 0],
+            Node::Skip => [16, 0, 0],
+            Node::Start => [17, 0, 0],
         }
     }
 
@@ -120,6 +137,8 @@ impl Node {
             Node::Down(i) => Target::Down(i),
             Node::Opt(_, k) => Target::Opt(k),
             Node::Title | Node::Header(_) | Node::Popup(_) => return None,
+            // Setup's: see `uia::setup::target`.
+            Node::Card(_) | Node::Place(_) | Node::Startup | Node::Skip | Node::Start => return None,
         };
         exists(v, self).then_some(t)
     }
@@ -193,6 +212,8 @@ fn rect(v: &View, n: Node) -> Option<Rect> {
         Node::Header(i) => v.placed.get(i).map(|p| v.to_window(p.rect)),
         Node::Popup(_) => v.popup.as_ref().map(|p| p.rect),
         Node::Opt(_, k) => v.option_rect(k),
+        // Setup's are in `uia::setup`.
+        Node::Card(_) | Node::Place(_) | Node::Startup | Node::Skip | Node::Start => None,
     }
 }
 
@@ -211,6 +232,7 @@ fn plain(role: Role, name: impl Into<String>) -> Info {
         status: String::new(),
         value: None,
         toggle: None,
+        selected: None,
         invoke: false,
         focusable: false,
         enabled: true,
@@ -293,6 +315,7 @@ pub(in crate::window) fn info(v: &View, cfg: &Config, n: Node, maximized: bool, 
             let status = if k == sel { "Selected" } else { "" };
             Info { status: status.into(), invoke: true, focusable: true, ..plain(Role::ListItem, &opts.get(k)?.label) }
         }
+        Node::Card(_) | Node::Place(_) | Node::Startup | Node::Skip | Node::Start => return None,
     })
 }
 
