@@ -223,7 +223,11 @@ impl Ui {
         let cfg = self.cfg.borrow();
         let mut v = self.view.borrow_mut();
         v.nav = model::nav(&cfg);
-        v.items = model::items(v.page, &cfg, &self.choices.borrow());
+        v.items = if v.searching() {
+            model::search(&v.query, &cfg, &self.choices.borrow())
+        } else {
+            model::items(v.page, &cfg, &self.choices.borrow())
+        };
         v.lay_out(&self.gfx, &self.fonts);
         drop(v);
         drop(cfg);

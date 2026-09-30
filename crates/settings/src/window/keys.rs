@@ -18,6 +18,15 @@ impl Ui {
         if self.view.borrow().popup.is_some() {
             return self.popup_key(vk);
         }
+        // SAFETY: reads the calling thread's keyboard state.
+        if vk == VK_F && unsafe { GetKeyState(VK_CONTROL.0 as i32) } < 0 {
+            self.view.borrow_mut().set_focus(Target::Search);
+            self.invalidate();
+            return true;
+        }
+        if self.view.borrow().focus == Some(Target::Search) && self.search_key(vk) {
+            return true;
+        }
         match vk {
             VK_TAB => self.tab(shift),
             VK_ESCAPE => self.close(),
@@ -130,6 +139,48 @@ impl Ui {
             }
             _ => {}
         }
+    }
+
+    /// Editing keys in the search box; the rest (Tab, Esc on an empty box) work as anywhere.
+    fn search_key(&self, vk: VIRTUAL_KEY) -> bool {
+        let mut v = self.view.borrow_mut();
+        match vk {
+            VK_BACK if !v.query.is_empty() => {
+                v.query.pop();
+            }
+            VK_ESCAPE if !v.query.is_empty() => v.query.clear(),
+            // Enter or ↓ go to the first result.
+            VK_RETURN | VK_DOWN => {
+                if let Some(&first) = v.stops().iter().find(|s| matches!(s, Target::Ctl(_))).filter(|_| v.searching()) {
+                    v.set_focus(first);
+                }
+                drop(v);
+                self.invalidate();
+                return true;
+            }
+            _ => return false,
+        }
+        v.scroll = 0.0;
+        drop(v);
+        self.rebuild();
+        true
+    }
+
+    /// `WM_CHAR`: typing goes to the search box while it has the focus.
+    pub(super) fn on_char(&self, c: u16) -> bool {
+        let mut v = self.view.borrow_mut();
+        if v.focus != Some(Target::Search) {
+            return false;
+        }
+        // Printable characters only (no control characters, no halves of a surrogate pair), and a sane length.
+        let Some(ch) = char::from_u32(c as u32).filter(|ch| !ch.is_control()) else { return true };
+        if v.query.chars().count() < 64 {
+            v.query.push(ch);
+            v.scroll = 0.0;
+        }
+        drop(v);
+        self.rebuild();
+        true
     }
 
     fn popup_key(&self, vk: VIRTUAL_KEY) -> bool {

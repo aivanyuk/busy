@@ -99,6 +99,8 @@ pub(super) enum Target {
     Max,
     Close,
     Nav(usize),
+    /// The search box.
+    Search,
     /// A row's control (toggle, dropdown button), by item index.
     Ctl(usize),
     /// Part `k` of a row's control: a segment or a swatch.
@@ -145,7 +147,9 @@ pub(super) struct View {
     pub(super) h: f32,
     pub(super) hover: Option<Target>,
     pub(super) popup: Option<Popup>,
-    /// The keyboard focus (`Nav`, `Ctl`, `Up` or `Down`), and whether its ring shows.
+    /// "Find a setting": while not blank, the content shows the matching rows of all pages.
+    pub(super) query: String,
+    /// The keyboard focus (`Search`, `Nav`, `Ctl`, `Up` or `Down`), and whether its ring shows.
     pub(super) focus: Option<Target>,
     pub(super) focus_visible: bool,
 }
@@ -165,6 +169,24 @@ impl View {
             popup: None,
             focus: None,
             focus_visible: false,
+            query: String::new(),
+        }
+    }
+
+    pub(super) fn searching(&self) -> bool {
+        !self.query.trim().is_empty()
+    }
+
+    /// The page title and subtitle, or the search results' (design `pageTitle`, `pageSub`).
+    pub(super) fn heading(&self) -> (&'static str, String) {
+        if !self.searching() {
+            return (self.page.title(), self.page.sub().into());
+        }
+        let q = self.query.trim();
+        match self.items.iter().filter(|i| matches!(i, Item::Row(_))).count() {
+            0 => ("Search results", format!("No settings match \u{201c}{q}\u{201d}")),
+            1 => ("Search results", format!("1 setting matches \u{201c}{q}\u{201d}")),
+            n => ("Search results", format!("{n} settings match \u{201c}{q}\u{201d}")),
         }
     }
 
@@ -211,7 +233,7 @@ impl View {
         self.height = PAD_T + y - GAP + PAD_B;
         self.scroll = self.scroll.min(self.max_scroll());
         // A focus on a control that is gone (another page, a row that went away) is dropped.
-        if self.focus.is_some_and(|f| !matches!(f, Target::Nav(_)) && !self.stops().contains(&f)) {
+        if self.focus.is_some_and(|f| !matches!(f, Target::Nav(_) | Target::Search) && !self.stops().contains(&f)) {
             self.focus = None;
         }
     }
@@ -220,10 +242,13 @@ impl View {
     /// ↑/↓ of the taskbar order.
     pub(super) fn stops(&self) -> Vec<Target> {
         let nav = self.nav.iter().position(|&p| p == self.page).unwrap_or(0);
-        let mut out = vec![match self.focus {
-            Some(Target::Nav(i)) => Target::Nav(i),
-            _ => Target::Nav(nav),
-        }];
+        let mut out = vec![
+            Target::Search,
+            match self.focus {
+                Some(Target::Nav(i)) => Target::Nav(i),
+                _ => Target::Nav(nav),
+            },
+        ];
         for (i, item) in self.items.iter().enumerate() {
             match item {
                 Item::Row(_) => out.push(Target::Ctl(i)),
@@ -335,6 +360,9 @@ impl View {
             return super::frame::button_at(self.w, x);
         }
         if x < NAV_W {
+            if self.search_rect().contains(x, y) {
+                return Some(Target::Search);
+            }
             return (0..self.nav.len()).find(|&i| self.nav_rect(i).contains(x, y)).map(Target::Nav);
         }
         if !self.pane().contains(x, y) {
