@@ -4,6 +4,8 @@ What changed for people who run busy, newest first. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-30
+
 The first release.
 
 ### Added
