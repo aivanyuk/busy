@@ -8,7 +8,7 @@
 - `controls/` — one file per control kind (`toggle`, `dropdown` with its popup, `segmented`, `swatch`, `preview`, `order` for the taskbar order list, `nav` for the nav column); each sizes and draws itself and names the part under the pointer.
 - `input.rs` — pointer input: hover, clicks, wheel; a click on a control becomes a `model::Edit`; `keys.rs` — keyboard input and focus.
 - `live.rs` — following the host: `sync` (configs it applied) and `refresh` (new readings: the preview, the machine lists); `clock.rs` — the preview's time and date in the user's formats.
-- `uia/` — UI Automation: `node.rs` (the elements, their roles, names and state, read from the `View`; pure and tested), `tree.rs` (a frame's elements, `Tree` and `Entry`), `provider.rs` (the COM providers, answering from a published `Tree`), `mod.rs` (`WM_GETOBJECT`, publishing each frame, requests, events).
+- `uia/` — UI Automation: `node.rs` (the elements, their roles, names and state, read from the `View`; pure and tested), `tree.rs` (a frame's elements, `Tree` and `Entry`), `setup.rs` (setup's elements), `provider.rs` (the COM providers, answering from a published `Tree`), `mod.rs` (`WM_GETOBJECT`, publishing each frame, requests, events).
 - `setup/` — setup (onboarding), the window's other mode: `mod.rs` (what it shows, layout, hit-testing, Tab stops), `paint.rs`, `input.rs` (entering setup, pointer, keyboard, finishing).
 - `frame.rs` — the custom title bar and the non-client handling behind it; `wndproc.rs` — the window procedure; `worker.rs` — registry thread (autostart read/write, app theme); `dump.rs` — debug-only frame dump.
 
@@ -76,6 +76,7 @@ Screen readers see the window through UIA (plan: basic roles and names). `WM_GET
 - the caption buttons (Button: Minimize, Maximize or Restore, Close; invoked, not focusable, as they aren't Tab stops), the search box (Edit, with a Value that can be set), the nav items (ListItem; status On/Off and "selected");
 - the page title (Text; the subtitle as help text), section headers (Text), each row's control named by its title with the description as help text: toggle → CheckBox (Toggle), dropdown → ComboBox (read-only Value), segments and swatches → Group (read-only Value: the choice, "Color n of 8"); the taskbar order's usable ↑/↓ (Button, "Move CPU up");
 - while open, the popup (List) with its options (ListItem, "Selected" on the current one).
+- In setup: Close, the headline (Text, the subtitle as help text) and the two headings, one CheckBox (Toggle) per reading card named by its module with the live reading as its status, the positions as RadioButton (SelectionItem: IsSelected, Select picks; also Invoke), Start with Windows (CheckBox), Skip and Start monitoring (Button). Its elements never change shape, so their keys are 0 (`uia/setup.rs`).
 
 Buttons, nav items and options have Invoke. Invoke, Toggle, SetFocus and SetValue are queued and posted to the window, so they run as the same key would from its message loop, never inside a UIA call: a toggle's Toggle on an opt-in shows the confirmation, SetFocus and SetValue close an open popup as a key would. A disabled control (the autostart toggle while the registry is busy) answers Invoke and Toggle with `UIA_E_ELEMENTNOTENABLED`.
 

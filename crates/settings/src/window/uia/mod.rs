@@ -17,6 +17,7 @@ use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, IsZoomed, WM_
 
 mod node;
 mod provider;
+mod setup;
 mod tree;
 
 /// Posted to the window when UIA queued a request.
@@ -54,7 +55,11 @@ impl Ui {
 
     /// The elements as the view shows them now; `None` while it is being changed.
     fn uia_tree(&self) -> Option<Tree> {
-        let (v, cfg) = (self.view.try_borrow().ok()?, self.cfg.try_borrow().ok()?);
+        let cfg = self.cfg.try_borrow().ok()?;
+        if self.in_setup() {
+            return Some(setup::tree(&*self.setup.try_borrow().ok()?, &cfg, self.autostart_busy()));
+        }
+        let v = self.view.try_borrow().ok()?;
         Some(node::tree(&v, &cfg, self.maximized(), self.autostart_busy()))
     }
 
@@ -140,8 +145,21 @@ impl Ui {
         let Some(shared) = self.uia.shared.borrow().clone() else { return };
         let requests = shared.requests.lock().map(|mut q| std::mem::take(&mut *q)).unwrap_or_default();
         for r in requests {
+            // An earlier request may have closed the window (Close, Skip, Start monitoring).
+            // SAFETY: only checks whether the handle still names a window.
+            if !unsafe { windows::Win32::UI::WindowsAndMessaging::IsWindow(Some(self.hwnd)) }.as_bool() {
+                break;
+            }
             // Checked against the view as it is now: an earlier request may have changed it.
             let here = self.uia_tree().is_some_and(|t| t.get(r.node, r.key).is_some());
+            if self.in_setup() {
+                match (r.action, setup::target(r.node).filter(|_| here)) {
+                    (Action::Invoke, Some(t)) => self.setup_activate(t),
+                    (Action::Focus, Some(t)) => self.setup_focus(t),
+                    _ => {}
+                }
+                continue;
+            }
             let Some(t) = here.then(|| r.node.target(&self.view.borrow())).flatten() else { continue };
             match (r.action, t) {
                 (Action::Invoke, t) => self.press(t),
