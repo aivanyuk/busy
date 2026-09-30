@@ -15,7 +15,9 @@ use windows::core::Result;
 pub(super) const WIN_W: f32 = 1000.0;
 pub(super) const WIN_H: f32 = 700.0;
 pub(super) const MIN_W: f32 = 760.0;
-pub(super) const MIN_H: f32 = 520.0;
+/// Tall enough for the whole nav (its top, ten items and the column's 16 bottom padding: 565) with the
+/// window's bottom resize border, which is part of the window size.
+pub(super) const MIN_H: f32 = 576.0;
 pub(super) const TITLE_H: f32 = 40.0;
 pub(super) const NAV_W: f32 = 272.0;
 /// Nav column: padding 4 12 16 16, 3 between children.

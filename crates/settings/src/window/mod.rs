@@ -245,7 +245,7 @@ impl Ui {
         self.shown.take();
         self.host.page(match page {
             Page::Module(m) => Some(m),
-            Page::General => None,
+            Page::General | Page::Advanced => None,
         });
         self.rebuild();
     }
@@ -253,6 +253,9 @@ impl Ui {
     fn edit(&self, e: Edit) {
         if let Edit::Flag(Flag::Autostart, on) = e {
             return self.set_autostart(on);
+        }
+        if e == Edit::Flag(Flag::ThirdPartySensors, true) && !self.confirm_opt_in(model::THIRD_PARTY) {
+            return;
         }
         let mut c = self.cfg.borrow().clone();
         edit::apply(&mut c, &e);
@@ -272,6 +275,17 @@ impl Ui {
         }
         self.rebuild();
         self.host.apply(c);
+    }
+
+    /// Asks before an opt-in source is turned on, stating its risk. The box is modal (its own message loop, so
+    /// the UI thread keeps running); no borrow is held across it. False also when the window closed meanwhile.
+    fn confirm_opt_in(&self, risk: &str) -> bool {
+        let msg =
+            HSTRING::from(format!("Turn on this data source?\n\n{risk}\n\nYou can turn it off again under Advanced."));
+        // SAFETY: our window as owner; the strings outlive the call.
+        let yes = unsafe { MessageBoxW(Some(self.hwnd), &msg, w!("busy"), MB_ICONWARNING | MB_YESNO | MB_DEFBUTTON2) };
+        // SAFETY: only checks whether the handle still names a window.
+        yes == IDYES && unsafe { IsWindow(Some(self.hwnd)) }.as_bool()
     }
 
     /// Autostart is written by the worker; the toggle waits (drawn disabled) until the write is read back.

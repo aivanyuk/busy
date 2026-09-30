@@ -8,13 +8,21 @@ use busy_core::{CellStyle, Config, Module};
 pub(super) enum Page {
     General,
     Module(Module),
+    /// Opt-in sources (not in the design): each off until turned on, with its risk stated.
+    Advanced,
 }
+
+/// Third-party sensor tools: what the opt-in reads and its risk, verbatim from the plan's Opt-in sources.
+pub(super) const THIRD_PARTY: &str = "Reading LibreHardwareMonitor (WMI) / HWiNFO (shared memory). Reads data \
+     published by another program you installed. Needed for CPU temps, fans, SSD temp/health, CPU power, \
+     throttling.";
 
 impl Page {
     pub(super) fn title(self) -> &'static str {
         match self {
             Page::General => "General",
             Page::Module(m) => m.label(),
+            Page::Advanced => "Advanced",
         }
     }
 
@@ -31,13 +39,17 @@ impl Page {
                 Module::Sensors => "Temperatures, fans and power",
                 Module::Processes => "The busiest programs, listed in flyouts",
             },
+            Page::Advanced => "Optional data sources, each off until you turn it on",
         }
     }
 }
 
-/// Nav order: General, then every module in config (taskbar) order.
+/// Nav order: General, every module in config (taskbar) order, then Advanced.
 pub(super) fn nav(cfg: &Config) -> Vec<Page> {
-    std::iter::once(Page::General).chain(cfg.modules.iter().map(|c| Page::Module(c.module))).collect()
+    std::iter::once(Page::General)
+        .chain(cfg.modules.iter().map(|c| Page::Module(c.module)))
+        .chain([Page::Advanced])
+        .collect()
 }
 
 /// A module's nav status: whether it shows anywhere (its cell; Processes: its flyout lists).
@@ -89,6 +101,8 @@ pub(super) enum Flag {
     Remaining,
     /// Processes' `flyout`: the top-process lists in the CPU, Memory and Disk flyouts.
     TopProcesses,
+    /// `opt_in.third_party_sensors`; turning it on asks first.
+    ThirdPartySensors,
 }
 
 /// A change the user made, applied to the config by `edit::apply`.
@@ -119,6 +133,7 @@ pub(super) fn items(page: Page, cfg: &Config, ch: &Choices) -> Vec<Item> {
         Page::General => general(cfg),
         Page::Module(Module::Processes) => processes(cfg),
         Page::Module(m) => module(m, cfg, ch),
+        Page::Advanced => advanced(cfg),
     }
 }
 
@@ -235,6 +250,14 @@ fn processes(cfg: &Config) -> Vec<Item> {
     r
 }
 
+/// Only the opt-ins that are built: the others would be switches that do nothing.
+fn advanced(cfg: &Config) -> Vec<Item> {
+    vec![
+        Item::Header("Opt-in sources"),
+        toggle("Third-party sensor tools", THIRD_PARTY, Flag::ThirdPartySensors, cfg.opt_in.third_party_sensors),
+    ]
+}
+
 fn updates(m: Module, cfg: &Config) -> [Item; 2] {
     let iv = cfg.module(m).and_then(|c| c.interval_s);
     [
@@ -294,6 +317,23 @@ mod tests {
     }
 
     #[test]
+    fn advanced_page_lists_the_built_opt_ins() {
+        let mut cfg = Config::default();
+        let ch = Choices::default();
+        let off = items(Page::Advanced, &cfg, &ch);
+        assert_eq!(rows(&off), ["Third-party sensor tools"]);
+        let Some(Item::Row(Row { control: Control::Toggle(Flag::ThirdPartySensors, false), desc, .. })) = off.get(1)
+        else {
+            panic!("no opt-in toggle")
+        };
+        assert!(desc.contains("Reads data published by another program you installed."));
+        cfg.opt_in.third_party_sensors = true;
+        let on = items(Page::Advanced, &cfg, &ch);
+        assert!(matches!(on.get(1), Some(Item::Row(Row { control: Control::Toggle(_, true), .. }))));
+        assert_eq!(rows(&search("hwinfo", &cfg, &ch)), ["Third-party sensor tools"]);
+    }
+
+    #[test]
     fn search_finds_rows_on_every_page() {
         let (cfg, ch) = (Config::default(), Choices::default());
         let found = search("  LABEL ", &cfg, &ch);
@@ -311,7 +351,8 @@ mod tests {
     fn nav_and_status() {
         let cfg = Config::default();
         let nav = nav(&cfg);
-        assert_eq!((nav[0], nav.len()), (Page::General, Module::ALL.len() + 1));
+        assert_eq!((nav[0], nav.len()), (Page::General, Module::ALL.len() + 2));
+        assert_eq!(nav.last(), Some(&Page::Advanced));
         assert!(is_on(&cfg, Module::Cpu) && !is_on(&cfg, Module::Disk) && is_on(&cfg, Module::Processes));
         assert_eq!(readings(&cfg), "4 readings on the taskbar");
         let mut one = cfg.clone();

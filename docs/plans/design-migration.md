@@ -71,7 +71,7 @@ PRs in order: `busy-core` + workspace → `busy-metrics` → `busy-sensors` → 
    - Kept from the native window as extra rows: Offset, History, and Processes' "Top processes" page.
    - Named adapters and sensors are offered from live data.
    - Not built: the "Run setup" row, which comes with Phase 5, and page subtitles with hardware names (they are static descriptions).
-3. Still to come: the Advanced page (the implemented opt-in only, third-party sensors, with its risk text and a confirmation), and UI Automation.
+3. `feat/settings-advanced`: the Advanced page, which lists the one opt-in that is built (third-party sensors) with its risk text and a confirmation, and UI Automation.
 
 The original plan follows.
 

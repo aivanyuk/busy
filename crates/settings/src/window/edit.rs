@@ -19,6 +19,7 @@ pub(super) fn apply(cfg: &mut Config, e: &Edit) {
                 Flag::ByLoad(m) => module(cfg, m).into_iter().for_each(|c| c.color_by_load = on),
                 Flag::Remaining => cfg.options.battery.show_remaining = on,
                 Flag::TopProcesses => module(cfg, Module::Processes).into_iter().for_each(|c| c.flyout = on),
+                Flag::ThirdPartySensors => cfg.opt_in.third_party_sensors = on,
             }
         }
         Edit::Pick(p) => match p.clone() {
@@ -70,6 +71,7 @@ mod tests {
         apply(&mut cfg, &Edit::Flag(Flag::Taskbar(Module::Disk), true));
         apply(&mut cfg, &Edit::Flag(Flag::Label(Module::Cpu), false));
         apply(&mut cfg, &Edit::Flag(Flag::TopProcesses, false));
+        apply(&mut cfg, &Edit::Flag(Flag::ThirdPartySensors, true));
         apply(&mut cfg, &Edit::Pick(Pick::Anchor(Anchor::Left)));
         apply(&mut cfg, &Edit::Pick(Pick::Interface(NetInterface::Named("Wi-Fi".into()))));
         apply(&mut cfg, &Edit::Pick(Pick::Sensor(SensorPick::Gpu)));
@@ -80,6 +82,7 @@ mod tests {
         assert!(cfg.module(Module::Disk).unwrap().taskbar);
         assert!(!cfg.module(Module::Cpu).unwrap().show_label);
         assert!(!cfg.module(Module::Processes).unwrap().flyout);
+        assert!(cfg.opt_in.third_party_sensors);
         assert_eq!(cfg.anchor, Anchor::Left);
         assert_eq!(cfg.options.network.interface, NetInterface::Named("Wi-Fi".into()));
         assert_eq!(cfg.options.sensors.sensor, SensorPick::Gpu);
