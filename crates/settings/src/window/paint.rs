@@ -35,7 +35,7 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
     };
     for (i, &p) in v.nav.iter().enumerate() {
         let (dot, status) = match p {
-            Page::General => (t.fg3, ""),
+            Page::General | Page::Advanced => (t.fg3, ""),
             Page::Module(m) => (dot(m), if model::is_on(s.cfg, m) { "On" } else { "Off" }),
         };
         let item = nav::Item {
