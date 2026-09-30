@@ -1,13 +1,13 @@
 //! The settings window's view of the app (`busy_settings::Host`).
 
-use crate::app::{WM_APP_SETTINGS_PAGE, main_hwnd, submit_config, with_readings};
+use crate::app::{WM_APP_SHOWN, main_hwnd, submit_config, with_readings};
 use busy_core::{Config, Module, Snapshot};
 use busy_ui::history::History;
 use windows::Win32::Foundation::{LPARAM, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
 
-/// `page` is also called inside `busy_settings::open`, while the app state is borrowed, so configs and pages
-/// arrive as posted messages; readings are lent only when the state is free.
+/// `shown` is also called inside `busy_settings::open`, while the app state is borrowed, so configs and shown
+/// modules arrive as posted messages; readings are lent only when the state is free.
 pub(crate) struct SettingsHost;
 
 impl busy_settings::Host for SettingsHost {
@@ -15,10 +15,10 @@ impl busy_settings::Host for SettingsHost {
         submit_config(cfg);
     }
 
-    fn page(&self, m: Option<Module>) {
+    fn shown(&self, modules: &[Module]) {
+        let mask = modules.iter().fold(0usize, |mask, m| mask | 1 << m.index());
         // SAFETY: PostMessageW only queues a message to our own window.
-        let wp = WPARAM(m.map_or(0, |m| m.index() + 1));
-        let _ = unsafe { PostMessageW(Some(main_hwnd()), WM_APP_SETTINGS_PAGE, wp, LPARAM(0)) };
+        let _ = unsafe { PostMessageW(Some(main_hwnd()), WM_APP_SHOWN, WPARAM(mask), LPARAM(0)) };
     }
 
     fn with_data(&self, f: &mut dyn FnMut(&Snapshot, &History)) {

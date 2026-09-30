@@ -124,7 +124,7 @@ impl Ui {
                 None
             }
             WM_NCDESTROY => {
-                self.host.page(None);
+                self.host.shown(&[]);
                 UI.take();
                 None
             }
