@@ -63,6 +63,12 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
         }
         match item {
             Item::Header(title) => cv.text(title, &f.strong, Rect::new(r.x, r.y, r.w, LINE_14), t.fg, Align::Left),
+            Item::Notice(text) => {
+                cv.round(r, 4.0, t.card);
+                cv.round_outline(r, 4.0, t.card_line);
+                let text_r = Rect::new(r.x + CARD_PAD_L, r.y + CARD_PAD_Y, p.text_w, r.h - 2.0 * CARD_PAD_Y);
+                cv.text(text, &f.desc, text_r, t.fg, Align::Left);
+            }
             Item::Order(list) => order::draw(cv, r, list, dot, v.hover, t, f),
             Item::Preview(m) => preview::draw(cv, r, *m, s.cfg, s.data.as_ref(), (s.gfx, s.cell_fonts), t, f),
             Item::Row(row) => {
