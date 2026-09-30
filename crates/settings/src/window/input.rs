@@ -3,7 +3,8 @@
 
 use super::Ui;
 use super::layout::Target;
-use super::model::{Command, Control, Edit, Item};
+use super::model::{Command, Control, Edit, Item, RELEASES};
+use super::worker::Job;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     ReleaseCapture, SetCapture, TME_LEAVE, TRACKMOUSEEVENT, TrackMouseEvent,
 };
@@ -219,6 +220,10 @@ impl Ui {
                 Control::Button(Command::RunSetup) => {
                     drop(v);
                     return self.enter_setup();
+                }
+                Control::Button(Command::Releases) => {
+                    self.worker.submit(Job::Open(RELEASES.into()));
+                    return;
                 }
             },
             _ => return,
