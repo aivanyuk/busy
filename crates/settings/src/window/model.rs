@@ -17,6 +17,10 @@ pub(super) const THIRD_PARTY: &str = "Reading LibreHardwareMonitor (WMI) / HWiNF
      published by another program you installed. Needed for CPU temps, fans, SSD temp/health, CPU power, \
      throttling.";
 
+/// The update check (`OptIn::update_check`): what it does and its risk, verbatim from docs/plans/release.md.
+pub(super) const UPDATE_CHECK: &str = "Contacts api.github.com once a day while busy runs, to see whether a newer \
+     release exists; GitHub sees your IP address. Nothing is downloaded or installed.";
+
 impl Page {
     pub(super) fn title(self) -> &'static str {
         match self {
@@ -125,6 +129,19 @@ pub(super) enum Flag {
     TopProcesses,
     /// `opt_in.third_party_sensors`; turning it on asks first.
     ThirdPartySensors,
+    /// `opt_in.update_check`; turning it on asks first.
+    UpdateCheck,
+}
+
+impl Flag {
+    /// An opt-in's risk, stated when it is turned on.
+    pub(super) fn risk(self) -> Option<&'static str> {
+        match self {
+            Flag::ThirdPartySensors => Some(THIRD_PARTY),
+            Flag::UpdateCheck => Some(UPDATE_CHECK),
+            _ => None,
+        }
+    }
 }
 
 /// A change the user made, applied to the config by `edit::apply`.
@@ -302,6 +319,7 @@ fn advanced(cfg: &Config) -> Vec<Item> {
     vec![
         Item::Header("Opt-in sources"),
         toggle("Third-party sensor tools", THIRD_PARTY, Flag::ThirdPartySensors, cfg.opt_in.third_party_sensors),
+        toggle("Check for updates", UPDATE_CHECK, Flag::UpdateCheck, cfg.opt_in.update_check),
     ]
 }
 
@@ -399,7 +417,7 @@ mod tests {
         let mut cfg = Config::default();
         let ch = Choices::default();
         let off = items(Page::Advanced, &cfg, &ch);
-        assert_eq!(rows(&off), ["Third-party sensor tools"]);
+        assert_eq!(rows(&off), ["Third-party sensor tools", "Check for updates"]);
         let Some(Item::Row(Row { control: Control::Toggle(Flag::ThirdPartySensors, false), desc, .. })) = off.get(1)
         else {
             panic!("no opt-in toggle")
@@ -409,6 +427,9 @@ mod tests {
         let on = items(Page::Advanced, &cfg, &ch);
         assert!(matches!(on.get(1), Some(Item::Row(Row { control: Control::Toggle(_, true), .. }))));
         assert_eq!(rows(&search("hwinfo", &cfg, &ch)), ["Third-party sensor tools"]);
+        assert_eq!(rows(&search("github", &cfg, &ch)), ["Check for updates"]);
+        assert_eq!(Flag::UpdateCheck.risk(), Some(UPDATE_CHECK));
+        assert_eq!(Flag::Autostart.risk(), None);
     }
 
     #[test]

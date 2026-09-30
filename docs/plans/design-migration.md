@@ -112,6 +112,7 @@ All default **off**, listed under Settings → Advanced with the risk shown verb
 | Per-app battery usage | "Power usage" in Battery flyout | Requires administrator; reads the Windows SRUM database. Experimental. |
 | Memory speed (WMI) | "Speed" in Memory flyout | One slow WMI query at startup (~100 ms+ on the sampler thread). |
 | Third-party sensor tools | Reading LibreHardwareMonitor (WMI) / HWiNFO (shared memory) | Reads data published by another program you installed. Needed for CPU temps, fans, SSD temp/health, CPU power, throttling. |
+| Check for updates | A newer release named in Settings → General → About (docs/plans/release.md R5) | Contacts api.github.com once a day while busy runs, to see whether a newer release exists; GitHub sees your IP address. Nothing is downloaded or installed. |
 
 When a source is off, its rows/sections are hidden (never shown as fake data). NVML/ADL/D3DKMT GPU sensors stay on (first-party driver APIs, no extra risk).
 

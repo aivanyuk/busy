@@ -20,6 +20,7 @@ pub(super) fn apply(cfg: &mut Config, e: &Edit) {
                 Flag::Remaining => cfg.options.battery.show_remaining = on,
                 Flag::TopProcesses => module(cfg, Module::Processes).into_iter().for_each(|c| c.flyout = on),
                 Flag::ThirdPartySensors => cfg.opt_in.third_party_sensors = on,
+                Flag::UpdateCheck => cfg.opt_in.update_check = on,
             }
         }
         Edit::Pick(p) => match p.clone() {
