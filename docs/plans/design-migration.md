@@ -55,7 +55,7 @@ PRs in order: `busy-core` + workspace → `busy-metrics` → `busy-sensors` → 
 
 ### 4. Settings window (custom D2D, `crates/settings/src/window/`)
 
-**Status: in progress.** Landed in three PRs:
+**Status: done.** Landed in three PRs (#25, #26, #27):
 1. `refactor/ui-crate`: the shared code moved into `busy-ui` (`crates/ui`), which holds formatting, selection, history, tones, theme, the D2D helpers, the draw context and the taskbar cell.
 2. `feat/settings-window`: the window itself, as built:
    - Design measures and tokens, including the new `--win`/`--card`/`--ctl-strong`/`--pop`/`--knob` tokens.
@@ -70,7 +70,7 @@ PRs in order: `busy-core` + workspace → `busy-metrics` → `busy-sensors` → 
      - The shown page's module is sampled (`Params::with_preview`, since generalized to `with_shown`).
    - Kept from the native window as extra rows: Offset, History, and Processes' "Top processes" page.
    - Named adapters and sensors are offered from live data.
-   - Not built: the "Run setup" row, which comes with Phase 5, and page subtitles with hardware names (they are static descriptions).
+   - Not built: page subtitles with hardware names (they are static descriptions). The "Run setup" row came with Phase 5.
 3. `feat/settings-advanced`: the Advanced page, which lists the one opt-in that is built (third-party sensors) with its risk text and a confirmation, and UI Automation.
 
 The original plan follows.
@@ -86,6 +86,18 @@ The original plan follows.
 - Changes apply live (design has no OK/Apply) through `on_apply` → `app::submit_config`; the app persists them through the config writer as today.
 
 ### 5. Onboarding
+
+**Status: done.** As built:
+- Setup is the settings window's second mode (`window/setup/`), so it shares the window's render target, worker, theme, frame, keyboard focus and UI Automation. It is a fixed 680-DIP page with Close only, titled "busy". The app opens it at startup while `onboarded` is false (`busy_settings::setup`), and Settings → General → Appearance → Setup → "Run setup" turns the window into it.
+- Reading cards (one per module with a cell, in taskbar order), with the live reading from `busy_ui::cell::sample` in the module's palette color. The host samples every card's module while setup is up: `Host::page` became `Host::shown(&[Module])`.
+- Choices apply live through `Host::apply`, so the taskbar follows them. Skip, Start monitoring, Close, Esc and Enter all keep them, set `onboarded` and close.
+- Decided with the maintainer:
+  - Start with Windows starts as the registry has it (unchecked on a fresh install), not checked as in the design.
+  - The checked readings are `Config::default`'s (CPU, Memory, GPU, Network), not the design's (CPU, Memory, Disk, Network).
+  - Setup has UI Automation too (checkboxes, radio buttons, buttons).
+
+The original plan follows.
+
 - Shown when `onboarded == false`; re-runnable from Settings → General → Run setup. Lives with the Phase 4 window code (same controls and worker), a page set of its own; the router opens it at startup after the widget is embedded.
 - Reading cards (checkbox, name, live sample in module color), position radio cards, Start with Windows (written on the settings worker), Skip / Start monitoring. Toggling updates the real taskbar live through `submit_config`; the sampler follows through `Params` like any config change.
 
