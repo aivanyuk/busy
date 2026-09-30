@@ -165,8 +165,8 @@ Authority: `docs/areas/app.md` intro, § Taskbar widget, § Flyout, § Theme;
 
 | ID | Assertion | Trigger |
 | --- | --- | --- |
-| S1 | The public API stays `open`, `is_open`, `is_dialog_message`, `autostart::{is_enabled, set}`; the app's message loop calls `is_dialog_message` before `TranslateMessage`/`DispatchMessage`. The planned custom-D2D rewrite keeps that API unchanged and adds no dependency. | `crates/settings/src/lib.rs`, the app's message loop |
-| S2 | `on_apply` fires only when the config actually changed, and the **caller** persists it (`Config::save`); the settings crate does not write the config file. | `on_apply`, dirty tracking, `Config::save` |
+| S1 | The public API stays `Host`, `open`, `sync`, `refresh`, `is_open`, `is_dialog_message`, `autostart::{is_enabled, set}`; the app's message loop calls `is_dialog_message` before `TranslateMessage`/`DispatchMessage`. A `Host` method never calls back into the settings window synchronously (`page` runs inside `open`): the app's host posts. No external dependency. | `crates/settings/src/lib.rs`, the app's `SettingsHost`, the app's message loop |
+| S2 | `Host::apply` gets a config only when an edit actually changed it, and the **host** persists it (`Config::save`, on the app's config writer); the settings crate does not write the config file. | `Host::apply`, `Ui::commit`, `Config::save` |
 | S3 | Autostart lives in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\busy` plus the `StartupApproved\Run` flag and is owned by `busy-settings`: `is_enabled` honours the Task Manager "disabled" flag, `set(true)` clears it, `set(false)` removes both values. On registry failure the window shows a message box and reflects the real registry state in `cfg.autostart`. | `autostart.rs`, the Start with Windows control |
 | S4 | The window is an unowned top-level with its own taskbar button (the app's HWND is explorer's child and cannot own it). Every label has an Alt mnemonic, Enter is OK and Esc Cancel, and it is DPI-aware through `SystemParametersInfoForDpi` + `WM_DPICHANGED`. Theme resolution is `BUSY_FORCE_DARK` → `Config.theme` → `AppsUseLightTheme`. | `window/`, `dark.rs` |
 

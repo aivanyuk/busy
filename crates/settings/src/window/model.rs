@@ -54,6 +54,8 @@ pub(super) fn readings(cfg: &Config) -> String {
 }
 
 pub(super) enum Item {
+    /// A module page's live preview of its cell.
+    Preview(Module),
     Header(&'static str),
     Row(Row),
     /// General: the modules with a taskbar cell, in order, each with ↑/↓ (design "Taskbar order").
@@ -149,6 +151,7 @@ fn module(m: Module, cfg: &Config, ch: &Choices) -> Vec<Item> {
         _ => m.label().to_lowercase(),
     };
     let mut r = vec![
+        Item::Preview(m),
         Item::Header("Taskbar"),
         toggle("Show on taskbar", format!("Display the {name} reading on the taskbar"), Flag::Taskbar(m), c.taskbar),
     ];
@@ -260,10 +263,11 @@ mod tests {
         let sensors = rows(&items(Page::Module(Module::Sensors), &cfg, &ch));
         assert!(sensors.contains(&"Taskbar sensor") && sensors.contains(&"Unit"));
         assert_eq!(rows(&items(Page::Module(Module::Processes), &cfg, &ch)), ["Top processes", "Update interval"]);
-        let Some(Item::Row(r)) = items(Page::Module(Module::Memory), &cfg, &ch).into_iter().nth(1) else {
-            panic!("no row")
-        };
+        let memory = items(Page::Module(Module::Memory), &cfg, &ch);
+        assert!(matches!(memory[0], Item::Preview(Module::Memory)));
+        let Item::Row(r) = &memory[2] else { panic!("no row") };
         assert_eq!(r.desc, "Display the memory reading on the taskbar");
+        assert!(!items(Page::Module(Module::Processes), &cfg, &ch).iter().any(|i| matches!(i, Item::Preview(_))));
     }
 
     #[test]

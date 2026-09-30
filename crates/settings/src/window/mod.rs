@@ -3,7 +3,7 @@
 //! (`model`, `choices`, `edit`), `layout`, `paint`, one file per control kind, `input`, the title bar (`frame`),
 //! the window procedure and the registry worker.
 
-use crate::dark;
+use crate::{Host, dark};
 use busy_core::{Config, Module};
 use busy_ui::render::{Canvas, Gfx};
 use busy_ui::theme::Theme;
@@ -26,6 +26,7 @@ use windows::core::{HSTRING, PCWSTR, Result, w};
 use worker::{Job, Reply, Worker};
 
 mod choices;
+mod clock;
 mod controls;
 #[cfg(debug_assertions)]
 mod dump;
@@ -33,6 +34,7 @@ mod edit;
 mod frame;
 mod input;
 mod layout;
+mod live;
 mod model;
 mod paint;
 mod wndproc;
@@ -52,7 +54,9 @@ pub fn hwnd() -> Option<HWND> {
     UI.with_borrow(|u| u.as_ref().map(|u| u.hwnd))
 }
 
-pub fn open(cfg: &Config, on_apply: Box<dyn Fn(Config)>, page: Option<Module>) {
+pub(crate) use live::{refresh, sync};
+
+pub fn open(cfg: &Config, host: Rc<dyn Host>, page: Option<Module>) {
     if let Some(u) = ui() {
         // SAFETY: `u.hwnd` is our live window.
         unsafe {
@@ -62,7 +66,7 @@ pub fn open(cfg: &Config, on_apply: Box<dyn Fn(Config)>, page: Option<Module>) {
             let _ = SetForegroundWindow(u.hwnd);
         }
     } else {
-        let _ = create(cfg, on_apply);
+        let _ = create(cfg, host);
     }
     if let (Some(u), Some(m)) = (ui(), page) {
         u.show_page(Page::Module(m));
@@ -77,8 +81,13 @@ struct Ui {
     dpi: Cell<u32>,
     /// The config as last applied; every edit starts from it.
     cfg: RefCell<Config>,
-    on_apply: Box<dyn Fn(Config)>,
+    host: Rc<dyn Host>,
     view: RefCell<View>,
+    /// The machine's drives, adapters and sensors, as last read in `refresh`.
+    choices: RefCell<Choices>,
+    /// The preview's cell fonts and what it last showed (redrawn only when that changes).
+    cell_fonts: busy_ui::cell::Fonts,
+    shown: RefCell<Option<live::Shown>>,
     worker: Worker,
     /// Windows app mode, as last read by the worker.
     system_dark: Cell<bool>,
@@ -102,9 +111,10 @@ fn work_area() -> RECT {
     }
 }
 
-fn create(cfg: &Config, on_apply: Box<dyn Fn(Config)>) -> Result<()> {
+fn create(cfg: &Config, host: Rc<dyn Host>) -> Result<()> {
     let gfx = Gfx::new()?;
     let fonts = Fonts::new(&gfx)?;
+    let cell_fonts = busy_ui::cell::Fonts::new(&gfx)?;
     // SAFETY: plain Win32 calls with valid arguments; the class name and title outlive them.
     let hwnd = unsafe {
         let hinst: HINSTANCE = GetModuleHandleW(None)?.into();
@@ -147,8 +157,11 @@ fn create(cfg: &Config, on_apply: Box<dyn Fn(Config)>) -> Result<()> {
         rt: RefCell::new(None),
         dpi: Cell::new(dpi),
         cfg: RefCell::new(cfg.clone()),
-        on_apply,
+        host,
         view: RefCell::new(View::new(Page::General)),
+        choices: RefCell::new(Choices::default()),
+        cell_fonts,
+        shown: RefCell::new(None),
         worker: Worker::start(hwnd),
         system_dark: Cell::new(false),
         reg_autostart: Cell::new(None),
@@ -209,7 +222,7 @@ impl Ui {
         let cfg = self.cfg.borrow();
         let mut v = self.view.borrow_mut();
         v.nav = model::nav(&cfg);
-        v.items = model::items(v.page, &cfg, &Choices::default());
+        v.items = model::items(v.page, &cfg, &self.choices.borrow());
         v.lay_out(&self.gfx, &self.fonts);
         drop(v);
         drop(cfg);
@@ -224,6 +237,11 @@ impl Ui {
         }
         v.popup = None;
         drop(v);
+        self.shown.take();
+        self.host.page(match page {
+            Page::Module(m) => Some(m),
+            Page::General => None,
+        });
         self.rebuild();
     }
 
@@ -248,7 +266,7 @@ impl Ui {
             self.apply_theme();
         }
         self.rebuild();
-        (self.on_apply)(c);
+        self.host.apply(c);
     }
 
     /// Autostart is written by the worker; the toggle waits (drawn disabled) until the write is read back.
@@ -349,8 +367,20 @@ impl Ui {
                 let _ = rt.Resize(&size);
             }
             rt.SetDpi(self.dpi.get() as f32, self.dpi.get() as f32);
-            rt.BeginDraw();
         }
+        // The preview draws from the host's readings, lent for the frame; without them it draws the rest.
+        let mut drawn = false;
+        self.host.with_data(&mut |snap, hist| {
+            self.draw(&rt, (rc.right, rc.bottom), Some(controls::preview::Data { snap, hist }));
+            drawn = true;
+        });
+        if !drawn {
+            self.draw(&rt, (rc.right, rc.bottom), None);
+        }
+    }
+
+    /// One frame into `rt`, between its BeginDraw and EndDraw.
+    fn draw(&self, rt: &ID2D1HwndRenderTarget, _size: (i32, i32), data: Option<controls::preview::Data>) {
         let (theme, cfg, view) = (self.theme(), self.cfg.borrow(), self.view.borrow());
         // SAFETY: our live window.
         let maximized = unsafe { IsZoomed(self.hwnd) }.as_bool();
@@ -359,10 +389,14 @@ impl Ui {
             theme: &theme,
             fonts: &self.fonts,
             gfx: &self.gfx,
+            cell_fonts: &self.cell_fonts,
+            data,
             maximized,
             autostart_busy: self.autostart_busy(),
         };
-        if let Ok(cv) = Canvas::new(&rt, &self.gfx) {
+        // SAFETY: the render target is a live COM object; drawing happens between BeginDraw and EndDraw.
+        unsafe { rt.BeginDraw() };
+        if let Ok(cv) = Canvas::new(rt, &self.gfx) {
             paint::paint(&cv, &view, &state);
         }
         // SAFETY: pairs the BeginDraw above.
@@ -370,7 +404,7 @@ impl Ui {
             *self.rt.borrow_mut() = None;
         }
         #[cfg(debug_assertions)]
-        dump::frame(&self.gfx, (rc.right, rc.bottom), self.dpi.get(), |cv| paint::paint(cv, &view, &state));
+        dump::frame(&self.gfx, _size, self.dpi.get(), |cv| paint::paint(cv, &view, &state));
     }
 
     /// The client size changed (or the DPI): the layout follows the new width.

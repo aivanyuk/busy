@@ -1,6 +1,6 @@
 //! Drawing the whole window from its `View`: title bar, nav, the page's cards, then the open popup on top.
 
-use super::controls::{dropdown, nav, order, segmented, swatch, toggle};
+use super::controls::{dropdown, nav, order, preview, segmented, swatch, toggle};
 use super::frame;
 use super::layout::{CARD_PAD_L, CARD_PAD_Y, Fonts, LINE_14, PAGE_SUB_H, PAGE_TITLE_H, Target, View};
 use super::model::{self, Control, Flag, Item, Page};
@@ -14,6 +14,9 @@ pub(super) struct State<'a> {
     pub(super) theme: &'a Theme,
     pub(super) fonts: &'a Fonts,
     pub(super) gfx: &'a Gfx,
+    pub(super) cell_fonts: &'a busy_ui::cell::Fonts,
+    /// The host's readings, for the preview; `None` when it couldn't lend them for this frame.
+    pub(super) data: Option<preview::Data<'a>>,
     pub(super) maximized: bool,
     /// The autostart toggle waits for the registry (first read or a write in flight).
     pub(super) autostart_busy: bool,
@@ -54,6 +57,7 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
         match item {
             Item::Header(title) => cv.text(title, &f.strong, Rect::new(r.x, r.y, r.w, LINE_14), t.fg, Align::Left),
             Item::Order(list) => order::draw(cv, r, list, dot, v.hover, t, f),
+            Item::Preview(m) => preview::draw(cv, r, *m, s.cfg, s.data.as_ref(), (s.gfx, s.cell_fonts), t, f),
             Item::Row(row) => {
                 cv.round(r, 4.0, t.card);
                 cv.round_outline(r, 4.0, t.card_line);

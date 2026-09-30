@@ -2,7 +2,9 @@
 //! among the design's options (a hand-edited file, a drive that is gone) is kept as an extra option, so opening
 //! the window never changes a setting by itself.
 
-use busy_core::{Anchor, CellStyle, CpuBar, Module, NetInterface, RateUnit, SensorPick, TempUnit, ThemeMode};
+use busy_core::{
+    Anchor, CellStyle, CpuBar, Module, NetInterface, RateUnit, SensorKind, SensorPick, Snapshot, TempUnit, ThemeMode,
+};
 
 /// A value a dropdown option sets.
 #[derive(Clone, Debug, PartialEq)]
@@ -39,6 +41,31 @@ pub(super) struct Choices {
     pub(super) adapters: Vec<String>,
     /// Temperature readings as "hardware/name", the form `SensorPick::Named` matches.
     pub(super) sensors: Vec<String>,
+}
+
+impl Choices {
+    /// The lists in `snap`, in its order, without repeats: every volume, every adapter, every temperature.
+    pub(super) fn from_snapshot(snap: &Snapshot) -> Self {
+        fn unique(it: impl Iterator<Item = String>) -> Vec<String> {
+            let mut v: Vec<String> = Vec::new();
+            for s in it {
+                if !v.contains(&s) {
+                    v.push(s);
+                }
+            }
+            v
+        }
+        Self {
+            volumes: snap.volumes.iter().map(|v| (v.mount.clone(), v.label.clone())).collect(),
+            adapters: unique(snap.net.iter().flat_map(|n| &n.interfaces).map(|i| i.name.clone())),
+            sensors: unique(
+                snap.sensors
+                    .iter()
+                    .filter(|s| s.kind == SensorKind::Temperature)
+                    .map(|s| format!("{}/{}", s.hardware, s.name)),
+            ),
+        }
+    }
 }
 
 /// `opts` as (label, pick) with `current` selected; appended as `extra(current)` when not among them.
@@ -247,6 +274,37 @@ mod tests {
             (opts[i].label.as_str(), opts[i].pick.clone()),
             ("Every 10 seconds", Pick::ModuleInterval(Module::Gpu, Some(10)))
         );
+    }
+
+    #[test]
+    fn lists_from_readings() {
+        use busy_core::{NetIf, NetInfo, SensorReading, VolumeInfo};
+        let temp = |h: &str, n: &str, kind| SensorReading {
+            source: String::new(),
+            hardware: h.into(),
+            name: n.into(),
+            kind,
+            value: 0.0,
+        };
+        let snap = Snapshot {
+            volumes: vec![VolumeInfo { mount: "C:".into(), label: "Windows".into(), ..Default::default() }],
+            net: Some(NetInfo {
+                interfaces: ["Wi-Fi", "Ethernet", "Wi-Fi"]
+                    .map(|n| NetIf { name: n.into(), ..Default::default() })
+                    .to_vec(),
+                ..Default::default()
+            }),
+            sensors: vec![
+                temp("CPU", "Package", SensorKind::Temperature),
+                temp("CPU", "Fan", SensorKind::Fan),
+                temp("GPU", "Hot Spot", SensorKind::Temperature),
+            ],
+            ..Default::default()
+        };
+        let ch = Choices::from_snapshot(&snap);
+        assert_eq!(ch.volumes, [("C:".to_string(), "Windows".to_string())]);
+        assert_eq!(ch.adapters, ["Wi-Fi", "Ethernet"]);
+        assert_eq!(ch.sensors, ["CPU/Package", "GPU/Hot Spot"]);
     }
 
     #[test]

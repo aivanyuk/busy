@@ -29,6 +29,8 @@ const WM_APP_RENDER: u32 = WM_APP + 2;
 const WM_APP_CONFIG: u32 = WM_APP + 3;
 const WM_APP_FLYOUT_DEACTIVATED: u32 = WM_APP + 4;
 const WM_APP_THEME: u32 = WM_APP + 5;
+/// The settings window shows a module's page (`wParam` = `Module::index` + 1) or none (0).
+const WM_APP_SETTINGS_PAGE: u32 = WM_APP + 6;
 
 const TIMER_WATCH: usize = 1;
 
@@ -63,6 +65,8 @@ struct App {
     locked: bool,
     /// The console display is off (`GUID_CONSOLE_DISPLAY_STATE` = 0).
     display_off: bool,
+    /// The module whose settings page is shown: sampled for its live preview.
+    settings_page: Option<Module>,
 }
 
 /// Runs `f` on the app state unless it is already borrowed (re-entrant message); then returns None.
@@ -84,6 +88,26 @@ fn post(msg: u32) {
 pub fn submit_config(cfg: Config) {
     *lock(&PENDING) = Some(cfg);
     post(WM_APP_CONFIG);
+}
+
+/// The settings window's view of the app. `page` is also called inside `busy_settings::open`, while the state
+/// is borrowed, so configs and pages arrive as posted messages; readings are lent only when the state is free.
+struct SettingsHost;
+
+impl busy_settings::Host for SettingsHost {
+    fn apply(&self, cfg: Config) {
+        submit_config(cfg);
+    }
+
+    fn page(&self, m: Option<Module>) {
+        // SAFETY: PostMessageW only queues a message to our own window.
+        let wp = WPARAM(m.map_or(0, |m| m.index() + 1));
+        let _ = unsafe { PostMessageW(Some(main_hwnd()), WM_APP_SETTINGS_PAGE, wp, LPARAM(0)) };
+    }
+
+    fn with_data(&self, f: &mut dyn FnMut(&Snapshot, &History)) {
+        with(|a| f(&a.snap, &a.hist));
+    }
 }
 
 pub fn run(open_flyout: bool) -> Result<()> {
@@ -141,6 +165,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
         open_flyout,
         locked: false,
         display_off: false,
+        settings_page: None,
     };
     APP.with(|a| *a.borrow_mut() = Some(app));
 
@@ -204,6 +229,12 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                 if let Some(cfg) = lock(&PENDING).take() {
                     with(|a| a.apply_config(cfg, true));
                 }
+            }
+            WM_APP_SETTINGS_PAGE => {
+                with(|a| {
+                    a.settings_page = wp.0.checked_sub(1).and_then(|i| Module::ALL.get(i)).copied();
+                    a.sync_sampler();
+                });
             }
             WM_APP_THEME => {
                 if let Some(t) = lock(&RESOLVED).take() {
@@ -297,6 +328,9 @@ impl App {
         self.hist.push(&snap, &fresh, &self.cfg);
         self.snap = snap;
         self.render_all();
+        if busy_settings::is_open() {
+            busy_settings::refresh(&self.snap, &self.hist);
+        }
         if std::mem::take(&mut self.open_flyout)
             && let Some(first) = self.cfg.modules.iter().find(|m| m.taskbar)
         {
@@ -374,7 +408,8 @@ impl App {
     /// while the session is locked or the display is off.
     fn sync_sampler(&self) {
         let open = self.flyout.as_ref().and_then(Flyout::open_module);
-        self.sampler.set_params(Params::new(&self.cfg, open, self.locked || self.display_off));
+        let params = Params::new(&self.cfg, open, self.locked || self.display_off).with_preview(self.settings_page);
+        self.sampler.set_params(params);
     }
 
     /// The cell the flyout was opened from shows `--active` while it is open; redrawn only when that changes.
@@ -408,14 +443,15 @@ impl App {
             self.refresh_theme();
         }
         self.render_all();
+        busy_settings::sync(&self.cfg);
         if save {
             self.writer.submit(self.cfg.clone());
         }
     }
 
-    /// `page`: the module whose row to select.
+    /// `page`: the module whose page to show.
     fn open_settings(&mut self, page: Option<Module>) {
-        busy_settings::open(self.main, &self.cfg, Box::new(submit_config), page);
+        busy_settings::open(self.main, &self.cfg, std::rc::Rc::new(SettingsHost), page);
     }
 
     /// A click on a flyout footer button: both close the flyout first, like the system flyouts' links.
