@@ -13,6 +13,7 @@
 - [ ] `cargo test --workspace`
 - [ ] Manual UI check (screenshots below) — if `app/` or `crates/settings/` changed
 - [ ] Area doc updated (`docs/areas/*.md`) — if behaviour or a Win32 quirk changed
+- [ ] `CHANGELOG.md` line under Unreleased — if users see or get something new (`docs/releasing.md`)
 
 <!-- Hardware / Windows build used, dump_* output, screenshots -->
 
