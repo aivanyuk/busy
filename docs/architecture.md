@@ -23,7 +23,7 @@ Each crate may depend only on the crates in its row, and exposes only what its r
 | `busy-core` | `serde`, `serde_json` | Data types, `Source`, `Module`, `Config`. No Win32, no threads; its only I/O is `Config::load`/`save`. |
 | `busy-win` | `windows` | Win32 plumbing shared by more than one crate: wide strings, registry reads, the System32 DLL loader, the PDH wrapper. No `busy-*` dependency and no policy (it never decides *what* to read). |
 | `busy-metrics`, `busy-sensors` | `busy-core`, `busy-win` | `sources()` only (plus examples and tests). |
-| `busy-settings` | `busy-core`, `busy-win`, `busy-ui` | `Host`, `open`, `setup`, `sync`, `refresh`, `is_open`, `is_dialog_message`, `autostart` (`is_enabled`, `set`, `repair`). |
+| `busy-settings` | `busy-core`, `busy-win`, `busy-ui` | `Host`, `open`, `setup`, `sync`, `refresh`, `release`, `is_open`, `is_dialog_message`, `autostart` (`is_enabled`, `set`, `repair`). |
 | `busy-ui` | `busy-core`, `busy-win` | `fmt`, `select`, `history`, `tone`, `theme`, `render`, `ctx`, `cell`. |
 | `busy` | all of the above | The binary. |
 

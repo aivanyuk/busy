@@ -3,8 +3,9 @@
 
 use super::Ui;
 use super::layout::Target;
-use super::model::{Command, Control, Edit, Item, RELEASES};
+use super::model::{Command, Control, Edit, Item};
 use super::worker::Job;
+use busy_core::release::RELEASES_URL;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     ReleaseCapture, SetCapture, TME_LEAVE, TRACKMOUSEEVENT, TrackMouseEvent,
 };
@@ -222,7 +223,8 @@ impl Ui {
                     return self.enter_setup();
                 }
                 Control::Button(Command::Releases) => {
-                    self.worker.submit(Job::Open(RELEASES.into()));
+                    let url = self.choices.borrow().newer.as_ref().map_or(RELEASES_URL.into(), |r| r.url.clone());
+                    self.worker.submit(Job::Open(url));
                     return;
                 }
             },

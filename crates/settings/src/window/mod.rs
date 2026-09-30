@@ -57,7 +57,7 @@ pub fn hwnd() -> Option<HWND> {
     UI.with_borrow(|u| u.as_ref().map(|u| u.hwnd))
 }
 
-pub(crate) use live::{refresh, sync};
+pub(crate) use live::{refresh, release, sync};
 
 /// What the window shows: the Settings pages, or setup (onboarding).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -192,7 +192,7 @@ fn create(cfg: &Config, host: Rc<dyn Host>) -> Result<()> {
         cfg: RefCell::new(cfg.clone()),
         host,
         view: RefCell::new(View::new(Page::General)),
-        choices: RefCell::new(Choices::default()),
+        choices: RefCell::new(Choices { newer: live::newer(), ..Choices::default() }),
         cell_fonts,
         shown: RefCell::new(None),
         worker: Worker::start(hwnd),

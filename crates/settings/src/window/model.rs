@@ -99,12 +99,9 @@ pub(super) enum Control {
 pub(super) enum Command {
     /// Turns the window into setup (onboarding).
     RunSetup,
-    /// Opens the releases page (`RELEASES`) in the browser.
+    /// Opens the newer release's page when the update check found one, else the releases page.
     Releases,
 }
-
-/// Where busy is downloaded from.
-pub(super) const RELEASES: &str = "https://github.com/aivanyuk/busy/releases";
 
 impl Command {
     pub(super) fn label(self) -> &'static str {
@@ -155,7 +152,7 @@ fn dropdown(title: &'static str, desc: impl Into<String>, (opts, i): (Vec<Opt>, 
 
 pub(super) fn items(page: Page, cfg: &Config, ch: &Choices) -> Vec<Item> {
     match page {
-        Page::General => general(cfg),
+        Page::General => general(cfg, ch),
         Page::Module(Module::Processes) => processes(cfg),
         Page::Module(m) => module(m, cfg, ch),
         Page::Advanced => advanced(cfg),
@@ -189,12 +186,21 @@ pub(super) fn search(query: &str, cfg: &Config, ch: &Choices) -> Vec<Item> {
 pub(super) const NEWER: &str =
     "These settings were saved by a newer version of busy. Changes apply now, but aren\u{2019}t saved.";
 
-fn general(cfg: &Config) -> Vec<Item> {
+fn general(cfg: &Config, ch: &Choices) -> Vec<Item> {
     let notice = cfg.newer.then_some(Item::Notice(NEWER));
-    notice.into_iter().chain(general_rows(cfg)).collect()
+    notice.into_iter().chain(general_rows(cfg, ch)).collect()
 }
 
-fn general_rows(cfg: &Config) -> Vec<Item> {
+/// About's line: this build's version, and a newer one when the update check found it.
+fn version(ch: &Choices) -> String {
+    let this = env!("CARGO_PKG_VERSION");
+    match &ch.newer {
+        Some(r) => format!("busy {this} \u{2014} {} is available", r.version),
+        None => format!("busy {this}"),
+    }
+}
+
+fn general_rows(cfg: &Config, ch: &Choices) -> Vec<Item> {
     vec![
         Item::Header("Behavior"),
         toggle("Start with Windows", "Launch busy when you sign in", Flag::Autostart, cfg.autostart),
@@ -218,11 +224,7 @@ fn general_rows(cfg: &Config) -> Vec<Item> {
             cfg.modules.iter().filter(|c| c.module != Module::Processes).map(|c| (c.module, c.taskbar)).collect(),
         ),
         Item::Header("About"),
-        Item::Row(Row {
-            title: "Version",
-            desc: format!("busy {}", env!("CARGO_PKG_VERSION")),
-            control: Control::Button(Command::Releases),
-        }),
+        Item::Row(Row { title: "Version", desc: version(ch), control: Control::Button(Command::Releases) }),
     ]
 }
 
@@ -318,6 +320,7 @@ fn updates(m: Module, cfg: &Config) -> [Item; 2] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use busy_core::release::Release;
 
     fn rows(items: &[Item]) -> Vec<&'static str> {
         items.iter().filter_map(|i| if let Item::Row(r) = i { Some(r.title) } else { None }).collect()
@@ -329,6 +332,16 @@ mod tests {
         assert!(!items(Page::General, &cfg, &Choices::default()).iter().any(|i| matches!(i, Item::Notice(_))));
         cfg.newer = true;
         assert!(matches!(items(Page::General, &cfg, &Choices::default())[0], Item::Notice(NEWER)));
+    }
+
+    #[test]
+    fn about_names_a_newer_release() {
+        let this = env!("CARGO_PKG_VERSION");
+        assert_eq!(version(&Choices::default()), format!("busy {this}"));
+        let newer =
+            Release { version: "9.0.0".into(), url: "https://github.com/aivanyuk/busy/releases/tag/v9.0.0".into() };
+        let ch = Choices { newer: Some(newer), ..Choices::default() };
+        assert_eq!(version(&ch), format!("busy {this} \u{2014} 9.0.0 is available"));
     }
 
     #[test]
@@ -348,6 +361,7 @@ mod tests {
                 "Version"
             ]
         );
+        assert!(matches!(items.last(), Some(Item::Row(Row { desc, .. })) if *desc == version(&Choices::default())));
         let Some(Item::Order(order)) = items.iter().find(|i| matches!(i, Item::Order(_))) else {
             panic!("no order list")
         };

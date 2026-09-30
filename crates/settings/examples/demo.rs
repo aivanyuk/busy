@@ -94,6 +94,11 @@ fn main() {
         hist.push(&snapshot(i as f32), &fresh, &cfg);
     }
     let demo = Rc::new(Demo { snap: snapshot(40.0), hist: RefCell::new(hist) });
+    // What the app's update check does when it finds a newer release: `BUSY_NEWER=X.Y.Z`.
+    if let Ok(v) = std::env::var("BUSY_NEWER") {
+        let url = format!("{}/tag/v{v}", release::RELEASES_URL);
+        busy_settings::release(Some(&release::Release { version: v, url }));
+    }
     if std::env::var_os("BUSY_SETUP").is_some() {
         busy_settings::setup(&cfg, demo.clone());
     } else {

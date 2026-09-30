@@ -1,11 +1,36 @@
-//! The window following the host: configs it applied (`sync`) and new readings (`refresh`), which feed the
-//! module page's live preview and the dropdowns that list the machine's drives, adapters and sensors.
+//! The window following the host: configs it applied (`sync`), new readings (`refresh`), which feed the
+//! module page's live preview and the dropdowns that list the machine's drives, adapters and sensors, and
+//! the update check's answer (`release`).
 
 use super::choices::Choices;
 use super::clock;
 use super::model::Page;
 use super::{Ui, ui};
+use busy_core::release::Release;
 use busy_core::{Config, Snapshot};
+use std::cell::RefCell;
+
+thread_local! {
+    /// The update check's last answer, kept while the window is closed for the next one to open with.
+    static NEWER: RefCell<Option<Release>> = const { RefCell::new(None) };
+}
+
+pub(super) fn newer() -> Option<Release> {
+    NEWER.with_borrow(Clone::clone)
+}
+
+pub(crate) fn release(newer: Option<&Release>) {
+    NEWER.set(newer.cloned());
+    let Some(u) = ui() else { return };
+    if u.choices.borrow().newer.as_ref() == newer {
+        return;
+    }
+    u.choices.borrow_mut().newer = newer.cloned();
+    // Under an open popup the rows stay as they are; the next rebuild shows it.
+    if u.view.borrow().popup.is_none() {
+        u.rebuild();
+    }
+}
 use busy_ui::cell::{self, Key};
 use busy_ui::ctx::Ctx;
 use busy_ui::history::History;
