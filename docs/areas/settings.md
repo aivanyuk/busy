@@ -8,7 +8,7 @@
 - `controls/` — one file per control kind (`toggle`, `dropdown` with its popup, `segmented`, `swatch`, `preview`, `order` for the taskbar order list, `nav` for the nav column); each sizes and draws itself and names the part under the pointer.
 - `input.rs` — pointer input: hover, clicks, wheel; a click on a control becomes a `model::Edit`; `keys.rs` — keyboard input and focus.
 - `live.rs` — following the host: `sync` (configs it applied) and `refresh` (new readings: the preview, the machine lists); `clock.rs` — the preview's time and date in the user's formats.
-- `uia/` — UI Automation: `node.rs` (the elements, their roles, names and state, read from the `View`; pure and tested), `provider.rs` (the COM providers, answering from a published `Tree`), `mod.rs` (`WM_GETOBJECT`, publishing each frame, requests, events).
+- `uia/` — UI Automation: `node.rs` (the elements, their roles, names and state, read from the `View`; pure and tested), `tree.rs` (a frame's elements, `Tree` and `Entry`), `provider.rs` (the COM providers, answering from a published `Tree`), `mod.rs` (`WM_GETOBJECT`, publishing each frame, requests, events).
 - `setup/` — setup (onboarding), the window's other mode: `mod.rs` (what it shows, layout, hit-testing, Tab stops), `paint.rs`, `input.rs` (entering setup, pointer, keyboard, finishing).
 - `frame.rs` — the custom title bar and the non-client handling behind it; `wndproc.rs` — the window procedure; `worker.rs` — registry thread (autostart read/write, app theme); `dump.rs` — debug-only frame dump.
 

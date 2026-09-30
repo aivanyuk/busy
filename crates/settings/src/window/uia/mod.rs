@@ -17,6 +17,7 @@ use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, IsZoomed, WM_
 
 mod node;
 mod provider;
+mod tree;
 
 /// Posted to the window when UIA queued a request.
 pub(super) const WM_APP_UIA: u32 = WM_APP + 2;
