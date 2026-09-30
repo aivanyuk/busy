@@ -54,6 +54,27 @@ PRs in order: `busy-core` + workspace → `busy-metrics` → `busy-sensors` → 
 - Not built (opt-ins, Phase 4 UI): Public IP, per-process network, per-app battery usage, memory speed. Real process icons need file I/O off the UI thread and are left out.
 
 ### 4. Settings window (custom D2D, `crates/settings/src/window/`)
+
+**Status: in progress.** Landed in three PRs:
+1. `refactor/ui-crate`: the shared code moved into `busy-ui` (`crates/ui`), which holds formatting, selection, history, tones, theme, the D2D helpers, the draw context and the taskbar cell.
+2. `feat/settings-window`: the window itself, as built:
+   - Design measures and tokens, including the new `--win`/`--card`/`--ctl-strong`/`--pop`/`--knob` tokens.
+   - A custom title bar with working Minimize and Maximize, and a solid `--win` background, as the design has no Mica.
+   - Nav, pages of one card per setting, and the taskbar order list.
+   - Controls, one file per kind: toggle, dropdown with popup, segmented, swatches, order, nav, preview.
+   - The Keyboard section below, and search, which filters rows across all pages.
+   - The page model is pure and tested: `model`, `choices`, `edit`.
+   - **API change** (the user chose live data over a static preview):
+     - `open` takes a `Host` (`apply`, `page`, `with_data`) instead of `on_apply`.
+     - The app calls `refresh(snap, hist)` after each sample and `sync(cfg)` after each applied config.
+     - The shown page's module is sampled (`Params::with_preview`).
+   - Kept from the native window as extra rows: Offset, History, and Processes' "Top processes" page.
+   - Named adapters and sensors are offered from live data.
+   - Not built: the "Run setup" row, which comes with Phase 5, and page subtitles with hardware names (they are static descriptions).
+3. Still to come: the Advanced page (the implemented opt-in only, third-party sensors, with its risk text and a confirmation), and UI Automation.
+
+The original plan follows.
+
 - New implementation of the `window/` modules (replaces native controls; public API unchanged: `open`, `is_open`, `is_dialog_message`, `autostart`), one concern per file as today: window + message routing (`wndproc.rs`), layout, paint, one file per control kind (toggle, dropdown, segmented, swatch, card, nav item), one per page, `config.rs` for Config ↔ controls. No window-owning struct with `pub` fields; controls report input to the page as typed events rather than calling into it.
 - **Registry I/O stays on the window's worker** (`window/worker.rs`, T5): autostart read/write and the app theme are requested and posted back; nothing on a message path touches the registry or files. The window stays hidden until the first read, as today.
 - Needs the renderer: move shared D2D/DWrite helpers (`render.rs`), `theme.rs` and `tone.rs` from `app/` into a new `crates/ui` (or into `busy-settings` depending on size) so both use one source — a mechanical move commit ahead of the rewrite, with the layering table in `docs/architecture.md` updated. Formats, brushes and constant widths cached per DPI and theme (F4); repaint on hover-target change only (F3).
