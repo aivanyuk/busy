@@ -53,6 +53,14 @@ impl Params {
         }
     }
 
+    /// Also samples `m`, whose settings page shows its cell as a live preview.
+    pub fn with_preview(mut self, m: Option<Module>) -> Self {
+        if let Some(m) = m {
+            self.active[m.index()] = true;
+        }
+        self
+    }
+
     fn is_active(&self, m: Module) -> bool {
         !self.paused && self.active[m.index()]
     }
@@ -291,6 +299,16 @@ mod tests {
         let (closed, open) = (Params::new(&cfg, None, false), Params::new(&cfg, Some(Module::Disk), false));
         assert!(closed.is_active(Module::Cpu) && !closed.is_active(Module::Processes));
         assert!(open.is_active(Module::Disk) && open.is_active(Module::Processes) && !open.is_active(Module::Battery));
+    }
+
+    #[test]
+    fn a_settings_page_adds_its_module_alone() {
+        let cfg = Config::default();
+        let p = Params::new(&cfg, None, false).with_preview(Some(Module::Disk));
+        // The preview is the cell only: none of what Disk's flyout borrows.
+        assert!(p.is_active(Module::Disk) && !p.is_active(Module::Processes) && !p.is_active(Module::Battery));
+        assert!(!Params::new(&cfg, None, true).with_preview(Some(Module::Disk)).is_active(Module::Disk));
+        assert_eq!(Params::new(&cfg, None, false).with_preview(None).active, Params::new(&cfg, None, false).active);
     }
 
     #[test]

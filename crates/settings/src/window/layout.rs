@@ -3,7 +3,7 @@
 //! read it, so what is drawn is what is clicked.
 
 use super::choices::Opt;
-use super::controls::{dropdown, order, segmented, swatch, toggle};
+use super::controls::{dropdown, order, preview, segmented, swatch, toggle};
 use super::model::{Control, Item, Page};
 use busy_ui::render::{Gfx, Rect};
 use std::cell::RefCell;
@@ -289,7 +289,7 @@ impl View {
                 },
                 Item::Row(_) => None,
                 Item::Order(list) => order::hit(p.rect, list.len(), cx, cy),
-                Item::Header(_) => None,
+                Item::Header(_) | Item::Preview(_) => None,
             };
         }
         None
@@ -300,6 +300,9 @@ fn place(item: &Item, y: f32, width: f32, gfx: &Gfx, f: &Fonts) -> Placed {
     match item {
         Item::Header(_) => {
             Placed { rect: Rect::new(0.0, y + HEADER_TOP, width, LINE_14 + 4.0), ctl: Rect::default(), text_w: width }
+        }
+        Item::Preview(_) => {
+            Placed { rect: Rect::new(0.0, y, width, preview::HEIGHT), ctl: Rect::default(), text_w: width }
         }
         Item::Order(list) => {
             Placed { rect: Rect::new(0.0, y, width, order::height(list.len())), ctl: Rect::default(), text_w: width }

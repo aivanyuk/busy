@@ -4,6 +4,7 @@
 pub(super) mod dropdown;
 pub(super) mod nav;
 pub(super) mod order;
+pub(super) mod preview;
 pub(super) mod segmented;
 pub(super) mod swatch;
 pub(super) mod toggle;

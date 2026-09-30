@@ -113,6 +113,7 @@ impl Ui {
                 Some(LRESULT(0))
             }
             WM_NCDESTROY => {
+                self.host.page(None);
                 UI.take();
                 None
             }
