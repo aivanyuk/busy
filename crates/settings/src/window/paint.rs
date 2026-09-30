@@ -26,7 +26,8 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
     let (t, f) = (s.theme, s.fonts);
     // SAFETY: the render target is a live COM object inside BeginDraw/EndDraw.
     unsafe { cv.rt.Clear(Some(&t.win)) };
-    frame::draw(cv, v.w, v.hover, s.maximized, t, f);
+    let bar = frame::Bar { title: "busy Settings", buttons: frame::ALL, hover: v.hover, maximized: s.maximized };
+    frame::draw(cv, v.w, &bar, t, f);
     nav::header(cv, &model::readings(s.cfg), t, f);
     nav::search(cv, v.search_rect(), &v.query, v.focus == Some(Target::Search), (s.gfx, t), f);
     // `Theme::color` clamps the index: a host's config need not be normalized.

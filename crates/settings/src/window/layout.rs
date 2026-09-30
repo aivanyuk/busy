@@ -359,7 +359,7 @@ impl View {
             return k.map(Target::Opt);
         }
         if y < TITLE_H {
-            return super::frame::button_at(self.w, x);
+            return super::frame::button_at(self.w, x, super::frame::ALL);
         }
         if x < NAV_W {
             if self.search_rect().contains(x, y) {

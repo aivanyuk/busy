@@ -23,7 +23,9 @@ impl Ui {
     fn handle(&self, m: u32, w: WPARAM, l: LPARAM) -> Option<LRESULT> {
         match m {
             WM_NCCALCSIZE if w.0 != 0 => Some(frame::calc_size(self.hwnd, w, l, self.dpi.get())),
-            WM_NCHITTEST => Some(frame::hit_test(self.hwnd, l, self.dpi.get(), self.view.borrow().w)),
+            WM_NCHITTEST => {
+                Some(frame::hit_test(self.hwnd, l, self.dpi.get(), (self.view.borrow().w, frame::ALL), true))
+            }
             WM_PAINT => {
                 let mut ps = PAINTSTRUCT::default();
                 // SAFETY: our window; BeginPaint/EndPaint pair around the draw.
