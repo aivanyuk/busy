@@ -15,14 +15,14 @@ use std::rc::Rc;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::MSG;
 
-/// What the settings window needs from the app that opens it, called on the UI thread. `page` is also called
+/// What the settings window needs from the app that opens it, called on the UI thread. `shown` is also called
 /// from inside [`open`], so no method may call back into the window synchronously: post a message instead.
 pub trait Host {
     /// A changed config, after every edit (changes apply live); the host applies and persists it.
     fn apply(&self, cfg: Config);
-    /// The module whose page is shown, `None` on other pages and once the window closes: the host samples it
-    /// while shown, so its preview is live even without a taskbar cell.
-    fn page(&self, m: Option<Module>);
+    /// The modules whose live readings the window shows (a module page's preview), empty when none and once
+    /// the window closes: the host samples them while shown, even those without a taskbar cell.
+    fn shown(&self, modules: &[Module]);
     /// Calls `f` with the host's latest readings and history, for drawing the preview; may skip the call
     /// when they are not available right now.
     fn with_data(&self, f: &mut dyn FnMut(&Snapshot, &History));
@@ -34,6 +34,13 @@ pub trait Host {
 /// module's page (a flyout's "<Module> settings" button), also when the window is already open.
 pub fn open(_owner: HWND, cfg: &Config, host: Rc<dyn Host>, page: Option<Module>) {
     window::open(cfg, host, page);
+}
+
+/// Opens setup (onboarding; design "FIRST RUN") in the settings window, or turns the open window into it.
+/// Choices apply live through [`Host::apply`]; finishing it (Skip, Start monitoring or Close) applies a config
+/// with `onboarded` set and closes the window. The host opens it at startup while `onboarded` is false.
+pub fn setup(cfg: &Config, host: Rc<dyn Host>) {
+    window::setup(cfg, host);
 }
 
 /// The host applied `cfg`, from the window or anywhere else (the widget's menu): the window shows it.

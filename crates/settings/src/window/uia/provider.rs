@@ -109,6 +109,7 @@ fn control_type(r: Role) -> UIA_CONTROLTYPE_ID {
         Role::List => UIA_ListControlTypeId,
         Role::ListItem => UIA_ListItemControlTypeId,
         Role::Text => UIA_TextControlTypeId,
+        Role::RadioButton => UIA_RadioButtonControlTypeId,
     }
 }
 
@@ -226,7 +227,14 @@ impl IRawElementProviderFragmentRoot_Impl for Root_Impl {
     }
 }
 
-#[implement(IRawElementProviderSimple, IRawElementProviderFragment, IInvokeProvider, IToggleProvider, IValueProvider)]
+#[implement(
+    IRawElementProviderSimple,
+    IRawElementProviderFragment,
+    IInvokeProvider,
+    IToggleProvider,
+    IValueProvider,
+    ISelectionItemProvider
+)]
 struct Element {
     shared: Arc<Shared>,
     node: Node,
@@ -268,9 +276,12 @@ impl IRawElementProviderSimple_Impl for Element_Impl {
     }
 
     fn GetPatternProvider(&self, id: UIA_PATTERN_ID) -> Result<IUnknown> {
-        let (invoke, toggle, value) =
-            self.with(|_, _, e| Some((e.info.invoke, e.info.toggle.is_some(), e.info.value.is_some())))?;
+        let (invoke, toggle, value, selection) = self.with(|_, _, e| {
+            let i = &e.info;
+            Some((i.invoke, i.toggle.is_some(), i.value.is_some(), i.selected.is_some()))
+        })?;
         match id {
+            UIA_SelectionItemPatternId if selection => Ok(self.to_interface::<ISelectionItemProvider>().into()),
             UIA_InvokePatternId if invoke => Ok(self.to_interface::<IInvokeProvider>().into()),
             UIA_TogglePatternId if toggle => Ok(self.to_interface::<IToggleProvider>().into()),
             UIA_ValuePatternId if value => Ok(self.to_interface::<IValueProvider>().into()),
@@ -289,6 +300,7 @@ impl IRawElementProviderSimple_Impl for Element_Impl {
                 UIA_ItemStatusPropertyId => text(&i.status),
                 UIA_IsKeyboardFocusablePropertyId => variant_bool(i.focusable),
                 UIA_HasKeyboardFocusPropertyId => variant_bool(t.focus == Some(id(e))),
+                UIA_SelectionItemIsSelectedPropertyId => variant_bool(i.selected == Some(true)),
                 UIA_IsEnabledPropertyId => variant_bool(i.enabled),
                 UIA_IsOffscreenPropertyId => variant_bool(e.offscreen),
                 _ => VARIANT::default(),
@@ -374,6 +386,30 @@ impl IToggleProvider_Impl for Element_Impl {
 
     fn ToggleState(&self) -> Result<ToggleState> {
         self.with(|_, _, e| e.info.toggle.map(|on| if on { ToggleState_On } else { ToggleState_Off }))
+    }
+}
+
+/// A radio button: selecting it is what a click does; it can't be unselected, only replaced.
+impl ISelectionItemProvider_Impl for Element_Impl {
+    fn Select(&self) -> Result<()> {
+        self.press()
+    }
+
+    fn AddToSelection(&self) -> Result<()> {
+        self.press()
+    }
+
+    fn RemoveFromSelection(&self) -> Result<()> {
+        Err(err(UIA_E_INVALIDOPERATION))
+    }
+
+    fn IsSelected(&self) -> Result<BOOL> {
+        self.with(|_, _, e| e.info.selected).map(Into::into)
+    }
+
+    /// None: the group isn't an element of its own.
+    fn SelectionContainer(&self) -> Result<IRawElementProviderSimple> {
+        none()
     }
 }
 

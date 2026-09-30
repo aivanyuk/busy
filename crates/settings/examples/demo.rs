@@ -1,6 +1,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 //! Standalone host for the settings window, with fixed synthetic readings for the preview and the machine
-//! lists. `BUSY_FORCE_DARK=1` forces dark mode. Applied configs are printed, not saved.
+//! lists. `BUSY_FORCE_DARK=1` forces dark mode; `BUSY_SETUP=1` opens setup (onboarding) instead of the
+//! Settings pages. Applied configs are printed, not saved.
 // link.exe's manifest schema predates <dpiAwareness> and warns (81010002); the element is still embedded.
 #![allow(linker_messages)]
 
@@ -23,8 +24,8 @@ impl Host for Demo {
         self.hist.borrow_mut().resize(&cfg);
     }
 
-    fn page(&self, m: Option<Module>) {
-        println!("page {m:?}");
+    fn shown(&self, modules: &[Module]) {
+        println!("shown {modules:?}");
     }
 
     fn with_data(&self, f: &mut dyn FnMut(&Snapshot, &History)) {
@@ -93,7 +94,11 @@ fn main() {
         hist.push(&snapshot(i as f32), &fresh, &cfg);
     }
     let demo = Rc::new(Demo { snap: snapshot(40.0), hist: RefCell::new(hist) });
-    busy_settings::open(HWND::default(), &cfg, demo.clone(), None);
+    if std::env::var_os("BUSY_SETUP").is_some() {
+        busy_settings::setup(&cfg, demo.clone());
+    } else {
+        busy_settings::open(HWND::default(), &cfg, demo.clone(), None);
+    }
     // What the app does after each sample: fills the drive, adapter and sensor lists.
     busy_settings::refresh(&demo.snap, &demo.hist.borrow());
     let mut msg = MSG::default();

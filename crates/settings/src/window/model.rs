@@ -88,6 +88,23 @@ pub(super) enum Control {
     Segmented(Vec<Opt>, usize),
     /// The module palette, with the module's color selected.
     Swatches(Module, u8),
+    /// A button that does something rather than edit the config.
+    Button(Command),
+}
+
+/// What a row's button does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Command {
+    /// Turns the window into setup (onboarding).
+    RunSetup,
+}
+
+impl Command {
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Command::RunSetup => "Run setup",
+        }
+    }
 }
 
 /// What a toggle switches.
@@ -174,6 +191,11 @@ fn general(cfg: &Config) -> Vec<Item> {
         dropdown("History", "How far back the flyout charts go", choices::history(cfg.history_secs)),
         Item::Header("Appearance"),
         dropdown("Theme", "Flyouts and this window", choices::theme(cfg.theme)),
+        Item::Row(Row {
+            title: "Setup",
+            desc: "Walk through choosing widgets again".into(),
+            control: Control::Button(Command::RunSetup),
+        }),
         Item::Header("Taskbar order"),
         Item::Order(
             cfg.modules.iter().filter(|c| c.module != Module::Processes).map(|c| (c.module, c.taskbar)).collect(),
@@ -284,7 +306,7 @@ mod tests {
         let items = items(Page::General, &cfg, &Choices::default());
         assert_eq!(
             rows(&items),
-            ["Start with Windows", "Widget position", "Offset", "Default update interval", "History", "Theme"]
+            ["Start with Windows", "Widget position", "Offset", "Default update interval", "History", "Theme", "Setup"]
         );
         let Some(Item::Order(order)) = items.last() else { panic!("no order list") };
         assert_eq!(order.len(), Module::ALL.len() - 1);

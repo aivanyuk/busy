@@ -15,14 +15,19 @@ const BTN_W: f32 = 46.0;
 /// Close-button hover (design: hard-coded `#C42B1C` with white glyph, as Windows).
 const CLOSE_HOT: u32 = 0xC42B1C;
 
-/// The caption button under `x` in a window `w` DIPs wide, right to left: Close, Max, Min.
-pub(super) fn button_at(w: f32, x: f32) -> Option<Target> {
-    match ((w - x) / BTN_W).floor() as i32 {
-        0 if x < w => Some(Target::Close),
-        1 => Some(Target::Max),
-        2 => Some(Target::Min),
-        _ => None,
-    }
+/// The caption buttons of the Settings window, and of setup (the design's onboarding has Close only).
+pub(super) const ALL: &[Target] = &[Target::Min, Target::Max, Target::Close];
+pub(super) const CLOSE: &[Target] = &[Target::Close];
+
+/// The caption button under `x` in a window `w` DIPs wide, right to left: Close, Max, Min (of `buttons`).
+pub(super) fn button_at(w: f32, x: f32, buttons: &[Target]) -> Option<Target> {
+    let b = match ((w - x) / BTN_W).floor() as i32 {
+        0 if x < w => Target::Close,
+        1 => Target::Max,
+        2 => Target::Min,
+        _ => return None,
+    };
+    buttons.contains(&b).then_some(b)
 }
 
 pub(super) fn button_rect(w: f32, t: Target) -> Rect {
@@ -34,11 +39,20 @@ pub(super) fn button_rect(w: f32, t: Target) -> Rect {
     Rect::new(w - i * BTN_W, 0.0, BTN_W, TITLE_H)
 }
 
-pub(super) fn draw(cv: &Canvas, w: f32, hover: Option<Target>, maximized: bool, t: &Theme, f: &Fonts) {
+/// The title bar: glyph, `title` and `buttons`.
+pub(super) struct Bar<'a> {
+    pub(super) title: &'a str,
+    pub(super) buttons: &'a [Target],
+    pub(super) hover: Option<Target>,
+    pub(super) maximized: bool,
+}
+
+pub(super) fn draw(cv: &Canvas, w: f32, bar: &Bar, t: &Theme, f: &Fonts) {
+    let (hover, maximized) = (bar.hover, bar.maximized);
     // Glyph: 3-wide bars 2 apart, 14 high, centered in the bar.
     glyph(cv, 16.0, (TITLE_H + 14.0) / 2.0, (3.0, 2.0), [6.0, 14.0, 9.0], t);
-    cv.text("busy Settings", &f.caption, Rect::new(16.0 + 13.0 + 12.0, 0.0, 200.0, TITLE_H), t.fg, Align::Left);
-    for b in [Target::Min, Target::Max, Target::Close] {
+    cv.text(bar.title, &f.caption, Rect::new(16.0 + 13.0 + 12.0, 0.0, 200.0, TITLE_H), t.fg, Align::Left);
+    for &b in bar.buttons {
         let r = button_rect(w, b);
         let hot = hover == Some(b);
         let ink = if hot && b == Target::Close { rgb(0xFFFFFF) } else { t.fg };
@@ -82,9 +96,16 @@ pub(super) fn calc_size(hwnd: HWND, w: WPARAM, l: LPARAM, dpi: u32) -> LRESULT {
     }
 }
 
-/// `WM_NCHITTEST`: the default for the side and bottom borders; the top border, the title bar (caption, so it
-/// drags and double-click maximizes) and the caption buttons (client, so we draw and click them) are ours.
-pub(super) fn hit_test(hwnd: HWND, l: LPARAM, dpi: u32, width: f32) -> LRESULT {
+/// `WM_NCHITTEST`: the default for the side and bottom borders; the top border (when `resizable`), the title
+/// bar (caption, so it drags and double-click maximizes) and the caption `buttons` (client, so we draw and
+/// click them) are ours.
+pub(super) fn hit_test(
+    hwnd: HWND,
+    l: LPARAM,
+    dpi: u32,
+    (width, buttons): (f32, &[Target]),
+    resizable: bool,
+) -> LRESULT {
     // SAFETY: DefWindowProcW with the message's own parameters; `pt` is a valid in/out pointer.
     unsafe {
         let r = DefWindowProcW(hwnd, WM_NCHITTEST, WPARAM(0), l);
@@ -93,12 +114,12 @@ pub(super) fn hit_test(hwnd: HWND, l: LPARAM, dpi: u32, width: f32) -> LRESULT {
         }
         let mut pt = POINT { x: (l.0 & 0xFFFF) as i16 as i32, y: ((l.0 >> 16) & 0xFFFF) as i16 as i32 };
         let _ = ScreenToClient(hwnd, &mut pt);
-        if !IsZoomed(hwnd).as_bool() && pt.y < border(dpi) {
+        if resizable && !IsZoomed(hwnd).as_bool() && pt.y < border(dpi) {
             return LRESULT(HTTOP as isize);
         }
         let s = dpi as f32 / 96.0;
         let (x, y) = (pt.x as f32 / s, pt.y as f32 / s);
-        if y < TITLE_H && button_at(width, x).is_none() {
+        if y < TITLE_H && button_at(width, x, buttons).is_none() {
             return LRESULT(HTCAPTION as isize);
         }
         LRESULT(HTCLIENT as isize)
@@ -111,11 +132,14 @@ mod tests {
 
     #[test]
     fn caption_buttons_right_to_left() {
-        assert_eq!(button_at(1000.0, 999.0), Some(Target::Close));
-        assert_eq!(button_at(1000.0, 955.0), Some(Target::Close));
-        assert_eq!(button_at(1000.0, 953.0), Some(Target::Max));
-        assert_eq!(button_at(1000.0, 870.0), Some(Target::Min));
-        assert_eq!(button_at(1000.0, 861.0), None);
-        assert_eq!(button_at(1000.0, 1000.0), None);
+        assert_eq!(button_at(1000.0, 999.0, ALL), Some(Target::Close));
+        assert_eq!(button_at(1000.0, 955.0, ALL), Some(Target::Close));
+        assert_eq!(button_at(1000.0, 953.0, ALL), Some(Target::Max));
+        assert_eq!(button_at(1000.0, 870.0, ALL), Some(Target::Min));
+        assert_eq!(button_at(1000.0, 861.0, ALL), None);
+        assert_eq!(button_at(1000.0, 1000.0, ALL), None);
+        // Setup has Close only: where Maximize would be is caption.
+        assert_eq!(button_at(680.0, 679.0, CLOSE), Some(Target::Close));
+        assert_eq!(button_at(680.0, 630.0, CLOSE), None);
     }
 }

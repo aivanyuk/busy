@@ -3,7 +3,7 @@
 
 use super::Ui;
 use super::layout::Target;
-use super::model::{Control, Edit, Item};
+use super::model::{Command, Control, Edit, Item};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     ReleaseCapture, SetCapture, TME_LEAVE, TRACKMOUSEEVENT, TrackMouseEvent,
 };
@@ -31,6 +31,9 @@ impl Ui {
                 self.tracking.set(true);
             }
         }
+        if self.in_setup() {
+            return self.setup_move(x, y);
+        }
         let (x, y) = self.dips(x, y);
         let hit = self.view.borrow().hit(&self.gfx, &self.fonts, x, y);
         self.set_hover(hit);
@@ -38,6 +41,9 @@ impl Ui {
 
     pub(super) fn on_leave(&self) {
         self.tracking.set(false);
+        if self.in_setup() {
+            return self.setup_hover(None);
+        }
         self.set_hover(None);
     }
 
@@ -51,6 +57,12 @@ impl Ui {
     }
 
     pub(super) fn on_down(&self, x: i32, y: i32) {
+        if self.in_setup() {
+            self.setup_down(x, y);
+            // SAFETY: our live window.
+            unsafe { SetCapture(self.hwnd) };
+            return;
+        }
         let (x, y) = self.dips(x, y);
         let hit = self.view.borrow().hit(&self.gfx, &self.fonts, x, y);
         // A press outside an open popup only closes it.
@@ -80,6 +92,9 @@ impl Ui {
     pub(super) fn on_up(&self, x: i32, y: i32) {
         // SAFETY: releases the capture taken in `on_down`, if any.
         let _ = unsafe { ReleaseCapture() };
+        if self.in_setup() {
+            return self.setup_up(x, y);
+        }
         let (x, y) = self.dips(x, y);
         let hit = self.view.borrow().hit(&self.gfx, &self.fonts, x, y);
         if let Some(t) = self.pressed.take().filter(|&p| Some(p) == hit) {
@@ -95,6 +110,9 @@ impl Ui {
     }
 
     pub(super) fn on_wheel(&self, delta: i16) {
+        if self.in_setup() {
+            return;
+        }
         let dy = -(delta as f32) / WHEEL_DELTA as f32 * WHEEL_STEP;
         let mut v = self.view.borrow_mut();
         // Over an open popup the wheel scrolls its options, one per notch.
@@ -189,7 +207,7 @@ impl Ui {
         }
     }
 
-    /// A click on row `i`'s control: a toggle flips, a dropdown opens (or closes).
+    /// A click on row `i`'s control: a toggle flips, a dropdown opens (or closes), a button does its command.
     pub(super) fn control(&self, i: usize) {
         let mut v = self.view.borrow_mut();
         let edit = match v.items.get(i) {
@@ -198,6 +216,10 @@ impl Ui {
                 Control::Dropdown(..) => None,
                 // Their parts are the targets (`Target::Part`).
                 Control::Segmented(..) | Control::Swatches(..) => return,
+                Control::Button(Command::RunSetup) => {
+                    drop(v);
+                    return self.enter_setup();
+                }
             },
             _ => return,
         };

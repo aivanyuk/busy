@@ -11,7 +11,7 @@ use crate::render::nice_max;
 use crate::theme::Color;
 use crate::tone::{self, SECOND};
 use crate::{fmt, select};
-use busy_core::{CellStyle, CpuBar, Module, ModuleCfg, SensorKind};
+use busy_core::{CellStyle, Config, CpuBar, Module, ModuleCfg, SensorKind, Snapshot};
 
 pub struct Cell<'a> {
     pub module: Module,
@@ -192,6 +192,23 @@ pub fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
     Some(Cell { module: mc.module, label, body: body? })
 }
 
+/// A module's reading as one short value, whatever its cell's style (design onboarding: `w.value || w.v2`):
+/// the percentage (Disk: how full its drive is), Network's download rate, the taskbar sensor's reading.
+/// `None` without data, and for Processes, which has no reading of its own.
+pub fn sample(snap: &Snapshot, cfg: &Config, m: Module) -> Option<String> {
+    let pct = |used: u64, total: u64| (total > 0).then(|| fmt::pct(used as f32 * 100.0 / total as f32));
+    match m {
+        Module::Cpu => snap.cpu.as_ref().map(|c| fmt::pct(c.total)),
+        Module::Memory => snap.memory.as_ref().and_then(|mem| pct(mem.used, mem.total)),
+        Module::Gpu => select::busiest_gpu(snap).map(|(_, g)| fmt::pct(g.util_pct)),
+        Module::Battery => snap.battery.as_ref().map(|b| fmt::pct(b.percent)),
+        Module::Network => select::net_rates(snap, cfg).map(|(rx, _)| fmt::rate_in(rx, cfg.options.network.units)),
+        Module::Disk => select::disk_volume(snap, cfg).and_then(|v| pct(v.total.saturating_sub(v.free), v.total)),
+        Module::Sensors => select::taskbar_sensor(snap, cfg).map(|s| fmt::sensor(s.value, s.kind, cfg.temp_unit)),
+        Module::Processes => None,
+    }
+}
+
 /// Design `MODS.short`, except: Disk Text/Bar name their drive ("C:"), Battery shows the time left (`h:mm`)
 /// on battery with `show_remaining`, and a sensor pick that isn't a temperature is named by its reading.
 fn label(m: Module, style: CellStyle, ctx: &Ctx) -> String {
@@ -219,12 +236,29 @@ fn label(m: Module, style: CellStyle, ctx: &Ctx) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Body, Cell};
+    use super::{Body, Cell, sample};
     use crate::theme::Color;
-    use busy_core::Module;
+    use busy_core::{Config, CpuInfo, MemInfo, Module, Snapshot};
 
     fn cell(module: Module, body: Body<'static>) -> Cell<'static> {
         Cell { module, label: None, body }
+    }
+
+    #[test]
+    fn samples_are_one_value_whatever_the_style() {
+        let cfg = Config::default();
+        let snap = Snapshot {
+            cpu: Some(CpuInfo { total: 42.0, ..CpuInfo::default() }),
+            memory: Some(MemInfo { total: 8, used: 2, ..MemInfo::default() }),
+            ..Snapshot::default()
+        };
+        assert_eq!(sample(&snap, &cfg, Module::Cpu).as_deref(), Some("42%"));
+        assert_eq!(sample(&snap, &cfg, Module::Memory).as_deref(), Some("25%"));
+        // No data yet, or no reading of its own.
+        assert_eq!(sample(&snap, &cfg, Module::Battery), None);
+        assert_eq!(sample(&snap, &cfg, Module::Processes), None);
+        let empty = Snapshot { memory: Some(MemInfo::default()), ..Snapshot::default() };
+        assert_eq!(sample(&empty, &cfg, Module::Memory), None);
     }
 
     #[test]

@@ -6,6 +6,7 @@ mod app;
 #[cfg(debug_assertions)]
 mod fake;
 mod flyout;
+mod host;
 mod launch;
 mod menu;
 mod presence;

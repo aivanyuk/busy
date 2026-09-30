@@ -29,8 +29,8 @@ const WM_APP_RENDER: u32 = WM_APP + 2;
 const WM_APP_CONFIG: u32 = WM_APP + 3;
 const WM_APP_FLYOUT_DEACTIVATED: u32 = WM_APP + 4;
 const WM_APP_THEME: u32 = WM_APP + 5;
-/// The settings window shows a module's page (`wParam` = `Module::index` + 1) or none (0).
-const WM_APP_SETTINGS_PAGE: u32 = WM_APP + 6;
+/// The settings window shows these modules' live readings (`wParam`: bit `Module::index` of each).
+pub(crate) const WM_APP_SHOWN: u32 = WM_APP + 6;
 
 const TIMER_WATCH: usize = 1;
 
@@ -65,8 +65,8 @@ struct App {
     locked: bool,
     /// The console display is off (`GUID_CONSOLE_DISPLAY_STATE` = 0).
     display_off: bool,
-    /// The module whose settings page is shown: sampled for its live preview.
-    settings_page: Option<Module>,
+    /// The modules whose live readings the settings window shows: sampled while shown.
+    shown: Vec<Module>,
 }
 
 /// Runs `f` on the app state unless it is already borrowed (re-entrant message); then returns None.
@@ -74,7 +74,12 @@ fn with<R>(f: impl FnOnce(&mut App) -> R) -> Option<R> {
     APP.with(|a| a.try_borrow_mut().ok().and_then(|mut g| g.as_mut().map(f)))
 }
 
-fn main_hwnd() -> HWND {
+/// Lends the latest readings and history, unless the app state is borrowed (a re-entrant message).
+pub(crate) fn with_readings(f: impl FnOnce(&Snapshot, &History)) {
+    with(|a| f(&a.snap, &a.hist));
+}
+
+pub(crate) fn main_hwnd() -> HWND {
     HWND(MAIN.load(Ordering::Relaxed) as _)
 }
 
@@ -88,26 +93,6 @@ fn post(msg: u32) {
 pub fn submit_config(cfg: Config) {
     *lock(&PENDING) = Some(cfg);
     post(WM_APP_CONFIG);
-}
-
-/// The settings window's view of the app. `page` is also called inside `busy_settings::open`, while the state
-/// is borrowed, so configs and pages arrive as posted messages; readings are lent only when the state is free.
-struct SettingsHost;
-
-impl busy_settings::Host for SettingsHost {
-    fn apply(&self, cfg: Config) {
-        submit_config(cfg);
-    }
-
-    fn page(&self, m: Option<Module>) {
-        // SAFETY: PostMessageW only queues a message to our own window.
-        let wp = WPARAM(m.map_or(0, |m| m.index() + 1));
-        let _ = unsafe { PostMessageW(Some(main_hwnd()), WM_APP_SETTINGS_PAGE, wp, LPARAM(0)) };
-    }
-
-    fn with_data(&self, f: &mut dyn FnMut(&Snapshot, &History)) {
-        with(|a| f(&a.snap, &a.hist));
-    }
 }
 
 pub fn run(open_flyout: bool) -> Result<()> {
@@ -165,9 +150,14 @@ pub fn run(open_flyout: bool) -> Result<()> {
         open_flyout,
         locked: false,
         display_off: false,
-        settings_page: None,
+        shown: Vec::new(),
     };
+    let first_run = (!app.cfg.onboarded).then(|| app.cfg.clone());
     APP.with(|a| *a.borrow_mut() = Some(app));
+    // First run: setup (onboarding) opens once the widget is embedded, until it is finished.
+    if let Some(cfg) = first_run {
+        busy_settings::setup(&cfg, std::rc::Rc::new(crate::host::SettingsHost));
+    }
 
     let mut msg = MSG::default();
     unsafe {
@@ -230,9 +220,9 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                     with(|a| a.apply_config(cfg, true));
                 }
             }
-            WM_APP_SETTINGS_PAGE => {
+            WM_APP_SHOWN => {
                 with(|a| {
-                    a.settings_page = wp.0.checked_sub(1).and_then(|i| Module::ALL.get(i)).copied();
+                    a.shown = Module::ALL.into_iter().filter(|m| wp.0 & 1 << m.index() != 0).collect();
                     a.sync_sampler();
                 });
             }
@@ -408,7 +398,7 @@ impl App {
     /// while the session is locked or the display is off.
     fn sync_sampler(&self) {
         let open = self.flyout.as_ref().and_then(Flyout::open_module);
-        let params = Params::new(&self.cfg, open, self.locked || self.display_off).with_preview(self.settings_page);
+        let params = Params::new(&self.cfg, open, self.locked || self.display_off).with_shown(&self.shown);
         self.sampler.set_params(params);
     }
 
@@ -451,7 +441,7 @@ impl App {
 
     /// `page`: the module whose page to show.
     fn open_settings(&mut self, page: Option<Module>) {
-        busy_settings::open(self.main, &self.cfg, std::rc::Rc::new(SettingsHost), page);
+        busy_settings::open(self.main, &self.cfg, std::rc::Rc::new(crate::host::SettingsHost), page);
     }
 
     /// A click on a flyout footer button: both close the flyout first, like the system flyouts' links.

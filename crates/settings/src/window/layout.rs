@@ -3,7 +3,7 @@
 //! read it, so what is drawn is what is clicked.
 
 use super::choices::Opt;
-use super::controls::{dropdown, order, preview, segmented, swatch, toggle};
+use super::controls::{button, dropdown, order, preview, segmented, swatch, toggle};
 use super::model::{Control, Item, Page};
 use busy_ui::render::{Gfx, Rect};
 use std::cell::RefCell;
@@ -59,6 +59,10 @@ pub(super) struct Fonts {
     pub(super) body: IDWriteTextFormat,
     pub(super) strong: IDWriteTextFormat,
     pub(super) small: IDWriteTextFormat,
+    /// Setup's reading values: 12 px semibold.
+    pub(super) small_strong: IDWriteTextFormat,
+    /// Setup's subtitle: 14 px, wrapping.
+    pub(super) body_wrap: IDWriteTextFormat,
     /// Card descriptions: 12 px, wrapping.
     pub(super) desc: IDWriteTextFormat,
     pub(super) sub: IDWriteTextFormat,
@@ -76,6 +80,8 @@ impl Fonts {
             body: gfx.format(14.0, false)?,
             strong: gfx.format(14.0, true)?,
             small: gfx.format(12.0, false)?,
+            small_strong: gfx.format_weight(12.0, DWRITE_FONT_WEIGHT_SEMI_BOLD)?,
+            body_wrap: gfx.wrapping(14.0)?,
             desc: gfx.wrapping(12.0)?,
             sub: gfx.format(13.0, false)?,
             title: gfx.format_weight(28.0, DWRITE_FONT_WEIGHT_SEMI_BOLD)?,
@@ -359,7 +365,7 @@ impl View {
             return k.map(Target::Opt);
         }
         if y < TITLE_H {
-            return super::frame::button_at(self.w, x);
+            return super::frame::button_at(self.w, x, super::frame::ALL);
         }
         if x < NAV_W {
             if self.search_rect().contains(x, y) {
@@ -411,6 +417,7 @@ fn place(item: &Item, y: f32, width: f32, gfx: &Gfx, f: &Fonts) -> Placed {
                 Control::Dropdown(opts, _) => dropdown::size(gfx, &f.body, opts),
                 Control::Segmented(opts, _) => segmented::size(gfx, f, opts),
                 Control::Swatches(..) => swatch::SIZE,
+                Control::Button(c) => button::size(gfx, f, c.label()),
             };
             let inner = width - CARD_PAD_L - CARD_PAD_R;
             let side = inner - cw - 16.0;

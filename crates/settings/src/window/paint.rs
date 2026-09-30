@@ -1,6 +1,6 @@
 //! Drawing the whole window from its `View`: title bar, nav, the page's cards, then the open popup on top.
 
-use super::controls::{dropdown, nav, order, preview, segmented, swatch, toggle};
+use super::controls::{button, dropdown, nav, order, preview, segmented, swatch, toggle};
 use super::frame;
 use super::layout::{CARD_PAD_L, CARD_PAD_Y, Fonts, LINE_14, PAGE_SUB_H, PAGE_TITLE_H, Target, View};
 use super::model::{self, Control, Flag, Item, Page};
@@ -26,7 +26,8 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
     let (t, f) = (s.theme, s.fonts);
     // SAFETY: the render target is a live COM object inside BeginDraw/EndDraw.
     unsafe { cv.rt.Clear(Some(&t.win)) };
-    frame::draw(cv, v.w, v.hover, s.maximized, t, f);
+    let bar = frame::Bar { title: "busy Settings", buttons: frame::ALL, hover: v.hover, maximized: s.maximized };
+    frame::draw(cv, v.w, &bar, t, f);
     nav::header(cv, &model::readings(s.cfg), t, f);
     nav::search(cv, v.search_rect(), &v.query, v.focus == Some(Target::Search), (s.gfx, t), f);
     // `Theme::color` clamps the index: a host's config need not be normalized.
@@ -84,6 +85,7 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
                     }
                     Control::Segmented(opts, sel) => segmented::draw(cv, s.gfx, ctl, opts, *sel, t, f),
                     Control::Swatches(_, sel) => swatch::draw(cv, ctl, *sel, t),
+                    Control::Button(c) => button::draw(cv, ctl, c.label(), hover, t, f),
                 }
             }
         }
