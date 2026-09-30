@@ -28,7 +28,7 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
     unsafe { cv.rt.Clear(Some(&t.win)) };
     frame::draw(cv, v.w, v.hover, s.maximized, t, f);
     nav::header(cv, &model::readings(s.cfg), t, f);
-    nav::search(cv, v.search_rect(), t, f);
+    nav::search(cv, v.search_rect(), &v.query, v.focus == Some(Target::Search), (s.gfx, t), f);
     // `Theme::color` clamps the index: a host's config need not be normalized.
     let dot = |m: Module| {
         t.color(busy_ui::tone::Tone::Pal(s.cfg.module(m).map_or(m.default_color(), ModuleCfg::color_index)))
@@ -38,8 +38,13 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
             Page::General => (t.fg3, ""),
             Page::Module(m) => (dot(m), if model::is_on(s.cfg, m) { "On" } else { "Off" }),
         };
-        let item =
-            nav::Item { label: p.title(), dot, status, selected: p == v.page, hover: v.hover == Some(Target::Nav(i)) };
+        let item = nav::Item {
+            label: p.title(),
+            dot,
+            status,
+            selected: p == v.page && !v.searching(),
+            hover: v.hover == Some(Target::Nav(i)),
+        };
         nav::item(cv, v.nav_rect(i), &item, t, f);
     }
 
@@ -47,8 +52,9 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
     cv.clip(pane);
     let (x, y) = v.origin();
     let w = pane.w - (x - pane.x) - 32.0;
-    cv.text(v.page.title(), &f.title, Rect::new(x, y, w, PAGE_TITLE_H), t.fg, Align::Left);
-    cv.text(v.page.sub(), &f.sub, Rect::new(x, y + PAGE_TITLE_H + 4.0, w, PAGE_SUB_H), t.fg2, Align::Left);
+    let (title, sub) = v.heading();
+    cv.text(title, &f.title, Rect::new(x, y, w, PAGE_TITLE_H), t.fg, Align::Left);
+    cv.text(&sub, &f.sub, Rect::new(x, y + PAGE_TITLE_H + 4.0, w, PAGE_SUB_H), t.fg2, Align::Left);
     for (i, (item, p)) in v.items.iter().zip(&v.placed).enumerate() {
         let r = v.to_window(p.rect);
         if r.bottom() < pane.y || r.y > pane.bottom() {

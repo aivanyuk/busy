@@ -65,6 +65,7 @@ impl Ui {
                 self.on_wheel((w.0 >> 16) as u16 as i16);
                 Some(LRESULT(0))
             }
+            WM_CHAR => self.on_char(w.0 as u16).then_some(LRESULT(0)),
             WM_KEYDOWN | WM_SYSKEYDOWN => {
                 self.on_key(VIRTUAL_KEY(w.0 as u16), m == WM_SYSKEYDOWN).then_some(LRESULT(0))
             }

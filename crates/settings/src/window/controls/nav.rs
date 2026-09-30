@@ -3,7 +3,7 @@
 
 use super::{face, pill};
 use crate::window::layout::{Fonts, HEADER_Y, LINE_12, LINE_14};
-use busy_ui::render::{Align, Canvas, Rect};
+use busy_ui::render::{Align, Canvas, Gfx, Rect};
 use busy_ui::theme::{Color, Theme};
 
 /// Three `--link` bars of `heights`, `w` wide and `gap` apart, bottoms on `base` (the app glyph).
@@ -25,10 +25,21 @@ pub(in crate::window) fn header(cv: &Canvas, readings: &str, t: &Theme, f: &Font
     cv.text(readings, &f.small, Rect::new(x, y + LINE_14 + 2.0, 170.0, LINE_12), t.fg2, Align::Left);
 }
 
-/// The search box as the design draws it: placeholder and a circle glyph, bottom edge `--ctl-strong`.
-pub(in crate::window) fn search(cv: &Canvas, r: Rect, t: &Theme, f: &Fonts) {
+/// The search box as the design draws it: placeholder (or the query) and a circle glyph, bottom edge
+/// `--ctl-strong`; with the focus, a caret and WinUI's 2-DIP accent bottom edge.
+pub(in crate::window) fn search(cv: &Canvas, r: Rect, query: &str, focused: bool, (gfx, t): (&Gfx, &Theme), f: &Fonts) {
     face(cv, r, t.ctl, t.ctl_strong, t);
-    cv.text("Find a setting", &f.body, Rect::new(r.x + 12.0, r.y, r.w - 40.0, r.h), t.fg3, Align::Left);
+    let text = Rect::new(r.x + 12.0, r.y, r.w - 40.0, r.h);
+    if query.is_empty() {
+        cv.text("Find a setting", &f.body, text, t.fg3, Align::Left);
+    } else {
+        cv.text(query, &f.body, text, t.fg, Align::Left);
+    }
+    if focused {
+        cv.fill(Rect::new(r.x + 2.0, r.bottom() - 2.0, r.w - 4.0, 2.0), t.accent);
+        let x = (text.x + if query.is_empty() { 0.0 } else { gfx.text_width(&f.body, query) }).min(text.right());
+        cv.fill(Rect::new(x, r.y + 8.0, 1.0, r.h - 16.0), t.fg);
+    }
     let icon = Rect::new(r.right() - 12.0 - 11.0, r.y + (r.h - 11.0) / 2.0, 11.0, 11.0);
     cv.round_stroke(icon, 5.5, 1.5, t.fg3);
 }

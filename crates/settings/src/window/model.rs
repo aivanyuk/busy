@@ -122,6 +122,29 @@ pub(super) fn items(page: Page, cfg: &Config, ch: &Choices) -> Vec<Item> {
     }
 }
 
+/// "Find a setting": the rows of every page whose page name, title or description contains `query` in any
+/// case, each page's under its name. Edits from these rows work as on their own page, since a row's control
+/// names its module.
+pub(super) fn search(query: &str, cfg: &Config, ch: &Choices) -> Vec<Item> {
+    let q = query.trim().to_lowercase();
+    let mut out = Vec::new();
+    for page in nav(cfg) {
+        let whole = page.title().to_lowercase().contains(&q);
+        let rows: Vec<Item> = items(page, cfg, ch)
+            .into_iter()
+            .filter(|i| match i {
+                Item::Row(r) => whole || r.title.to_lowercase().contains(&q) || r.desc.to_lowercase().contains(&q),
+                _ => false,
+            })
+            .collect();
+        if !rows.is_empty() {
+            out.push(Item::Header(page.title()));
+            out.extend(rows);
+        }
+    }
+    out
+}
+
 fn general(cfg: &Config) -> Vec<Item> {
     vec![
         Item::Header("Behavior"),
@@ -268,6 +291,20 @@ mod tests {
         let Item::Row(r) = &memory[2] else { panic!("no row") };
         assert_eq!(r.desc, "Display the memory reading on the taskbar");
         assert!(!items(Page::Module(Module::Processes), &cfg, &ch).iter().any(|i| matches!(i, Item::Preview(_))));
+    }
+
+    #[test]
+    fn search_finds_rows_on_every_page() {
+        let (cfg, ch) = (Config::default(), Choices::default());
+        let found = search("  LABEL ", &cfg, &ch);
+        let headers: Vec<_> =
+            found.iter().filter_map(|i| if let Item::Header(h) = i { Some(*h) } else { None }).collect();
+        // Network's default style is Io, which has no label row; Battery's time left "replaces the label".
+        assert_eq!(headers, ["CPU", "Memory", "GPU", "Disk", "Sensors", "Battery"]);
+        assert!(rows(&found).iter().all(|&t| t == "Show label" || t == "Show time remaining"));
+        // A page's name finds all of its rows.
+        assert_eq!(rows(&search("processes", &cfg, &ch)), ["Top processes", "Update interval"]);
+        assert!(search("zzz", &cfg, &ch).is_empty());
     }
 
     #[test]

@@ -64,7 +64,7 @@ impl Ui {
         // A click moves the focus there, without the ring (that shows once the keyboard is used).
         let focus = match hit {
             Some(Target::Part(i, _)) => Some(Target::Ctl(i)),
-            Some(t @ (Target::Nav(_) | Target::Ctl(_) | Target::Up(_) | Target::Down(_))) => Some(t),
+            Some(t @ (Target::Search | Target::Nav(_) | Target::Ctl(_) | Target::Up(_) | Target::Down(_))) => Some(t),
             _ => None,
         };
         let mut v = self.view.borrow_mut();
@@ -146,8 +146,14 @@ impl Ui {
             Target::Nav(i) => {
                 let page = self.view.borrow().nav.get(i).copied();
                 if let Some(p) = page {
+                    // Picking a page ends a search.
+                    self.view.borrow_mut().query.clear();
                     self.show_page(p);
                 }
+            }
+            Target::Search => {
+                self.view.borrow_mut().focus = Some(Target::Search);
+                self.invalidate();
             }
             Target::Ctl(i) => self.control(i),
             Target::Part(i, k) => {
