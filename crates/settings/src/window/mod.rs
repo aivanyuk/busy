@@ -33,6 +33,7 @@ mod dump;
 mod edit;
 mod frame;
 mod input;
+mod keys;
 mod layout;
 mod live;
 mod model;

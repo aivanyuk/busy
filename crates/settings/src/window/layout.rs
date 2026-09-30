@@ -128,6 +128,8 @@ pub(super) struct Popup {
     /// First option shown, when not all fit.
     pub(super) first: usize,
     pub(super) visible: usize,
+    /// The option the arrow keys are on.
+    pub(super) cursor: usize,
 }
 
 pub(super) struct View {
@@ -143,6 +145,9 @@ pub(super) struct View {
     pub(super) h: f32,
     pub(super) hover: Option<Target>,
     pub(super) popup: Option<Popup>,
+    /// The keyboard focus (`Nav`, `Ctl`, `Up` or `Down`), and whether its ring shows.
+    pub(super) focus: Option<Target>,
+    pub(super) focus_visible: bool,
 }
 
 impl View {
@@ -158,6 +163,8 @@ impl View {
             h: WIN_H,
             hover: None,
             popup: None,
+            focus: None,
+            focus_visible: false,
         }
     }
 
@@ -203,6 +210,67 @@ impl View {
             .collect();
         self.height = PAD_T + y - GAP + PAD_B;
         self.scroll = self.scroll.min(self.max_scroll());
+        // A focus on a control that is gone (another page, a row that went away) is dropped.
+        if self.focus.is_some_and(|f| !matches!(f, Target::Nav(_)) && !self.stops().contains(&f)) {
+            self.focus = None;
+        }
+    }
+
+    /// Tab order: the focused (else the selected) nav item, then each control of the page, then each usable
+    /// ↑/↓ of the taskbar order.
+    pub(super) fn stops(&self) -> Vec<Target> {
+        let nav = self.nav.iter().position(|&p| p == self.page).unwrap_or(0);
+        let mut out = vec![match self.focus {
+            Some(Target::Nav(i)) => Target::Nav(i),
+            _ => Target::Nav(nav),
+        }];
+        for (i, item) in self.items.iter().enumerate() {
+            match item {
+                Item::Row(_) => out.push(Target::Ctl(i)),
+                Item::Order(list) => {
+                    for j in 0..list.len() {
+                        if j > 0 {
+                            out.push(Target::Up(j));
+                        }
+                        if j + 1 < list.len() {
+                            out.push(Target::Down(j));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+
+    /// Focuses `t` (with its ring) and scrolls it into view.
+    pub(super) fn set_focus(&mut self, t: Target) {
+        self.focus = Some(t);
+        self.focus_visible = true;
+        let Some(r) = self.focus_rect(t) else { return };
+        let pane = self.pane();
+        if r.y < pane.y + 8.0 {
+            self.scroll_by(r.y - pane.y - 8.0);
+        } else if r.bottom() > pane.bottom() - 8.0 {
+            self.scroll_by(r.bottom() - pane.bottom() + 8.0);
+        }
+    }
+
+    /// What the focus ring surrounds, in window coordinates.
+    pub(super) fn focus_rect(&self, t: Target) -> Option<Rect> {
+        match t {
+            Target::Nav(i) => Some(self.nav_rect(i)),
+            Target::Ctl(i) => self.placed.get(i).map(|p| self.to_window(p.ctl)),
+            Target::Up(j) | Target::Down(j) => {
+                let p = self
+                    .items
+                    .iter()
+                    .zip(&self.placed)
+                    .find_map(|(it, p)| matches!(it, Item::Order(_)).then_some(p))?;
+                Some(self.to_window(order::button(p.rect, j, matches!(t, Target::Up(_)))))
+            }
+            _ => None,
+        }
     }
 
     /// A content rect in window coordinates.
@@ -254,7 +322,7 @@ impl View {
         let y = if down { ctl.bottom() + 4.0 } else { ctl.y - 4.0 - h };
         let x = (ctl.right() - w).max(NAV_W + 8.0);
         let first = sel.saturating_sub(visible.saturating_sub(1)).min(n - visible);
-        self.popup = Some(Popup { item: i, rect: Rect::new(x, y, w, h), first, visible });
+        self.popup = Some(Popup { item: i, rect: Rect::new(x, y, w, h), first, visible, cursor: *sel });
     }
 
     pub(super) fn hit(&self, gfx: &Gfx, f: &Fonts, x: f32, y: f32) -> Option<Target> {

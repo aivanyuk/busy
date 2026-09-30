@@ -6,7 +6,7 @@
 - `model.rs` — what each page shows (design `rows()`): headers, one card per setting with its control, the taskbar order; `choices.rs` — each dropdown's options and the value each sets; `edit.rs` — applying an `Edit` to the config. All pure and tested.
 - `layout.rs` — the design's measures, the `View` (page, items, their places, scroll, hover, open popup) and hit-testing; `paint.rs` — drawing the whole window from the `View`.
 - `controls/` — one file per control kind (`toggle`, `dropdown` with its popup, `segmented`, `swatch`, `preview`, `order` for the taskbar order list, `nav` for the nav column); each sizes and draws itself and names the part under the pointer.
-- `input.rs` — pointer input: hover, clicks, wheel; a click on a control becomes a `model::Edit`.
+- `input.rs` — pointer input: hover, clicks, wheel; a click on a control becomes a `model::Edit`; `keys.rs` — keyboard input and focus.
 - `live.rs` — following the host: `sync` (configs it applied) and `refresh` (new readings: the preview, the machine lists); `clock.rs` — the preview's time and date in the user's formats.
 - `frame.rs` — the custom title bar and the non-client handling behind it; `wndproc.rs` — the window procedure; `worker.rs` — registry thread (autostart read/write, app theme); `dump.rs` — debug-only frame dump.
 
@@ -46,6 +46,13 @@ pub mod autostart { pub fn is_enabled() -> bool; pub fn set(enabled: bool) -> wi
 - Drive, Interface and Taskbar sensor list the machine's volumes ("Label (C:)"), adapters and temperature readings ("hardware · name") from the latest readings, after the design's options ("System drive"; Automatic, Wi‑Fi, Ethernet; CPU package, GPU, Drive). A list that comes back empty (its module isn't sampled) keeps the last one, and nothing changes under an open popup.
 - Dropdowns list the design's options; a current value that isn't one of them (a hand-edited file, a drive that is gone) is kept as an extra option, so opening the window never changes a setting.
 - The popup opens 4 below its button (above it without room), at least as wide as the button, and scrolls by wheel when its options don't fit. A click outside it only closes it; Esc closes it, and without a popup Esc closes the window.
+
+## Keyboard
+
+- Tab / Shift+Tab cycle through the stops: the nav (one stop: the focused, else the selected item), every row's control, then each usable ↑/↓ of the taskbar order. The window handles its keys itself (no `IsDialogMessage`), so `is_dialog_message` returns false.
+- Nav: ↑/↓ move the focus, Space/Enter shows that page. Toggle: Space/Enter flips it. Dropdown: Space/Enter, F4, ↓ or Alt+↓ open it; in the popup ↑/↓/Home/End move a cursor (scrolling it into view), Space/Enter pick, Esc/Tab/F4 close. Segments and swatches: ←/→ pick the neighbour. Order ↑/↓: Space/Enter move the module, and the focus follows it.
+- Page Up/Down scroll the page; a focused control is scrolled into view. Esc closes an open popup, else the window. Alt+F4 and Alt+Space go to the default handling.
+- The focus ring (WinUI's focus visual: 2-DIP `--fg`, 3 outside the target) shows only once the keyboard is used; a click moves the focus without it.
 
 ## Theme
 

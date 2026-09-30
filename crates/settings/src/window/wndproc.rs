@@ -6,7 +6,7 @@ use super::{UI, Ui, frame, ui};
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, PAINTSTRUCT};
 use windows::Win32::UI::Controls::WM_MOUSELEAVE;
-use windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE;
+use windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::PCWSTR;
 
@@ -65,9 +65,8 @@ impl Ui {
                 self.on_wheel((w.0 >> 16) as u16 as i16);
                 Some(LRESULT(0))
             }
-            WM_KEYDOWN if w.0 as u16 == VK_ESCAPE.0 => {
-                self.on_escape();
-                Some(LRESULT(0))
+            WM_KEYDOWN | WM_SYSKEYDOWN => {
+                self.on_key(VIRTUAL_KEY(w.0 as u16), m == WM_SYSKEYDOWN).then_some(LRESULT(0))
             }
             WM_DPICHANGED => {
                 self.dpi.set(w.0 as u16 as u32);
