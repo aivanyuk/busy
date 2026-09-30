@@ -1,6 +1,6 @@
 //! What the window shows to UI Automation, pure: the elements under the window (`Node`s) in reading order,
 //! each with a role, a name and the state a screen reader announces, read from the `View` as painted. A
-//! `Tree` is one frame's worth, which the providers answer from.
+//! `Tree` (`tree.rs`) is one frame's worth, which the providers answer from.
 
 use crate::window::frame;
 use crate::window::layout::{PAGE_TITLE_H, Target, View};
@@ -8,6 +8,8 @@ use crate::window::model::{self, Control, Flag, Item, Page};
 use busy_core::Config;
 use busy_ui::render::Rect;
 use std::hash::{DefaultHasher, Hash, Hasher};
+
+pub(in crate::window) use super::tree::{Entry, Tree};
 
 /// An element under the window (the root, which the window's own provider stands for).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -28,6 +30,12 @@ pub(in crate::window) enum Node {
     /// The open dropdown of item `i`, and its option `k`.
     Popup(usize),
     Opt(usize, usize),
+    /// Setup: a reading card, a position, Start with Windows, Skip, Start monitoring.
+    Card(usize),
+    Place(usize),
+    Startup,
+    Skip,
+    Start,
 }
 
 /// The element's UIA control type.
@@ -41,6 +49,7 @@ pub(in crate::window) enum Role {
     List,
     ListItem,
     Text,
+    RadioButton,
 }
 
 /// What a screen reader is told about an element.
@@ -56,72 +65,21 @@ pub(in crate::window) struct Info {
     pub(in crate::window) value: Option<String>,
     /// A toggle's state (Toggle pattern).
     pub(in crate::window) toggle: Option<bool>,
+    /// A radio button's state (SelectionItem pattern).
+    pub(in crate::window) selected: Option<bool>,
     /// Can be invoked (Invoke pattern): buttons, nav items, options.
     pub(in crate::window) invoke: bool,
     pub(in crate::window) focusable: bool,
     pub(in crate::window) enabled: bool,
 }
 
-/// One element of a `Tree`.
-#[derive(Clone, Debug, PartialEq)]
-pub(in crate::window) struct Entry {
-    pub(in crate::window) node: Node,
-    /// Tells this element from one that took its place: content ids are indexes, which name another row after
-    /// a page switch, a search or a row coming or going. 0 outside the content.
-    pub(in crate::window) key: u32,
-    pub(in crate::window) parent: Option<Node>,
-    pub(in crate::window) info: Info,
-    /// In window DIPs; `None` when not shown (an option scrolled out of the popup).
-    pub(in crate::window) rect: Option<Rect>,
-    pub(in crate::window) offscreen: bool,
-}
-
-/// The window's elements as one frame shows them.
-#[derive(Clone, Debug, PartialEq)]
-pub(in crate::window) struct Tree {
-    /// Top-level elements in reading order, then the popup's options.
-    pub(in crate::window) entries: Vec<Entry>,
-    /// The element with the keyboard focus.
-    pub(in crate::window) focus: Option<(Node, u32)>,
-    /// The content pane and the open popup, in window DIPs, for hit-testing.
-    pub(in crate::window) pane: Rect,
-    pub(in crate::window) popup: Option<Rect>,
-}
-
-impl Tree {
-    pub(in crate::window) fn get(&self, n: Node, key: u32) -> Option<&Entry> {
-        self.entries.iter().find(|e| e.node == n && e.key == key)
-    }
-
-    /// The children of `parent` (`None`: the window), in order.
-    pub(in crate::window) fn children(&self, parent: Option<Node>) -> Vec<&Entry> {
-        self.entries.iter().filter(|e| e.parent == parent).collect()
-    }
-
-    /// The element at a window-DIP point: an option or the popup while one is open, else a control, a nav
-    /// item, the search box or a caption button.
-    pub(in crate::window) fn at(&self, x: f32, y: f32) -> Option<&Entry> {
-        let hit = |e: &&Entry| e.rect.is_some_and(|r| r.contains(x, y));
-        if self.popup.is_some_and(|p| p.contains(x, y)) {
-            return self
-                .entries
-                .iter()
-                .filter(|e| matches!(e.node, Node::Opt(..)))
-                .find(hit)
-                .or_else(|| self.entries.iter().find(|e| matches!(e.node, Node::Popup(_))));
-        }
-        let content = self.pane.contains(x, y);
-        self.entries
-            .iter()
-            .filter(|e| e.parent.is_none() && (e.info.invoke || e.info.focusable))
-            .find(|e| (content || !e.node.in_content()) && hit(e))
-    }
-}
-
 impl Node {
     /// Whether it is part of the content, which scrolls and changes with the page.
     pub(in crate::window) fn in_content(self) -> bool {
-        !matches!(self, Node::Min | Node::Max | Node::Close | Node::Search | Node::Nav(_))
+        matches!(
+            self,
+            Node::Title | Node::Header(_) | Node::Ctl(_) | Node::Up(_) | Node::Down(_) | Node::Popup(_) | Node::Opt(..)
+        )
     }
 
     /// Three numbers that tell elements apart, for the runtime id (with the key).
@@ -144,6 +102,11 @@ impl Node {
             Node::Down(i) => [10, i as i32, 0],
             Node::Popup(i) => [11, i as i32, 0],
             Node::Opt(i, k) => [12, i as i32, k as i32],
+            Node::Card(i) => [13, i as i32, 0],
+            Node::Place(i) => [14, i as i32, 0],
+            Node::Startup => [15, 0, 0],
+            Node::Skip => [16, 0, 0],
+            Node::Start => [17, 0, 0],
         }
     }
 
@@ -174,6 +137,8 @@ impl Node {
             Node::Down(i) => Target::Down(i),
             Node::Opt(_, k) => Target::Opt(k),
             Node::Title | Node::Header(_) | Node::Popup(_) => return None,
+            // Setup's: see `uia::setup::target`.
+            Node::Card(_) | Node::Place(_) | Node::Startup | Node::Skip | Node::Start => return None,
         };
         exists(v, self).then_some(t)
     }
@@ -187,7 +152,7 @@ pub(in crate::window) fn children(v: &View) -> Vec<Node> {
     out.push(Node::Title);
     for (i, item) in v.items.iter().enumerate() {
         match item {
-            Item::Header(_) => out.push(Node::Header(i)),
+            Item::Header(_) | Item::Notice(_) => out.push(Node::Header(i)),
             Item::Row(_) => out.push(Node::Ctl(i)),
             // The taskbar order: its usable buttons, as its Tab stops.
             Item::Order(_) => out.extend(v.stops().into_iter().filter_map(|t| match t {
@@ -247,6 +212,8 @@ fn rect(v: &View, n: Node) -> Option<Rect> {
         Node::Header(i) => v.placed.get(i).map(|p| v.to_window(p.rect)),
         Node::Popup(_) => v.popup.as_ref().map(|p| p.rect),
         Node::Opt(_, k) => v.option_rect(k),
+        // Setup's are in `uia::setup`.
+        Node::Card(_) | Node::Place(_) | Node::Startup | Node::Skip | Node::Start => None,
     }
 }
 
@@ -265,6 +232,7 @@ fn plain(role: Role, name: impl Into<String>) -> Info {
         status: String::new(),
         value: None,
         toggle: None,
+        selected: None,
         invoke: false,
         focusable: false,
         enabled: true,
@@ -313,7 +281,7 @@ pub(in crate::window) fn info(v: &View, cfg: &Config, n: Node, maximized: bool, 
             Info { help: sub, ..plain(Role::Text, title) }
         }
         Node::Header(i) => match v.items.get(i)? {
-            Item::Header(h) => plain(Role::Text, *h),
+            Item::Header(h) | Item::Notice(h) => plain(Role::Text, *h),
             _ => return None,
         },
         Node::Up(j) => button(order_name(j, "up")?),
@@ -333,6 +301,7 @@ pub(in crate::window) fn info(v: &View, cfg: &Config, n: Node, maximized: bool, 
                 }
                 // Picked with ←/→, like a radio group.
                 Control::Segmented(opts, sel) => Info { value: opts.get(*sel).map(|o| o.label.clone()), ..base },
+                Control::Button(c) => Info { role: Role::Button, name: c.label().into(), invoke: true, ..base },
                 Control::Swatches(_, sel) => {
                     Info { value: Some(format!("Color {} of {}", sel + 1, busy_core::PALETTE_LEN)), ..base }
                 }
@@ -347,6 +316,7 @@ pub(in crate::window) fn info(v: &View, cfg: &Config, n: Node, maximized: bool, 
             let status = if k == sel { "Selected" } else { "" };
             Info { status: status.into(), invoke: true, focusable: true, ..plain(Role::ListItem, &opts.get(k)?.label) }
         }
+        Node::Card(_) | Node::Place(_) | Node::Startup | Node::Skip | Node::Start => return None,
     })
 }
 

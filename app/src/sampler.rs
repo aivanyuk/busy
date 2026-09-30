@@ -53,9 +53,9 @@ impl Params {
         }
     }
 
-    /// Also samples `m`, whose settings page shows its cell as a live preview.
-    pub fn with_preview(mut self, m: Option<Module>) -> Self {
-        if let Some(m) = m {
+    /// Also samples `shown`, whose live readings the settings window shows.
+    pub fn with_shown(mut self, shown: &[Module]) -> Self {
+        for m in shown {
             self.active[m.index()] = true;
         }
         self
@@ -302,13 +302,15 @@ mod tests {
     }
 
     #[test]
-    fn a_settings_page_adds_its_module_alone() {
+    fn shown_modules_are_added_alone() {
         let cfg = Config::default();
-        let p = Params::new(&cfg, None, false).with_preview(Some(Module::Disk));
+        let p = Params::new(&cfg, None, false).with_shown(&[Module::Disk]);
         // The preview is the cell only: none of what Disk's flyout borrows.
         assert!(p.is_active(Module::Disk) && !p.is_active(Module::Processes) && !p.is_active(Module::Battery));
-        assert!(!Params::new(&cfg, None, true).with_preview(Some(Module::Disk)).is_active(Module::Disk));
-        assert_eq!(Params::new(&cfg, None, false).with_preview(None).active, Params::new(&cfg, None, false).active);
+        assert!(!Params::new(&cfg, None, true).with_shown(&[Module::Disk]).is_active(Module::Disk));
+        assert_eq!(Params::new(&cfg, None, false).with_shown(&[]).active, Params::new(&cfg, None, false).active);
+        let both = Params::new(&cfg, None, false).with_shown(&[Module::Disk, Module::Battery]);
+        assert!(both.is_active(Module::Disk) && both.is_active(Module::Battery));
     }
 
     #[test]

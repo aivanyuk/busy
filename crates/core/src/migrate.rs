@@ -57,9 +57,16 @@ mod tests {
     }"#;
 
     fn load_str(json: &str) -> Config {
-        let mut cfg: Config = serde_json::from_str(json).unwrap();
-        cfg.normalize();
-        cfg
+        Config::from_json(json.as_bytes())
+    }
+
+    #[test]
+    fn a_newer_file_is_used_but_never_saved_over() {
+        let cfg = load_str(r#"{"version": 99, "onboarded": true, "interval_ms": 2000, "future_field": 1}"#);
+        assert!(cfg.newer);
+        assert_eq!((cfg.interval_ms, cfg.onboarded), (2000, true));
+        assert!(cfg.save().is_err());
+        assert!(!load_str(r#"{"version": 2}"#).newer && !load_str("{}").newer && !Config::default().newer);
     }
 
     #[test]

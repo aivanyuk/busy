@@ -69,6 +69,8 @@ pub(super) enum Item {
     /// A module page's live preview of its cell.
     Preview(Module),
     Header(&'static str),
+    /// A card of text only: General's notice that the config came from a newer busy.
+    Notice(&'static str),
     Row(Row),
     /// General: the modules with a taskbar cell, in order, each with ↑/↓ (design "Taskbar order").
     Order(Vec<(Module, bool)>),
@@ -88,6 +90,23 @@ pub(super) enum Control {
     Segmented(Vec<Opt>, usize),
     /// The module palette, with the module's color selected.
     Swatches(Module, u8),
+    /// A button that does something rather than edit the config.
+    Button(Command),
+}
+
+/// What a row's button does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Command {
+    /// Turns the window into setup (onboarding).
+    RunSetup,
+}
+
+impl Command {
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Command::RunSetup => "Run setup",
+        }
+    }
 }
 
 /// What a toggle switches.
@@ -160,7 +179,16 @@ pub(super) fn search(query: &str, cfg: &Config, ch: &Choices) -> Vec<Item> {
     out
 }
 
+/// General's notice for a config file a newer busy wrote (`Config::newer`), which is never saved over.
+pub(super) const NEWER: &str =
+    "These settings were saved by a newer version of busy. Changes apply now, but aren\u{2019}t saved.";
+
 fn general(cfg: &Config) -> Vec<Item> {
+    let notice = cfg.newer.then_some(Item::Notice(NEWER));
+    notice.into_iter().chain(general_rows(cfg)).collect()
+}
+
+fn general_rows(cfg: &Config) -> Vec<Item> {
     vec![
         Item::Header("Behavior"),
         toggle("Start with Windows", "Launch busy when you sign in", Flag::Autostart, cfg.autostart),
@@ -174,6 +202,11 @@ fn general(cfg: &Config) -> Vec<Item> {
         dropdown("History", "How far back the flyout charts go", choices::history(cfg.history_secs)),
         Item::Header("Appearance"),
         dropdown("Theme", "Flyouts and this window", choices::theme(cfg.theme)),
+        Item::Row(Row {
+            title: "Setup",
+            desc: "Walk through choosing widgets again".into(),
+            control: Control::Button(Command::RunSetup),
+        }),
         Item::Header("Taskbar order"),
         Item::Order(
             cfg.modules.iter().filter(|c| c.module != Module::Processes).map(|c| (c.module, c.taskbar)).collect(),
@@ -279,12 +312,20 @@ mod tests {
     }
 
     #[test]
+    fn a_newer_config_is_noticed_on_general() {
+        let mut cfg = Config::default();
+        assert!(!items(Page::General, &cfg, &Choices::default()).iter().any(|i| matches!(i, Item::Notice(_))));
+        cfg.newer = true;
+        assert!(matches!(items(Page::General, &cfg, &Choices::default())[0], Item::Notice(NEWER)));
+    }
+
+    #[test]
     fn general_page() {
         let cfg = Config::default();
         let items = items(Page::General, &cfg, &Choices::default());
         assert_eq!(
             rows(&items),
-            ["Start with Windows", "Widget position", "Offset", "Default update interval", "History", "Theme"]
+            ["Start with Windows", "Widget position", "Offset", "Default update interval", "History", "Theme", "Setup"]
         );
         let Some(Item::Order(order)) = items.last() else { panic!("no order list") };
         assert_eq!(order.len(), Module::ALL.len() - 1);

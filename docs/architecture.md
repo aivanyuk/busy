@@ -23,7 +23,7 @@ Each crate may depend only on the crates in its row, and exposes only what its r
 | `busy-core` | `serde`, `serde_json` | Data types, `Source`, `Module`, `Config`. No Win32, no threads; its only I/O is `Config::load`/`save`. |
 | `busy-win` | `windows` | Win32 plumbing shared by more than one crate: wide strings, registry reads, the System32 DLL loader, the PDH wrapper. No `busy-*` dependency and no policy (it never decides *what* to read). |
 | `busy-metrics`, `busy-sensors` | `busy-core`, `busy-win` | `sources()` only (plus examples and tests). |
-| `busy-settings` | `busy-core`, `busy-win`, `busy-ui` | `Host`, `open`, `sync`, `refresh`, `is_open`, `is_dialog_message`, `autostart`. |
+| `busy-settings` | `busy-core`, `busy-win`, `busy-ui` | `Host`, `open`, `setup`, `sync`, `refresh`, `is_open`, `is_dialog_message`, `autostart` (`is_enabled`, `set`, `repair`). |
 | `busy-ui` | `busy-core`, `busy-win` | `fmt`, `select`, `history`, `tone`, `theme`, `render`, `ctx`, `cell`. |
 | `busy` | all of the above | The binary. |
 
@@ -64,10 +64,10 @@ config writer thread ◀── latest Config ───────────�
 
 - One `Snapshot` kept across ticks; each source fills only its part (`Snapshot::clear` names it), and a module is cleared and refilled when it is due, at `Config::module_interval_ms`. The UI gets a copy plus the set of modules refreshed since it last took one, and pushes history only for those. Sources are ordered: the GPU source runs before the Sensors source (they share state via `Rc<RefCell<_>>`, which is why `Source` has no `Send` bound).
 - Sources are constructed **on** the sampler thread after `CoInitializeEx(COINIT_MULTITHREADED)` and never leave it.
-- Sources skipped when `Config::is_active(module, open)` is false: a module is sampled for its taskbar cell, and otherwise only while the open flyout shows it, as its own module or as data it borrows (`Module::flyout_needs`: processes and temperatures), or while the settings window shows its page (`Params::with_preview`, for the live preview).
+- Sources skipped when `Config::is_active(module, open)` is false: a module is sampled for its taskbar cell, and otherwise only while the open flyout shows it, as its own module or as data it borrows (`Module::flyout_needs`: processes and temperatures), or while the settings window shows its live readings (`Params::with_shown`: a module page's preview).
 - Settings reach sources only as `SourceOptions` (`Config::source_options()`), carried in `sampler::Params`: the sampler calls `Source::configure` on every source before the first tick and whenever the options change, on the sampler thread. Sources never see the `Config`.
 - Rates are computed inside sources from deltas; the first sample may have zero rates.
-- A config from another thread or the settings window (`Host::apply`) is parked in a latest-wins slot and applied on `WM_APP_CONFIG`. The settings window runs on the UI thread but calls its host from its own message handling (and `Host::page` from inside `open`), so the app's host posts rather than touching the app state; it lends the readings (`Host::with_data`) only when the state isn't borrowed, and the app pushes new readings and applied configs to the window (`refresh`, `sync`).
+- A config from another thread or the settings window (`Host::apply`) is parked in a latest-wins slot and applied on `WM_APP_CONFIG`. The settings window runs on the UI thread but calls its host from its own message handling (and `Host::shown` from inside `open`), so the app's host posts rather than touching the app state; it lends the readings (`Host::with_data`) only when the state isn't borrowed, and the app pushes new readings and applied configs to the window (`refresh`, `sync`).
 
 ## Threads
 
@@ -80,6 +80,7 @@ Every thread the app starts is listed here.
 | Config writer | Yes (file I/O) | the one `config.json` writer; writes the latest submitted `Config`, older pending ones are dropped |
 | Theme reader | Yes (registry) | resolves `Theme` (light or dark, from `SystemUsesLightTheme`) on theme broadcasts and config changes, posts it back |
 | Launcher | Yes (shell) | starts Task Manager for the flyout's "Open Task Manager" (`launch::task_manager`: `ShellExecuteW` with the System32 path, in its own STA) |
+| Autostart repair | Yes (registry, file system) | runs `autostart::repair` once at startup (a Run entry naming an exe that is gone now names this one); ends on its own, never joined |
 | Settings registry (one per open settings window) | Yes (registry) | reads autostart and `AppsUseLightTheme`, writes autostart, posts results to the window; ends with the window, never joined |
 | Debug dump (debug builds, per render) | Yes (file I/O) | one `taskbar.bmp` or `settings.bmp` write |
 
