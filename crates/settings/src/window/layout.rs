@@ -393,7 +393,7 @@ impl View {
                 },
                 Item::Row(_) => None,
                 Item::Order(list) => order::hit(p.rect, list.len(), cx, cy),
-                Item::Header(_) | Item::Preview(_) => None,
+                Item::Header(_) | Item::Notice(_) | Item::Preview(_) => None,
             };
         }
         None
@@ -407,6 +407,11 @@ fn place(item: &Item, y: f32, width: f32, gfx: &Gfx, f: &Fonts) -> Placed {
         }
         Item::Preview(_) => {
             Placed { rect: Rect::new(0.0, y, width, preview::HEIGHT), ctl: Rect::default(), text_w: width }
+        }
+        Item::Notice(text) => {
+            let text_w = width - CARD_PAD_L - CARD_PAD_R;
+            let h = CARD_PAD_Y * 2.0 + gfx.metrics(&f.desc, text, text_w).1.max(LINE_12);
+            Placed { rect: Rect::new(0.0, y, width, h), ctl: Rect::default(), text_w }
         }
         Item::Order(list) => {
             Placed { rect: Rect::new(0.0, y, width, order::height(list.len())), ctl: Rect::default(), text_w: width }

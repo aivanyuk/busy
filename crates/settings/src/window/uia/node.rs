@@ -152,7 +152,7 @@ pub(in crate::window) fn children(v: &View) -> Vec<Node> {
     out.push(Node::Title);
     for (i, item) in v.items.iter().enumerate() {
         match item {
-            Item::Header(_) => out.push(Node::Header(i)),
+            Item::Header(_) | Item::Notice(_) => out.push(Node::Header(i)),
             Item::Row(_) => out.push(Node::Ctl(i)),
             // The taskbar order: its usable buttons, as its Tab stops.
             Item::Order(_) => out.extend(v.stops().into_iter().filter_map(|t| match t {
@@ -281,7 +281,7 @@ pub(in crate::window) fn info(v: &View, cfg: &Config, n: Node, maximized: bool, 
             Info { help: sub, ..plain(Role::Text, title) }
         }
         Node::Header(i) => match v.items.get(i)? {
-            Item::Header(h) => plain(Role::Text, *h),
+            Item::Header(h) | Item::Notice(h) => plain(Role::Text, *h),
             _ => return None,
         },
         Node::Up(j) => button(order_name(j, "up")?),
