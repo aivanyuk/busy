@@ -1,6 +1,6 @@
 //! Drawing the whole window from its `View`: title bar, nav, the page's cards, then the open popup on top.
 
-use super::controls::{dropdown, nav, order, preview, segmented, swatch, toggle};
+use super::controls::{button, dropdown, nav, order, preview, segmented, swatch, toggle};
 use super::frame;
 use super::layout::{CARD_PAD_L, CARD_PAD_Y, Fonts, LINE_14, PAGE_SUB_H, PAGE_TITLE_H, Target, View};
 use super::model::{self, Control, Flag, Item, Page};
@@ -85,6 +85,7 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
                     }
                     Control::Segmented(opts, sel) => segmented::draw(cv, s.gfx, ctl, opts, *sel, t, f),
                     Control::Swatches(_, sel) => swatch::draw(cv, ctl, *sel, t),
+                    Control::Button(c) => button::draw(cv, ctl, c.label(), hover, t, f),
                 }
             }
         }

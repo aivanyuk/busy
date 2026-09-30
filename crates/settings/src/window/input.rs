@@ -3,7 +3,7 @@
 
 use super::Ui;
 use super::layout::Target;
-use super::model::{Control, Edit, Item};
+use super::model::{Command, Control, Edit, Item};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     ReleaseCapture, SetCapture, TME_LEAVE, TRACKMOUSEEVENT, TrackMouseEvent,
 };
@@ -207,7 +207,7 @@ impl Ui {
         }
     }
 
-    /// A click on row `i`'s control: a toggle flips, a dropdown opens (or closes).
+    /// A click on row `i`'s control: a toggle flips, a dropdown opens (or closes), a button does its command.
     pub(super) fn control(&self, i: usize) {
         let mut v = self.view.borrow_mut();
         let edit = match v.items.get(i) {
@@ -216,6 +216,10 @@ impl Ui {
                 Control::Dropdown(..) => None,
                 // Their parts are the targets (`Target::Part`).
                 Control::Segmented(..) | Control::Swatches(..) => return,
+                Control::Button(Command::RunSetup) => {
+                    drop(v);
+                    return self.enter_setup();
+                }
             },
             _ => return,
         };

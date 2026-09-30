@@ -3,7 +3,7 @@
 //! read it, so what is drawn is what is clicked.
 
 use super::choices::Opt;
-use super::controls::{dropdown, order, preview, segmented, swatch, toggle};
+use super::controls::{button, dropdown, order, preview, segmented, swatch, toggle};
 use super::model::{Control, Item, Page};
 use busy_ui::render::{Gfx, Rect};
 use std::cell::RefCell;
@@ -417,6 +417,7 @@ fn place(item: &Item, y: f32, width: f32, gfx: &Gfx, f: &Fonts) -> Placed {
                 Control::Dropdown(opts, _) => dropdown::size(gfx, &f.body, opts),
                 Control::Segmented(opts, _) => segmented::size(gfx, f, opts),
                 Control::Swatches(..) => swatch::SIZE,
+                Control::Button(c) => button::size(gfx, f, c.label()),
             };
             let inner = width - CARD_PAD_L - CARD_PAD_R;
             let side = inner - cw - 16.0;

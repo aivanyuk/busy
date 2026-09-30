@@ -2,7 +2,7 @@
 //! position cards and the footer with Start with Windows, Skip and Start monitoring.
 
 use super::{BOX, HEADLINE, Layout, PLACES, POSITION, READINGS, SKIP, START, STARTUP, SUB, Target, View, W};
-use crate::window::controls::face;
+use crate::window::controls::button;
 use crate::window::frame;
 use crate::window::layout::{self, LINE_12, LINE_14};
 use crate::window::paint::State;
@@ -64,9 +64,7 @@ fn footer(cv: &Canvas, l: &Layout, v: &View, s: &State) {
     check(cv, l.check, s.cfg.autostart, !busy, t);
     let label = Rect::new(l.check.right() + 10.0, l.startup.y, l.startup.right() - l.check.right() - 10.0, l.startup.h);
     cv.text(STARTUP, &f.body, label, if busy { t.fg3 } else { t.fg }, Align::Left);
-    let skip_fill = if v.hover == Some(Target::Skip) { t.active } else { t.ctl };
-    face(cv, l.skip, skip_fill, t.ctl_bottom, t);
-    cv.text(SKIP, &f.body, l.skip, t.fg, Align::Center);
+    button::draw(cv, l.skip, SKIP, v.hover == Some(Target::Skip), t, f);
     let start = if v.hover == Some(Target::Start) { alpha(t.accent, 0.9) } else { t.accent };
     cv.round(l.start, 4.0, start);
     cv.text(START, &f.body, l.start, t.on_accent, Align::Center);

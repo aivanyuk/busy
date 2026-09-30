@@ -1,6 +1,7 @@
 //! The design's controls, one file per kind: each knows its size, draws itself and says which of its parts is
 //! under the pointer. None of them changes state: input on a control becomes a `model::Edit` in `input.rs`.
 
+pub(super) mod button;
 pub(super) mod dropdown;
 pub(super) mod nav;
 pub(super) mod order;
