@@ -246,9 +246,9 @@ impl Ui {
         v.popup = None;
         drop(v);
         self.shown.take();
-        self.host.page(match page {
-            Page::Module(m) => Some(m),
-            Page::General | Page::Advanced => None,
+        self.host.shown(match &page {
+            Page::Module(m) => std::slice::from_ref(m),
+            Page::General | Page::Advanced => &[],
         });
         self.rebuild();
     }

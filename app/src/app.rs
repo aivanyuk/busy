@@ -29,8 +29,8 @@ const WM_APP_RENDER: u32 = WM_APP + 2;
 const WM_APP_CONFIG: u32 = WM_APP + 3;
 const WM_APP_FLYOUT_DEACTIVATED: u32 = WM_APP + 4;
 const WM_APP_THEME: u32 = WM_APP + 5;
-/// The settings window shows a module's page (`wParam` = `Module::index` + 1) or none (0).
-pub(crate) const WM_APP_SETTINGS_PAGE: u32 = WM_APP + 6;
+/// The settings window shows these modules' live readings (`wParam`: bit `Module::index` of each).
+pub(crate) const WM_APP_SHOWN: u32 = WM_APP + 6;
 
 const TIMER_WATCH: usize = 1;
 
@@ -65,8 +65,8 @@ struct App {
     locked: bool,
     /// The console display is off (`GUID_CONSOLE_DISPLAY_STATE` = 0).
     display_off: bool,
-    /// The module whose settings page is shown: sampled for its live preview.
-    settings_page: Option<Module>,
+    /// The modules whose live readings the settings window shows: sampled while shown.
+    shown: Vec<Module>,
 }
 
 /// Runs `f` on the app state unless it is already borrowed (re-entrant message); then returns None.
@@ -150,7 +150,7 @@ pub fn run(open_flyout: bool) -> Result<()> {
         open_flyout,
         locked: false,
         display_off: false,
-        settings_page: None,
+        shown: Vec::new(),
     };
     APP.with(|a| *a.borrow_mut() = Some(app));
 
@@ -215,9 +215,9 @@ extern "system" fn main_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                     with(|a| a.apply_config(cfg, true));
                 }
             }
-            WM_APP_SETTINGS_PAGE => {
+            WM_APP_SHOWN => {
                 with(|a| {
-                    a.settings_page = wp.0.checked_sub(1).and_then(|i| Module::ALL.get(i)).copied();
+                    a.shown = Module::ALL.into_iter().filter(|m| wp.0 & 1 << m.index() != 0).collect();
                     a.sync_sampler();
                 });
             }
@@ -393,7 +393,7 @@ impl App {
     /// while the session is locked or the display is off.
     fn sync_sampler(&self) {
         let open = self.flyout.as_ref().and_then(Flyout::open_module);
-        let params = Params::new(&self.cfg, open, self.locked || self.display_off).with_preview(self.settings_page);
+        let params = Params::new(&self.cfg, open, self.locked || self.display_off).with_shown(&self.shown);
         self.sampler.set_params(params);
     }
 

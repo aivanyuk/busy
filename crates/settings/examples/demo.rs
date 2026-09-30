@@ -23,8 +23,8 @@ impl Host for Demo {
         self.hist.borrow_mut().resize(&cfg);
     }
 
-    fn page(&self, m: Option<Module>) {
-        println!("page {m:?}");
+    fn shown(&self, modules: &[Module]) {
+        println!("shown {modules:?}");
     }
 
     fn with_data(&self, f: &mut dyn FnMut(&Snapshot, &History)) {

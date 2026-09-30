@@ -67,7 +67,7 @@ PRs in order: `busy-core` + workspace → `busy-metrics` → `busy-sensors` → 
    - **API change** (the user chose live data over a static preview):
      - `open` takes a `Host` (`apply`, `page`, `with_data`) instead of `on_apply`.
      - The app calls `refresh(snap, hist)` after each sample and `sync(cfg)` after each applied config.
-     - The shown page's module is sampled (`Params::with_preview`).
+     - The shown page's module is sampled (`Params::with_preview`, since generalized to `with_shown`).
    - Kept from the native window as extra rows: Offset, History, and Processes' "Top processes" page.
    - Named adapters and sensors are offered from live data.
    - Not built: the "Run setup" row, which comes with Phase 5, and page subtitles with hardware names (they are static descriptions).
