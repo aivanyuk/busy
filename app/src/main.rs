@@ -37,5 +37,10 @@ fn main() {
     let open_flyout = std::env::args().any(|a| a == "--open-flyout");
     #[cfg(not(debug_assertions))]
     let open_flyout = false;
+    // A "Start with Windows" entry that names an exe that is gone (busy was moved) now names this one. On a
+    // thread of its own: it waits on the registry and the file system.
+    let _ = std::thread::Builder::new().name("busy-autostart".into()).spawn(|| {
+        let _ = busy_settings::autostart::repair();
+    });
     let _ = app::run(open_flyout);
 }
