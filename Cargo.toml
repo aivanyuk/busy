@@ -16,6 +16,8 @@ busy-settings = { path = "crates/settings" }
 busy-ui = { path = "crates/ui" }
 busy-win = { path = "crates/win" }
 windows = "0.62"
+# `windows`' own core, needed directly only because `#[implement]` expands to `::windows_core` paths.
+windows-core = "0.62"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

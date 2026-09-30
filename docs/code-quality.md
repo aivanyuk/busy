@@ -10,7 +10,7 @@
 
 ## Dependencies
 
-The whole point of this app is that users can trust it. Allowed: `windows`, `serde`, `serde_json`. Anything else needs explicit maintainer approval and a reason in the PR. Add `windows` features to the crate that needs them, not to the workspace.
+The whole point of this app is that users can trust it. Allowed: `windows`, `serde`, `serde_json`, and `windows-core` — `windows`' own core, already in every build — as a direct dependency only where COM's `#[implement]` needs it (its expansion names `::windows_core`). Anything else needs explicit maintainer approval and a reason in the PR. Add `windows` features to the crate that needs them, not to the workspace.
 
 ## Style
 

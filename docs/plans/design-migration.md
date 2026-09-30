@@ -13,7 +13,7 @@ Source of truth: `design/` (exported from Claude Design project `363af25b-1580-4
 
 - App name stays **busy** (design calls it "Meterbar"; only the name differs).
 - Flyout layout: **Detailed (1a)**, 360 px. Compact/Tiles are not implemented.
-- Settings window: **custom-drawn Direct2D**, reusing `app/src/render.rs`; own controls (toggle, dropdown, segmented, swatch, card, nav item) with keyboard navigation and basic UI Automation. No new dependencies.
+- Settings window: **custom-drawn Direct2D**, reusing `app/src/render.rs`; own controls (toggle, dropdown, segmented, swatch, card, nav item) with keyboard navigation and basic UI Automation. No new dependencies (`windows-core`, which `windows` is built on, became a direct one for UI Automation's `#[implement]`, with the user's approval).
 - Data needing external services, admin rights, heavy/unsupported APIs or third-party tools is **opt-in**, off by default, each with a stated risk (see Opt-in sources).
 - Baseline (current code) lands via PRs first; migration phases follow as separate PRs.
 

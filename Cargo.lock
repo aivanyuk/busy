@@ -49,6 +49,7 @@ dependencies = [
  "busy-ui",
  "busy-win",
  "windows",
+ "windows-core",
 ]
 
 [[package]]
