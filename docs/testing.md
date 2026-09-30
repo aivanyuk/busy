@@ -25,5 +25,5 @@ cargo test --workspace
 
 1. `cargo run -p busy` (or `-- --open-flyout` to open the flyout after the first sample).
 2. Screenshot the taskbar strip and the flyout; check both anchors (`NearTray`, `Left`) and both themes (set `theme` in `%APPDATA%\busy\config.json`).
-3. Settings: `cargo run -p busy-settings --example demo`, with `BUSY_FORCE_DARK=1` and `0`.
+3. Settings: `cargo run -p busy-settings --example demo`, with `BUSY_FORCE_DARK=1` and `0`. For UI Automation changes, read the window with a UIA client (Accessibility Insights, Narrator, or `System.Windows.Automation` from Windows PowerShell; see docs/areas/settings.md § Gotchas): names, roles, patterns, and the focus events as Tab moves.
 4. Stop your instance (`Stop-Process -Name busy`). Never restart `explorer.exe`; never use SendKeys/SendInput against windows you don't own.

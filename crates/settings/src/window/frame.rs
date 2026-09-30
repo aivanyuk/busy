@@ -25,7 +25,7 @@ pub(super) fn button_at(w: f32, x: f32) -> Option<Target> {
     }
 }
 
-fn button_rect(w: f32, t: Target) -> Rect {
+pub(super) fn button_rect(w: f32, t: Target) -> Rect {
     let i = match t {
         Target::Close => 1.0,
         Target::Max => 2.0,

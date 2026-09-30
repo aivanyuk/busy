@@ -1,7 +1,7 @@
 //! The settings window, custom-drawn with Direct2D to the design (`design/Meterbar.dc.html`, Settings): its
 //! state (`Ui`), creation, the open/focus entry point and applying changes. Split by concern: the page model
 //! (`model`, `choices`, `edit`), `layout`, `paint`, one file per control kind, `input`, the title bar (`frame`),
-//! the window procedure and the registry worker.
+//! UI Automation (`uia`), the window procedure and the registry worker.
 
 use crate::{Host, dark};
 use busy_core::{Config, Module};
@@ -38,6 +38,7 @@ mod layout;
 mod live;
 mod model;
 mod paint;
+mod uia;
 mod wndproc;
 mod worker;
 
@@ -100,6 +101,7 @@ struct Ui {
     pressed: Cell<Option<layout::Target>>,
     /// `TrackMouseEvent` is armed for `WM_MOUSELEAVE`.
     tracking: Cell<bool>,
+    uia: uia::State,
 }
 
 fn work_area() -> RECT {
@@ -169,6 +171,7 @@ fn create(cfg: &Config, host: Rc<dyn Host>) -> Result<()> {
         pending: Cell::new(None),
         pressed: Cell::new(None),
         tracking: Cell::new(false),
+        uia: uia::State::default(),
     });
     UI.set(Some(ui.clone()));
     let s = dpi as f32 / 96.0;
@@ -401,8 +404,7 @@ impl Ui {
     /// One frame into `rt`, between its BeginDraw and EndDraw.
     fn draw(&self, rt: &ID2D1HwndRenderTarget, _size: (i32, i32), data: Option<controls::preview::Data>) {
         let (theme, cfg, view) = (self.theme(), self.cfg.borrow(), self.view.borrow());
-        // SAFETY: our live window.
-        let maximized = unsafe { IsZoomed(self.hwnd) }.as_bool();
+        let maximized = self.maximized();
         let state = paint::State {
             cfg: &cfg,
             theme: &theme,

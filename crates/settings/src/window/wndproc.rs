@@ -1,6 +1,7 @@
 //! The window procedure and its message dispatch.
 
 use super::layout::{MIN_H, MIN_W};
+use super::uia::WM_APP_UIA;
 use super::worker::{Job, WM_APP_REPLY};
 use super::{UI, Ui, frame, ui};
 use windows::Win32::Foundation::*;
@@ -31,6 +32,7 @@ impl Ui {
                     self.render();
                     let _ = EndPaint(self.hwnd, &ps);
                 }
+                self.uia_frame();
                 Some(LRESULT(0))
             }
             WM_ERASEBKGND => Some(LRESULT(1)),
@@ -95,6 +97,11 @@ impl Ui {
                 }
                 None
             }
+            WM_GETOBJECT => self.uia_object(w, l),
+            WM_APP_UIA => {
+                self.uia_requests();
+                Some(LRESULT(0))
+            }
             WM_APP_REPLY => {
                 for r in self.worker.replies() {
                     self.on_reply(r);
@@ -111,6 +118,10 @@ impl Ui {
             WM_CLOSE => {
                 self.close();
                 Some(LRESULT(0))
+            }
+            WM_DESTROY => {
+                self.uia_destroy();
+                None
             }
             WM_NCDESTROY => {
                 self.host.page(None);
