@@ -61,6 +61,18 @@ impl Ui {
             return;
         }
         self.pressed.set(hit);
+        // A click moves the focus there, without the ring (that shows once the keyboard is used).
+        let focus = match hit {
+            Some(Target::Part(i, _)) => Some(Target::Ctl(i)),
+            Some(t @ (Target::Nav(_) | Target::Ctl(_) | Target::Up(_) | Target::Down(_))) => Some(t),
+            _ => None,
+        };
+        let mut v = self.view.borrow_mut();
+        v.focus_visible = false;
+        if focus.is_some() {
+            v.focus = focus;
+        }
+        drop(v);
         // SAFETY: our live window.
         unsafe { SetCapture(self.hwnd) };
     }
@@ -111,7 +123,15 @@ impl Ui {
         }
     }
 
-    fn activate(&self, t: Target) {
+    /// The taskbar order's `i`th module.
+    pub(super) fn order_module(&self, i: usize) -> Option<busy_core::Module> {
+        self.view.borrow().items.iter().find_map(|it| match it {
+            Item::Order(list) => list.get(i).map(|&(m, _)| m),
+            _ => None,
+        })
+    }
+
+    pub(super) fn activate(&self, t: Target) {
         match t {
             // SAFETY: our live window.
             Target::Min => unsafe {
@@ -144,14 +164,9 @@ impl Ui {
                 }
             }
             Target::Up(i) | Target::Down(i) => {
-                let m = match self.view.borrow().items.iter().find_map(|it| match it {
-                    Item::Order(list) => list.get(i).map(|&(m, _)| m),
-                    _ => None,
-                }) {
-                    Some(m) => m,
-                    None => return,
-                };
-                self.edit(Edit::Move(m, matches!(t, Target::Up(_))));
+                if let Some(m) = self.order_module(i) {
+                    self.edit(Edit::Move(m, matches!(t, Target::Up(_))));
+                }
             }
             Target::Opt(k) => {
                 let pick = {
@@ -169,7 +184,7 @@ impl Ui {
     }
 
     /// A click on row `i`'s control: a toggle flips, a dropdown opens (or closes).
-    fn control(&self, i: usize) {
+    pub(super) fn control(&self, i: usize) {
         let mut v = self.view.borrow_mut();
         let edit = match v.items.get(i) {
             Some(Item::Row(r)) => match &r.control {
@@ -194,15 +209,6 @@ impl Ui {
                 drop(v);
                 self.invalidate();
             }
-        }
-    }
-
-    /// Esc: closes the open popup, else the window.
-    pub(super) fn on_escape(&self) {
-        if self.view.borrow_mut().popup.take().is_some() {
-            self.invalidate();
-        } else {
-            self.close();
         }
     }
 }

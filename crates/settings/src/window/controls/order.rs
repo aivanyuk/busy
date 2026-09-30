@@ -27,6 +27,12 @@ fn buttons(r: Rect, i: usize) -> (Rect, Rect) {
     (Rect::new(down.x - 4.0 - BTN, y, BTN, BTN), down)
 }
 
+/// Row `i`'s ↑ (`up`) or ↓ button.
+pub(in crate::window) fn button(r: Rect, i: usize, up: bool) -> Rect {
+    let (u, d) = buttons(r, i);
+    if up { u } else { d }
+}
+
 /// The ↑ of the first row and the ↓ of the last do nothing, so they are not targets.
 pub(in crate::window) fn hit(r: Rect, n: usize, x: f32, y: f32) -> Option<Target> {
     (0..n).find_map(|i| {

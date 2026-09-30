@@ -90,5 +90,12 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
         let ty = pane.y + 4.0 + (track - thumb) * v.scroll / v.max_scroll();
         cv.round(Rect::new(pane.right() - 6.0, ty, 3.0, thumb), 1.5, t.fg3);
     }
+    // Keyboard focus (WinUI's focus visual): a 2-DIP `--fg` ring 3 outside the target.
+    if v.focus_visible
+        && v.popup.is_none()
+        && let Some(r) = v.focus.and_then(|f| v.focus_rect(f))
+    {
+        cv.round_stroke(r.inset(-3.0, -3.0), 7.0, 2.0, t.fg);
+    }
     dropdown::draw_popup(cv, v, t, f);
 }
