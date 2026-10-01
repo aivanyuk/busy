@@ -4,6 +4,9 @@ What changed for people who run busy, newest first. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Fixed
+- Readings in the taskbar keep their width as their values change, so a CPU going from 9% to 10% or 100% no longer nudges every reading after it.
+
 ## [0.1.0] - 2026-09-30
 
 The first release.

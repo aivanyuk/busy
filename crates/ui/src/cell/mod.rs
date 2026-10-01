@@ -11,7 +11,7 @@ use crate::render::nice_max;
 use crate::theme::Color;
 use crate::tone::{self, SECOND};
 use crate::{fmt, select};
-use busy_core::{CellStyle, Config, CpuBar, Module, ModuleCfg, SensorKind, Snapshot};
+use busy_core::{CellStyle, Config, CpuBar, Module, ModuleCfg, RateUnit, SensorKind, Snapshot, TempUnit};
 
 pub struct Cell<'a> {
     pub module: Module,
@@ -24,11 +24,13 @@ pub struct Cell<'a> {
 enum Body<'a> {
     Text {
         value: String,
+        room: Room,
         color: Color,
     },
     /// Sparkline under a label/value row. The first series is filled (area .3), the others are lines only.
     Graph {
         value: String,
+        room: Room,
         lines: Vec<(&'a Series, Color)>,
         max: f32,
     },
@@ -38,12 +40,44 @@ enum Body<'a> {
         /// Width of each bar: 3 DIPs for per-core bars, 6 for a single bar.
         bar_w: f32,
         value: String,
+        room: Room,
         color: Color,
     },
     /// Two rows of (key, key color, value), e.g. ↑ upload / ↓ download or R / W.
     Io {
         rows: [(&'static str, Color, String); 2],
+        room: Room,
     },
+}
+
+/// The widest strings a cell's value can take, which its width makes room for: a cell keeps its width while
+/// its value changes ("1%", "10%", "100%"), so neither it nor the cells after it shift every second.
+type Room = &'static [&'static str];
+
+const PCT: Room = &["100%"];
+/// `fmt::rate_in`: three digits, or two and a decimal, in each unit a real link reaches.
+const RATE_BYTES: Room = &["999 KB/s", "99.9 KB/s", "999 MB/s", "99.9 MB/s", "999 GB/s", "99.9 GB/s"];
+const RATE_BITS: Room = &["999 Kb/s", "99.9 Kb/s", "999 Mb/s", "99.9 Mb/s", "999 Gb/s", "99.9 Gb/s"];
+
+fn rate_room(unit: RateUnit) -> Room {
+    match unit {
+        RateUnit::Bytes => RATE_BYTES,
+        RateUnit::Bits => RATE_BITS,
+    }
+}
+
+/// `fmt::sensor`'s widest output per kind over the usual range of readings.
+fn sensor_room(kind: SensorKind, unit: TempUnit) -> Room {
+    match (kind, unit) {
+        (SensorKind::Temperature, TempUnit::Celsius) => &["100°C"],
+        (SensorKind::Temperature, TempUnit::Fahrenheit) => &["212°F"],
+        (SensorKind::Fan, _) => &["9999 rpm"],
+        (SensorKind::Power, _) => &["99.9 W", "999 W"],
+        (SensorKind::Voltage, _) => &["9.999 V"],
+        (SensorKind::Clock, _) => &["9.99 GHz", "999 MHz"],
+        (SensorKind::Load, _) => PCT,
+        (SensorKind::Other, _) => &["999.9"],
+    }
 }
 
 /// What a cell's pixels depend on, owned so the widget can compare it with the last drawn frame.
@@ -69,7 +103,7 @@ impl Cell<'_> {
             Body::Text { value, .. } | Body::Graph { value, .. } | Body::Bar { value, .. } if !value.is_empty() => {
                 format!("{name}: {value}")
             }
-            Body::Io { rows: [(k1, _, v1), (k2, _, v2)] } => format!("{name}: {k1} {v1}  {k2} {v2}"),
+            Body::Io { rows: [(k1, _, v1), (k2, _, v2)], .. } => format!("{name}: {k1} {v1}  {k2} {v2}"),
             _ => name.into(),
         }
     }
@@ -84,18 +118,18 @@ impl Cell<'_> {
             size: 0.0,
         };
         match &self.body {
-            Body::Text { value, color } => key.texts.push((value.clone(), *color)),
-            Body::Graph { value, lines, max } => {
+            Body::Text { value, color, .. } => key.texts.push((value.clone(), *color)),
+            Body::Graph { value, lines, max, .. } => {
                 key.texts.push((value.clone(), Color::default()));
                 key.series = lines.iter().map(|(s, c)| (s.pushed(), s.len(), *c)).collect();
                 key.size = *max;
             }
-            Body::Bar { bars, bar_w, value, color } => {
+            Body::Bar { bars, bar_w, value, color, .. } => {
                 key.texts.push((value.clone(), *color));
                 key.bars = bars.iter().map(|(f, c)| ((f.clamp(0.0, 1.0) * 255.0).round() as u8, *c)).collect();
                 key.size = *bar_w;
             }
-            Body::Io { rows } => key.texts = rows.iter().map(|(k, c, v)| (format!("{k} {v}"), *c)).collect(),
+            Body::Io { rows, .. } => key.texts = rows.iter().map(|(k, c, v)| (format!("{k} {v}"), *c)).collect(),
         }
         key
     }
@@ -118,11 +152,16 @@ pub fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
     let pct_body = |pct: f32, series: Option<&'a Series>, (fill, value): (Color, Color)| {
         let v = fmt::pct(pct);
         match mc.style {
-            CellStyle::Graph => {
-                Body::Graph { value: v, lines: series.map(|s| vec![(s, fill)]).unwrap_or_default(), max: 100.0 }
+            CellStyle::Graph => Body::Graph {
+                value: v,
+                room: PCT,
+                lines: series.map(|s| vec![(s, fill)]).unwrap_or_default(),
+                max: 100.0,
+            },
+            CellStyle::Bar => {
+                Body::Bar { bars: vec![(pct / 100.0, fill)], bar_w: 6.0, value: v, room: PCT, color: value }
             }
-            CellStyle::Bar => Body::Bar { bars: vec![(pct / 100.0, fill)], bar_w: 6.0, value: v, color: value },
-            _ => Body::Text { value: v, color: value },
+            _ => Body::Text { value: v, room: PCT, color: value },
         }
     };
     let opts = &ctx.cfg.options;
@@ -133,6 +172,7 @@ pub fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
                 bars: select::core_bars(&c.per_core).into_iter().map(|p| (p / 100.0, fill(p))).collect(),
                 bar_w: 3.0,
                 value: fmt::pct(c.total),
+                room: PCT,
                 color: value(c.total),
             },
             _ => pct_body(c.total, Some(&hist.cpu), (fill(c.total), value(c.total))),
@@ -151,12 +191,16 @@ pub fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
             // Design: the Graph style has no value; the two rates are the two lines.
             CellStyle::Graph => Body::Graph {
                 value: String::new(),
+                room: &[],
                 lines: vec![(&hist.net_rx, color), (&hist.net_tx, second)],
                 max: nice_max(hist.net_rx.max().max(hist.net_tx.max())),
             },
             _ => {
                 let rate = |bps| fmt::rate_in(bps, opts.network.units);
-                Body::Io { rows: [("↑", second, rate(tx)), ("↓", color, rate(rx))] }
+                Body::Io {
+                    rows: [("↑", second, rate(tx)), ("↓", color, rate(rx))],
+                    room: rate_room(opts.network.units),
+                }
             }
         }),
         // Design: Io shows the read/write rates of all disks, Text and Bar how full the chosen drive is.
@@ -164,7 +208,7 @@ pub fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
             CellStyle::Io => (!snap.disks.is_empty()).then(|| {
                 let r = snap.disks.iter().map(|d| d.read_bps).sum::<f64>();
                 let w = snap.disks.iter().map(|d| d.write_bps).sum::<f64>();
-                Body::Io { rows: [("R", color, fmt::rate(r)), ("W", second, fmt::rate(w))] }
+                Body::Io { rows: [("R", color, fmt::rate(r)), ("W", second, fmt::rate(w))], room: RATE_BYTES }
             }),
             _ => select::disk_volume(snap, ctx.cfg).filter(|v| v.total > 0).map(|v| {
                 let p = v.total.saturating_sub(v.free) as f32 * 100.0 / v.total as f32;
@@ -173,16 +217,18 @@ pub fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
         },
         Module::Sensors => select::taskbar_sensor(snap, ctx.cfg).map(|s| {
             let v = fmt::sensor(s.value, s.kind, ctx.cfg.temp_unit);
+            let room = sensor_room(s.kind, ctx.cfg.temp_unit);
             // Load coloring reads a temperature in °C as percent, like the design.
             let is_temp = s.kind == SensorKind::Temperature;
             let (c, vc) = if is_temp { (fill(s.value), value(s.value)) } else { (color, t.fg) };
             match mc.style {
                 CellStyle::Graph => Body::Graph {
                     value: v,
+                    room,
                     lines: vec![(&hist.sensor, c)],
                     max: if is_temp { 100.0 } else { nice_max(hist.sensor.max()) },
                 },
-                _ => Body::Text { value: v, color: vc },
+                _ => Body::Text { value: v, room, color: vc },
             }
         }),
         // Flyout-only: `Config::normalize` never leaves it on the taskbar.
@@ -236,7 +282,8 @@ fn label(m: Module, style: CellStyle, ctx: &Ctx) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Body, Cell, sample};
+    use super::{Body, Cell, Fonts, PCT, RATE_BYTES, sample};
+    use crate::render::Gfx;
     use crate::theme::Color;
     use busy_core::{Config, CpuInfo, MemInfo, Module, Snapshot};
 
@@ -264,12 +311,37 @@ mod tests {
     #[test]
     fn tips_name_the_module_and_its_reading() {
         let c = Color::default();
-        let text = cell(Module::Memory, Body::Text { value: "35%".into(), color: c });
+        let text = cell(Module::Memory, Body::Text { value: "35%".into(), room: PCT, color: c });
         assert_eq!(text.tip(), "Memory: 35%");
-        let io = cell(Module::Network, Body::Io { rows: [("↑", c, "24 KB/s".into()), ("↓", c, "3 MB/s".into())] });
+        let io = cell(
+            Module::Network,
+            Body::Io { rows: [("↑", c, "24 KB/s".into()), ("↓", c, "3 MB/s".into())], room: RATE_BYTES },
+        );
         assert_eq!(io.tip(), "Network: ↑ 24 KB/s  ↓ 3 MB/s");
         // Design: a Network graph has no value, so the tip is the name alone.
-        let graph = cell(Module::Network, Body::Graph { value: String::new(), lines: Vec::new(), max: 1.0 });
+        let graph = cell(Module::Network, Body::Graph { value: String::new(), room: &[], lines: Vec::new(), max: 1.0 });
         assert_eq!(graph.tip(), "Network");
+    }
+
+    #[test]
+    fn widths_hold_while_values_change() {
+        let gfx = Gfx::new().unwrap();
+        let fonts = Fonts::new(&gfx).unwrap();
+        let c = Color::default();
+        let width = |body| Cell { module: Module::Cpu, label: Some("CPU".into()), body }.width(&gfx, &fonts);
+        for pct in ["1%", "10%", "100%"] {
+            let text = width(Body::Text { value: pct.into(), room: PCT, color: c });
+            assert_eq!(text, width(Body::Text { value: "0%".into(), room: PCT, color: c }), "Text {pct}");
+            let graph = |v: &str| width(Body::Graph { value: v.into(), room: PCT, lines: Vec::new(), max: 100.0 });
+            assert_eq!(graph(pct), graph("0%"), "Graph {pct}");
+            let bar =
+                |v: &str| width(Body::Bar { bars: vec![(0.5, c)], bar_w: 6.0, value: v.into(), room: PCT, color: c });
+            assert_eq!(bar(pct), bar("0%"), "Bar {pct}");
+        }
+        let io =
+            |v: &str| width(Body::Io { rows: [("↑", c, v.into()), ("↓", c, "0 KB/s".into())], room: RATE_BYTES });
+        for rate in ["5.2 KB/s", "350 KB/s", "12.4 MB/s", "999 MB/s"] {
+            assert_eq!(io(rate), io("0 KB/s"), "Io {rate}");
+        }
     }
 }
