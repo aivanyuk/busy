@@ -33,6 +33,20 @@ cargo test --workspace
 
 `pwsh tools/pack-msix.ps1` builds the release exe and packs `target\msix\busy-X.Y.Z-x64.msix` (unsigned: the Store signs it). It needs `makepri.exe` and `makeappx.exe`: an installed Windows SDK, or, with nothing installed, the `Microsoft.Windows.SDK.BuildTools` package from nuget.org unpacked into `target\sdk-buildtools\<version>` (the `.nupkg` is a zip; about 21 MB). `makeappx` validates the manifest against its schema as it packs. `-Layout` stops at the unpacked layout in `target\msix\layout`.
 
+Checking it installed (any change to the package, or to what a packaged busy does differently: config path, autostart, update check). Needs Developer Mode, which only the user turns on:
+
+1. `pwsh tools/pack-msix.ps1 -Layout`, then `Add-AppxPackage -Register target\msix\layout\AppxManifest.xml` (no signature needed for a registered layout). Exit any running busy first: the single-instance mutex is shared, so whichever starts second exits.
+2. Start it as Windows does: `Start-Process "shell:AppsFolder\<family>!busy"` (`(Get-AppxPackage tmik.busysystemmonitor).PackageFamilyName`); `(Get-Process busy).Path` is in the layout. A fresh package has no config, so setup opens.
+3. Start with Windows, from setup or Settings (toggled through UI Automation from Windows PowerShell, as for any UIA check): the startup task's state is the `State` DWORD under `HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData\<family>\busy` (0 off, 1 turned off by the user, 2 on; the key appears on the first change). Turning it on from busy sets 2 without a prompt; off sets 0. Setting 1 by hand stands in for Windows Settings → Apps → Startup: turning it on then shows the "turned off for busy in Windows Settings" message and the toggle stays off. The `Run` value must not change.
+4. Finish setup: `config.json` appears in `%LOCALAPPDATA%\Packages\<family>\LocalState` and `%APPDATA%\busy\config.json` keeps its time stamp. Exit (`WM_CLOSE` to `busy.main`) and start it again: no setup, the widget is back.
+5. The widget is a visible child of `Shell_TrayWnd`; a click posted to it opens the flyout, and its "<Module> settings" button opens Settings, whose taskbar button shows the package's logo. Settings → General → About has no Releases button, Advanced no update check. `Get-StartApps` lists "busy — system monitor".
+6. `target\release\busy.exe` started while the packaged one runs exits at once.
+7. Clean up: exit busy, `Get-AppxPackage tmik.busysystemmonitor | Remove-AppxPackage` (it takes the startup task, its registry key and `LocalState` with it).
+
+Not covered on a workstation: the next sign-in starting busy (it means signing out), and re-embedding after explorer restarts (a VM only, above).
+
+Verified so far: 26300.9457, 3840×2160 @ 200 %, taskbar on the right edge: every step above passes.
+
 ## Windows versions
 
 Supported: Windows 11 build 22631 (23H2) and later. What changes between builds is explorer's taskbar: the legacy windows `taskbar/explorer.rs` reads (`TrayNotifyWnd`, `Start`, `ReBarWindow32`) and how they track the XAML taskbar, alignment, and the DWM attributes the flyout sets. Monthly updates and staged feature rollouts change it too, so a result is for a build *and* its UBR.
