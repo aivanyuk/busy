@@ -28,9 +28,9 @@ A new unsigned download gets "Windows protected your PC" until it builds SmartSc
 - Unit tests for the path and the mapping of `StartupTask` states; `docs/areas/settings.md` and `core.md` gain the packaged cases.
 
 ### S2. Package layout (`build`, `tools`)
-- `packaging/AppxManifest.xml`, a template: identity, `X.Y.Z.0`, `DisplayName` "busy — system monitor", publisher display name, `windows.fullTrustApplication` entry point `busy.exe`, `runFullTrust`, the startup task, `Windows.Desktop` from 10.0.22000.0, as busy is a Windows 11 app.
-- Logos (`Square44x44Logo` with `targetsize-16…256` and `altform-unplated`, `Square150x150Logo`, `StoreLogo`) rasterized from the app glyph by the same code `build.rs` draws the icon with, written as PNG by hand (stored deflate blocks, CRC-32, Adler-32; no crates), so there are still no binary assets in the repository.
-- `tools/pack-msix.ps1 <exe> <out>`: lays out exe, manifest, logos, `LICENSE`, `THIRD-PARTY-LICENSES.txt`, and runs `makeappx pack`.
+- `app/AppxManifest.xml`, a template next to `app.manifest`: identity `tmik.busysystemmonitor` / `CN=4F8212EC-…` and publisher display name `tmik` from Partner Center, `X.Y.Z.0`, `DisplayName` "busy — system monitor", `Windows.FullTrustApplication` entry point `busy.exe`, `runFullTrust`, the startup task, `Windows.Desktop` from 10.0.22631.0 (23H2), the oldest build busy supports (docs/testing.md).
+- Logos (`Square44x44Logo` with `targetsize-16…256` and `altform-unplated`, `Square150x150Logo`, `StoreLogo`, each at scale 100–400) rasterized from the app glyph by the same code the build script draws the icon with and encoded by its PNG writer, so there are still no binary assets in the repository. The build script writes them and the filled-in manifest to `OUT_DIR/msix` (`app/build/msix.rs`).
+- `tools/pack-msix.ps1 [-Out <msix>] [-Layout]`: builds the release exe, finds that layout through cargo's JSON messages, adds the exe, `LICENSE` and `THIRD-PARTY-LICENSES.txt`, indexes the logos' qualifiers into `resources.pri` (`makepri`; without it Windows would only find unqualified file names) and runs `makeappx pack`. The SDK tools come from an installed Windows SDK (GitHub's runners) or the `Microsoft.Windows.SDK.BuildTools` NuGet package unpacked under `target\sdk-buildtools`, which needs no install.
 
 ### S3. Release workflow (`ci`)
 - `build` packs `busy-X.Y.Z-x64.msix` from the exe it just built and uploads it with the run's artifacts; it isn't attached to the Release.
