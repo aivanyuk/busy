@@ -46,7 +46,7 @@ fn info(role: Role, name: &str) -> Info {
     }
 }
 
-/// Setup's elements as its view and the config show them, the positions worded for a ertical taskbar or not.
+/// Setup's elements as its view and the config show them, the positions worded for a vertical taskbar or not.
 pub(in crate::window) fn tree(v: &View, cfg: &Config, autostart_busy: bool, vertical: bool) -> Tree {
     let entry =
         |node: Node, info: Info, rect: Option<Rect>| Entry { node, key: 0, parent: None, info, rect, offscreen: false };

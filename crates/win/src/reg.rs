@@ -111,6 +111,6 @@ mod tests {
         let all = reg_subkeys(HKEY_LOCAL_MACHINE, parent, usize::MAX);
         assert!(all.iter().any(|k| k == "CurrentVersion"), "{all:?}");
         assert_eq!(reg_subkeys(HKEY_LOCAL_MACHINE, parent, 1), all[..1]);
-        assert!(reg_subkeys(HKEY_LOCAL_MACHINE, r"SOFTWAREusy-no-such-key", 10).is_empty());
+        assert!(reg_subkeys(HKEY_LOCAL_MACHINE, r"SOFTWARE\busy-no-such-key", 10).is_empty());
     }
 }
