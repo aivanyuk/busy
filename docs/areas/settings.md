@@ -1,6 +1,6 @@
 # busy-settings
 
-`crates/settings` — the settings window, custom-drawn with Direct2D to the design (`design/Meterbar.dc.html`, Settings), and autostart. Files: `lib.rs` (API), `autostart.rs`, `dark.rs` (theme resolution, DWM title-bar mode), and `window/`, one concern per file:
+`crates/settings` — the settings window, custom-drawn with Direct2D to the design (`design/Meterbar.dc.html`, Settings), and autostart. Files: `lib.rs` (API), `autostart.rs` (with `startup_task.rs` for a packaged busy), `dark.rs` (theme resolution, DWM title-bar mode), and `window/`, one concern per file:
 
 - `mod.rs` — `Ui` state, create/open, applying edits, autostart through the worker, rendering to an `ID2D1HwndRenderTarget`.
 - `model.rs` — what each page shows (design `rows()`): headers, one card per setting with its control, the taskbar order; `choices.rs` — each dropdown's options and the value each sets; `edit.rs` — applying an `Edit` to the config. All pure and tested.
@@ -39,6 +39,7 @@ pub mod autostart { pub fn is_enabled() -> bool; pub fn set(enabled: bool) -> wi
 - "Releases" opens `https://github.com/aivanyuk/busy/releases` through the worker (`Job::Open`, `ShellExecuteW` after an STA `CoInitializeEx` with OLE1 DDE off, as the shell asks): starting a browser can take seconds, and the UI thread must not wait on it. Only `https://` URLs are opened; a failure does nothing. Nothing is fetched otherwise.
 - `autostart::{is_enabled, set}` block on the registry: call them off a UI thread (the window calls them only from its worker).
 - `autostart::is_enabled` also checks the Task Manager "disabled" flag (`StartupApproved\Run`); `set(true)` clears it, `set(false)` removes both values.
+- A busy installed from the Microsoft Store (`busy_win::package_family`) starts through its package's startup task instead (`startup_task.rs`, `Windows.ApplicationModel.StartupTask`, TaskId `busy` as in the manifest): its writes to the `Run` key would land in the package's private copy of the registry and start nothing. `is_enabled` is the task's state (Enabled or EnabledByPolicy); `set(true)` asks for it (`RequestEnableAsync`) and, when the user turned busy off in Windows Settings → Apps → Startup or a policy keeps it off, returns that as the error the window's message box shows, as the app can't override either; `set(false)` disables it; `repair` does nothing. The WinRT calls run on a short-lived MTA thread of their own, since the worker thread may be an STA for the shell. Untested until the package exists (store plan S4).
 - `autostart::repair` (called by the app at startup, on a thread of its own) points the Run entry at the running exe when the exe it names no longer exists, so moving busy.exe or replacing it with a download elsewhere keeps "Start with Windows". An entry naming another exe that still exists is left alone, so a development build never takes over an installed copy's autostart; Task Manager's flag is kept.
 
 ## Layout (design measures, in DIPs)
