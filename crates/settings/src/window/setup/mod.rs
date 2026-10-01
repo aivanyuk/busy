@@ -45,6 +45,16 @@ pub(super) const PLACES: [(Anchor, &str, &str); 2] = [
     (Anchor::NearTray, "Next to the system tray", "Right side, beside the clock"),
     (Anchor::Left, "Left edge of the taskbar", "Where Widgets usually sits"),
 ];
+/// The same down a vertical taskbar (design `obPos`), whose far end from the tray is its top.
+const PLACES_VERTICAL: [(Anchor, &str, &str); 2] = [
+    (Anchor::NearTray, "Next to the system tray", "Bottom, just above the clock"),
+    (Anchor::Left, "Top of the taskbar", "Above the app icons"),
+];
+
+/// The positions as a taskbar standing `vertical` or not words them.
+pub(super) fn places(vertical: bool) -> &'static [(Anchor, &'static str, &'static str); 2] {
+    if vertical { &PLACES_VERTICAL } else { &PLACES }
+}
 
 /// Something the pointer or the keyboard acts on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -198,5 +208,8 @@ mod tests {
         assert_eq!(place(&cfg), 1);
         let s = stops(&cfg);
         assert_eq!(s[c.len()..], [Target::Place(1), Target::Startup, Target::Skip, Target::Start]);
+        // Only the words follow the taskbar's orientation.
+        assert!(places(true).iter().zip(places(false)).all(|(v, h)| v.0 == h.0));
+        assert_eq!(places(true)[1].1, "Top of the taskbar");
     }
 }

@@ -118,6 +118,8 @@ struct Ui {
     /// The preview's cell fonts and what it last showed (redrawn only when that changes).
     cell_fonts: busy_ui::cell::Fonts,
     shown: RefCell<Option<live::Shown>>,
+    /// The preview cell's height in a vertical taskbar's column, as last measured (`fit_preview`).
+    cell_h: Cell<Option<f32>>,
     worker: Worker,
     /// Windows app mode, as last read by the worker.
     system_dark: Cell<bool>,
@@ -192,9 +194,10 @@ fn create(cfg: &Config, host: Rc<dyn Host>) -> Result<()> {
         cfg: RefCell::new(cfg.clone()),
         host,
         view: RefCell::new(View::new(Page::General)),
-        choices: RefCell::new(Choices { newer: live::newer(), ..Choices::default() }),
+        choices: RefCell::new(Choices { newer: live::newer(), edge: busy_win::taskbar_edge(), ..Choices::default() }),
         cell_fonts,
         shown: RefCell::new(None),
+        cell_h: Cell::new(None),
         worker: Worker::start(hwnd),
         system_dark: Cell::new(false),
         reg_autostart: Cell::new(None),
@@ -257,13 +260,12 @@ impl Ui {
     fn rebuild(&self) {
         let cfg = self.cfg.borrow();
         let mut v = self.view.borrow_mut();
+        let ch = self.choices.borrow();
         v.nav = model::nav(&cfg);
-        v.items = if v.searching() {
-            model::search(&v.query, &cfg, &self.choices.borrow())
-        } else {
-            model::items(v.page, &cfg, &self.choices.borrow())
-        };
+        v.items = if v.searching() { model::search(&v.query, &cfg, &ch) } else { model::items(v.page, &cfg, &ch) };
+        v.preview_h = controls::preview::height(ch.edge, self.cell_h.get());
         v.lay_out(&self.gfx, &self.fonts);
+        drop(ch);
         drop(v);
         drop(cfg);
         self.invalidate();
@@ -391,6 +393,7 @@ impl Ui {
     }
 
     fn render(&self) {
+        self.follow_edge();
         let mut rc = RECT::default();
         // SAFETY: our live window; `rc` is a valid out-pointer.
         unsafe {
@@ -427,7 +430,9 @@ impl Ui {
         // The preview draws from the host's readings, lent for the frame; without them it draws the rest.
         let mut drawn = false;
         self.host.with_data(&mut |snap, hist| {
-            self.draw(&rt, (rc.right, rc.bottom), Some(controls::preview::Data { snap, hist }));
+            let data = controls::preview::Data { snap, hist };
+            self.fit_preview(&data);
+            self.draw(&rt, (rc.right, rc.bottom), Some(data));
             drawn = true;
         });
         if !drawn {
@@ -448,6 +453,7 @@ impl Ui {
             data,
             maximized,
             autostart_busy: self.autostart_busy(),
+            edge: self.choices.borrow().edge,
         };
         let setup = self.in_setup().then(|| self.setup.borrow());
         let paint = |cv: &Canvas| match &setup {

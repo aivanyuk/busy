@@ -47,20 +47,27 @@ pub(in crate::window) fn hit(r: Rect, n: usize, x: f32, y: f32) -> Option<Target
     })
 }
 
-/// `color(m)` is a module's palette color; `hover` the hovered button.
+/// The intro line (design `orderNote`): a vertical taskbar stacks the cells top to bottom.
+fn note(vertical: bool) -> &'static str {
+    if vertical { "Widgets appear top to bottom in this order." } else { "Widgets appear left to right in this order." }
+}
+
+/// `color(m)` is a module's palette color; `hover` the hovered button; `vertical` whether the taskbar is.
+#[allow(clippy::too_many_arguments)] // One call site, in `paint`; the arguments are what the card needs to draw.
 pub(in crate::window) fn draw(
     cv: &Canvas,
     r: Rect,
     list: &[(Module, bool)],
     color: impl Fn(Module) -> Color,
     hover: Option<Target>,
+    vertical: bool,
     t: &Theme,
     f: &Fonts,
 ) {
     cv.round(r, 4.0, t.card);
     cv.round_outline(r, 4.0, t.card_line);
     let intro = Rect::new(r.x + CARD_PAD_L, r.y + 12.0, r.w - CARD_PAD_L - 16.0, LINE_12);
-    cv.text("Widgets appear left to right in this order.", &f.small, intro, t.fg2, Align::Left);
+    cv.text(note(vertical), &f.small, intro, t.fg2, Align::Left);
     let n = list.len();
     for (i, &(m, shown)) in list.iter().enumerate() {
         let rr = row(r, i);

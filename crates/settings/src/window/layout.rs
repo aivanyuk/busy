@@ -160,6 +160,9 @@ pub(super) struct View {
     /// The keyboard focus (`Search`, `Nav`, `Ctl`, `Up` or `Down`), and whether its ring shows.
     pub(super) focus: Option<Target>,
     pub(super) focus_visible: bool,
+    /// The preview card's height (`preview::height`): it follows the taskbar's edge and, down a vertical
+    /// taskbar, the cell's.
+    pub(super) preview_h: f32,
 }
 
 impl View {
@@ -178,6 +181,7 @@ impl View {
             focus: None,
             focus_visible: false,
             query: String::new(),
+            preview_h: preview::HEIGHT,
         }
     }
 
@@ -233,7 +237,7 @@ impl View {
             .items
             .iter()
             .map(|item| {
-                let p = place(item, y, width, gfx, f);
+                let p = place(item, y, width, self.preview_h, gfx, f);
                 y = p.rect.bottom() + GAP;
                 p
             })
@@ -400,14 +404,12 @@ impl View {
     }
 }
 
-fn place(item: &Item, y: f32, width: f32, gfx: &Gfx, f: &Fonts) -> Placed {
+fn place(item: &Item, y: f32, width: f32, preview_h: f32, gfx: &Gfx, f: &Fonts) -> Placed {
     match item {
         Item::Header(_) => {
             Placed { rect: Rect::new(0.0, y + HEADER_TOP, width, LINE_14 + 4.0), ctl: Rect::default(), text_w: width }
         }
-        Item::Preview(_) => {
-            Placed { rect: Rect::new(0.0, y, width, preview::HEIGHT), ctl: Rect::default(), text_w: width }
-        }
+        Item::Preview(_) => Placed { rect: Rect::new(0.0, y, width, preview_h), ctl: Rect::default(), text_w: width },
         Item::Notice(text) => {
             let text_w = width - CARD_PAD_L - CARD_PAD_R;
             let h = CARD_PAD_Y * 2.0 + gfx.metrics(&f.desc, text, text_w).1.max(LINE_12);

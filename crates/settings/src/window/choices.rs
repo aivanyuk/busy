@@ -6,6 +6,7 @@ use busy_core::release::Release;
 use busy_core::{
     Anchor, CellStyle, CpuBar, Module, NetInterface, RateUnit, SensorKind, SensorPick, Snapshot, TempUnit, ThemeMode,
 };
+use busy_win::Edge;
 
 /// A value a dropdown option sets.
 #[derive(Clone, Debug, PartialEq)]
@@ -44,6 +45,9 @@ pub(super) struct Choices {
     pub(super) sensors: Vec<String>,
     /// Shown in General's About row; readings leave it alone.
     pub(super) newer: Option<Release>,
+    /// The taskbar's screen edge (`busy_win::taskbar_edge`), which words and draws what is "left" and the
+    /// preview; readings leave it alone too.
+    pub(super) edge: Edge,
 }
 
 impl Choices {
@@ -68,6 +72,7 @@ impl Choices {
                     .map(|s| format!("{}/{}", s.hardware, s.name)),
             ),
             newer: None,
+            edge: Edge::default(),
         }
     }
 }
@@ -89,12 +94,11 @@ fn fixed(opts: &[(&str, Pick)], current: Pick) -> (Vec<Opt>, usize) {
     list(opts.iter().map(|(l, p)| (l.to_string(), p.clone())).collect(), current, |_| String::new())
 }
 
-pub(super) fn anchor(a: Anchor) -> (Vec<Opt>, usize) {
+/// Down a vertical taskbar the far end from the tray is its top (design `isVert()`).
+pub(super) fn anchor(a: Anchor, vertical: bool) -> (Vec<Opt>, usize) {
+    let left = if vertical { "Top of taskbar" } else { "Left edge of taskbar" };
     fixed(
-        &[
-            ("Next to system tray", Pick::Anchor(Anchor::NearTray)),
-            ("Left edge of taskbar", Pick::Anchor(Anchor::Left)),
-        ],
+        &[("Next to system tray", Pick::Anchor(Anchor::NearTray)), (left, Pick::Anchor(Anchor::Left))],
         Pick::Anchor(a),
     )
 }
@@ -243,8 +247,12 @@ mod tests {
         );
         assert_eq!(labels(theme(ThemeMode::Light)).1, 2);
         assert_eq!(
-            labels(anchor(Anchor::Left)),
+            labels(anchor(Anchor::Left, false)),
             (vec!["Next to system tray".into(), "Left edge of taskbar".into()], 1)
+        );
+        assert_eq!(
+            labels(anchor(Anchor::Left, true)),
+            (vec!["Next to system tray".into(), "Top of taskbar".into()], 1)
         );
         let (opts, i) = module_interval(Module::Cpu, None, 5000);
         assert_eq!((opts[0].label.as_str(), i, opts.len()), ("Default (5 seconds)", 0, 4));
@@ -317,7 +325,7 @@ mod tests {
             volumes: vec![("C:".into(), "Windows".into()), ("E:".into(), String::new())],
             adapters: vec!["Wi-Fi 2".into()],
             sensors: vec!["GPU/Hot Spot".into()],
-            newer: None,
+            ..Choices::default()
         };
         assert_eq!(
             labels(drive(Some("E:"), &ch)),

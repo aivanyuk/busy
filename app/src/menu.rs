@@ -45,12 +45,9 @@ pub fn show(owner: HWND, cfg: &Config) -> Option<Command> {
             ID_ANCHOR_TRAY as usize,
             w!("Next to notification area"),
         );
-        let _ = AppendMenuW(
-            sub_pos,
-            MF_STRING | checked(cfg.anchor == Anchor::Left),
-            ID_ANCHOR_LEFT as usize,
-            w!("Left edge"),
-        );
+        // Down a vertical taskbar (design `isVert()`) the far end from the tray is its top.
+        let left = if busy_win::taskbar_edge().is_vertical() { w!("Top") } else { w!("Left edge") };
+        let _ = AppendMenuW(sub_pos, MF_STRING | checked(cfg.anchor == Anchor::Left), ID_ANCHOR_LEFT as usize, left);
         let _ = AppendMenuW(menu, MF_STRING, ID_SETTINGS as usize, w!("Settings…"));
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
         let _ = AppendMenuW(menu, MF_POPUP, sub_mods.0 as usize, w!("Show on taskbar"));

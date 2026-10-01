@@ -221,7 +221,11 @@ fn general_rows(cfg: &Config, ch: &Choices) -> Vec<Item> {
     vec![
         Item::Header("Behavior"),
         toggle("Start with Windows", "Launch busy when you sign in", Flag::Autostart, cfg.autostart),
-        dropdown("Widget position", "Where readings sit on the taskbar", choices::anchor(cfg.anchor)),
+        dropdown(
+            "Widget position",
+            "Where readings sit on the taskbar",
+            choices::anchor(cfg.anchor, ch.edge.is_vertical()),
+        ),
         dropdown("Offset", "Extra space between the readings and that edge", choices::offset(cfg.offset_px)),
         dropdown(
             "Default update interval",
@@ -386,6 +390,18 @@ mod tests {
         assert_eq!(order.len(), Module::ALL.len() - 1);
         assert!(order.iter().all(|&(m, _)| m != Module::Processes));
         assert_eq!(order[0], (Module::Cpu, true));
+        // Down a vertical taskbar "left" is its top.
+        let position = |edge| {
+            let ch = Choices { edge, ..Choices::default() };
+            super::items(Page::General, &cfg, &ch).into_iter().find_map(|i| match i {
+                Item::Row(Row { title: "Widget position", control: Control::Dropdown(opts, _), .. }) => {
+                    opts.get(1).map(|o| o.label.clone())
+                }
+                _ => None,
+            })
+        };
+        assert_eq!(position(busy_win::Edge::Bottom).as_deref(), Some("Left edge of taskbar"));
+        assert_eq!(position(busy_win::Edge::Right).as_deref(), Some("Top of taskbar"));
     }
 
     #[test]

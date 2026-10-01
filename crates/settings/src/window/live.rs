@@ -1,9 +1,10 @@
 //! The window following the host: configs it applied (`sync`), new readings (`refresh`), which feed the
 //! module page's live preview and the dropdowns that list the machine's drives, adapters and sensors, and
-//! the update check's answer (`release`).
+//! the update check's answer (`release`); and following the taskbar to another screen edge (`follow_edge`).
 
 use super::choices::Choices;
 use super::clock;
+use super::controls::preview;
 use super::model::Page;
 use super::{Ui, ui};
 use busy_core::release::Release;
@@ -34,12 +35,15 @@ pub(crate) fn release(newer: Option<&Release>) {
 use busy_ui::cell::{self, Key};
 use busy_ui::ctx::Ctx;
 use busy_ui::history::History;
+use busy_win::Edge;
 
-/// What the preview last showed: its cell and the clock beside it.
+/// What the preview last showed: its cell, the clock beside it, and the taskbar edge it was drawn for (a strip,
+/// or a column on the left or right).
 #[derive(PartialEq)]
 pub(super) struct Shown {
     cell: Option<Key>,
     clock: (String, String),
+    edge: Edge,
 }
 
 pub(crate) fn sync(cfg: &Config) {
@@ -57,15 +61,17 @@ pub(crate) fn sync(cfg: &Config) {
 
 pub(crate) fn refresh(snap: &Snapshot, hist: &History) {
     let Some(u) = ui() else { return };
+    u.follow_edge();
     u.update_choices(Choices::from_snapshot(snap));
     if u.in_setup() {
         return u.setup_samples(snap);
     }
     let Page::Module(m) = u.view.borrow().page else { return };
     let shown = {
-        let (cfg, theme) = (u.cfg.borrow(), u.theme());
+        let (cfg, theme, edge) = (u.cfg.borrow(), u.theme(), u.choices.borrow().edge);
         let ctx = Ctx { cfg: &cfg, snap, hist, theme: &theme, gfx: &u.gfx };
-        Shown { cell: cfg.module(m).and_then(|mc| cell::cell(&ctx, mc)).map(|c| c.key()), clock: clock::now() }
+        let cell = cfg.module(m).and_then(|mc| cell::cell(&ctx, mc)).map(|c| c.key());
+        Shown { cell, clock: if edge.is_vertical() { clock::now_short() } else { clock::now() }, edge }
     };
     if u.shown.borrow().as_ref() != Some(&shown) {
         *u.shown.borrow_mut() = Some(shown);
@@ -74,6 +80,37 @@ pub(crate) fn refresh(snap: &Snapshot, hist: &History) {
 }
 
 impl Ui {
+    /// Follows the taskbar to another screen edge (Windows 26H2 lets it stand on the left or right): "left"
+    /// becomes "top" in the words, and the preview turns into a column. `taskbar_edge` only reads window
+    /// rects, so this runs before every frame and with every refresh: a change shows by the next paint or
+    /// sample, whichever comes first. An open popup closes, as its options' words and place change.
+    pub(super) fn follow_edge(&self) {
+        let edge = busy_win::taskbar_edge();
+        if self.choices.borrow().edge == edge {
+            return;
+        }
+        self.choices.borrow_mut().edge = edge;
+        self.view.borrow_mut().popup = None;
+        self.rebuild();
+    }
+
+    /// Down a vertical taskbar the preview card is as tall as its cell's column, which the style, the label and
+    /// the readings decide: measured from the readings lent for a frame, and laid out again before the frame is
+    /// drawn when it changed.
+    pub(super) fn fit_preview(&self, d: &preview::Data) {
+        let edge = self.choices.borrow().edge;
+        if self.in_setup() || !edge.is_vertical() {
+            return;
+        }
+        let Page::Module(m) = self.view.borrow().page else { return };
+        let h = preview::column_height(d, m, &self.cfg.borrow(), &self.theme(), &self.gfx);
+        if self.cell_h.replace(h) != h {
+            let mut v = self.view.borrow_mut();
+            v.preview_h = preview::height(edge, h);
+            v.lay_out(&self.gfx, &self.fonts);
+        }
+    }
+
     /// Setup's cards: each module's reading, redrawn when one changes.
     pub(super) fn setup_samples(&self, snap: &Snapshot) {
         let samples: Vec<_> = {
