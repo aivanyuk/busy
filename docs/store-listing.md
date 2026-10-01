@@ -100,7 +100,7 @@ Optional. Without a 1:1 app tile icon (300 × 300) the Store uses the package's 
 | Website | https://github.com/aivanyuk/busy |
 | Support contact info | https://github.com/aivanyuk/busy/issues |
 | Product declarations | Leave the accessibility declaration unchecked: busy supports keyboard and UI Automation, but hasn't been tested against the accessibility guidelines that declaration names |
-| System requirements | Windows 11 23H2 (build 22631) or later, x64 (README → Install). The installable OS floor is the manifest's `TargetDeviceFamily MinVersion`; store plan S2 names 10.0.22000.0, below the supported 22631, so align the two before submitting |
+| System requirements | Windows 11 23H2 (build 22631) or later, x64 (README → Install), the package manifest's `TargetDeviceFamily MinVersion` (10.0.22631.0, `app/AppxManifest.xml`) |
 
 ## Age ratings (IARC questionnaire)
 
