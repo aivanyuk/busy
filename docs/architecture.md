@@ -79,6 +79,7 @@ Every thread the app starts is listed here.
 | Sampler | Yes (PDH, WMI, NtQuerySystemInformation) | all `Source`s, COM MTA |
 | Config writer | Yes (file I/O) | the one `config.json` writer; writes the latest submitted `Config`, older pending ones are dropped |
 | Theme reader | Yes (registry) | resolves `Theme` (light or dark, from `SystemUsesLightTheme`) on theme broadcasts and config changes, posts it back |
+| Task buttons (`busy-tasks`) | Yes (UI Automation calls into explorer, bounded by 1 s connection and 2 s transaction timeouts) | the UIA client (`taskbar::tasks`, COM MTA): on each widget timer tick scans where the task buttons are and leaves the rect for the widget's next layout; joined when the widget drops, after its window is destroyed |
 | Launcher | Yes (shell) | starts Task Manager for the flyout's "Open Task Manager" (`launch::task_manager`: `ShellExecuteW` with the System32 path, in its own STA) |
 | Update check (only while `opt_in.update_check` is on) | Yes (network, up to 10 s per step) | `update::Updates`: one GET of GitHub's latest release at once and every 24 h (WinHTTP), a newer one posted back (`WM_APP_RELEASE`); idle on a channel while off; ends when the app drops it, never joined |
 | Autostart repair | Yes (registry, file system) | runs `autostart::repair` once at startup (a Run entry naming an exe that is gone now names this one); ends on its own, never joined |
