@@ -43,6 +43,6 @@ Definition of done for any change: fmt clean, clippy clean with `-D warnings`, t
 | Commit/branch conventions, automated PR review | [docs/commits.md](docs/commits.md), `.github/review-rules.md` |
 | UI design source + migration plan | [docs/plans/design-migration.md](docs/plans/design-migration.md), `design/` |
 | Versioning, release artifacts, update check | [docs/plans/release.md](docs/plans/release.md), [docs/releasing.md](docs/releasing.md) |
-| Microsoft Store package (MSIX), packaged vs portable | [docs/plans/store.md](docs/plans/store.md) |
+| Microsoft Store package (MSIX), packaged vs portable, Store listing | [docs/plans/store.md](docs/plans/store.md), [docs/store-listing.md](docs/store-listing.md), [PRIVACY.md](PRIVACY.md) |
 
 When you learn something non-obvious about an area (Win32 quirk, measured cost, layout gotcha), add it to that area's doc in the same change.
