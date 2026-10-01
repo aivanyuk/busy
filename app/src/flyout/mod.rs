@@ -11,6 +11,7 @@ use busy_core::{Anchor, Module};
 use busy_ui::ctx::Ctx;
 use busy_ui::render::{Canvas, Gfx, Rect};
 use busy_ui::theme::{Color, Theme};
+use busy_win::Edge;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Direct2D::Common::*;
 use windows::Win32::Graphics::Direct2D::*;
@@ -66,6 +67,8 @@ pub struct Flyout {
     dpi: u32,
     anchor: RECT,
     anchor_side: Anchor,
+    /// The taskbar's screen edge: the flyout opens beside it.
+    edge: Edge,
     /// Window rect last passed to `SetWindowPos`.
     placed: RECT,
     scroll: f32,
@@ -110,6 +113,7 @@ impl Flyout {
             dpi: 96,
             anchor: RECT::default(),
             anchor_side: Anchor::NearTray,
+            edge: Edge::Bottom,
             placed: RECT::default(),
             scroll: 0.0,
             view_h: 0.0,
@@ -146,10 +150,11 @@ impl Flyout {
         self.dpi as f32 / 96.0
     }
 
-    /// Shows `m`'s flyout on the side of `anchor` (the widget's screen rect); hides it if `m`'s is open, and
+    /// Shows `m`'s flyout on the side of `anchor` (the widget's screen rect), beside the taskbar on `edge`; hides
+    /// it if `m`'s is open, and
     /// switches to `m` if another module's is. A click on the widget doesn't take activation from the flyout
     /// (the widget answers `MA_NOACTIVATE`), so a click on another cell arrives while it is still open.
-    pub fn toggle(&mut self, ctx: &Ctx, m: Module, anchor: RECT, dpi: u32) {
+    pub fn toggle(&mut self, ctx: &Ctx, m: Module, anchor: RECT, edge: Edge, dpi: u32) {
         if self.visible && self.module == Some(m) {
             self.hide(false);
         } else if self.visible {
@@ -159,7 +164,7 @@ impl Flyout {
             self.render(ctx);
         } else if unsafe { GetTickCount64() }.saturating_sub(self.deactivated_at) >= 250 {
             self.module = Some(m);
-            self.show(ctx, anchor, dpi);
+            self.show(ctx, anchor, edge, dpi);
         }
         // Otherwise the press that deactivated (and hid) the flyout was on the widget itself: stay closed.
     }
@@ -173,9 +178,10 @@ impl Flyout {
         unsafe { GetForegroundWindow() == self.hwnd }
     }
 
-    fn show(&mut self, ctx: &Ctx, anchor: RECT, dpi: u32) {
+    fn show(&mut self, ctx: &Ctx, anchor: RECT, edge: Edge, dpi: u32) {
         self.anchor = anchor;
         self.anchor_side = ctx.cfg.anchor;
+        self.edge = edge;
         self.dpi = dpi;
         self.scroll = 0.0;
         self.visible = true;
@@ -225,14 +231,22 @@ impl Flyout {
         let w = (WIDTH * s).round() as i32;
         let h = ((self.content_h * s).ceil() as i32).min(wa.bottom - wa.top - 2 * m).max(1);
         self.view_h = h as f32 / s;
-        // Design: 12 px in from the work area's edge on the widget's side, like the system flyouts.
-        let x = match self.anchor_side {
-            Anchor::NearTray => wa.right - m - w,
-            Anchor::Left => wa.left + m,
-        }
-        .clamp(wa.left + m, (wa.right - m - w).max(wa.left + m));
-        let below_center = self.anchor.top > (wa.top + wa.bottom) / 2;
-        let y = if below_center { wa.bottom - m - h } else { wa.top + m };
+        // Design: 12 px in from the work area's edges, like the system flyouts: beside the taskbar, at the end of
+        // it the widget is on (right or bottom for `NearTray`, left or top for `Left`).
+        let near_tray = self.anchor_side == Anchor::NearTray;
+        let right = match self.edge {
+            Edge::Left => false,
+            Edge::Right => true,
+            Edge::Top | Edge::Bottom => near_tray,
+        };
+        let bottom = match self.edge {
+            Edge::Top => false,
+            Edge::Bottom => true,
+            Edge::Left | Edge::Right => near_tray,
+        };
+        let x = if right { wa.right - m - w } else { wa.left + m };
+        let x = x.clamp(wa.left + m, (wa.right - m - w).max(wa.left + m));
+        let y = if bottom { wa.bottom - m - h } else { wa.top + m };
         let want = RECT { left: x, top: y, right: x + w, bottom: y + h };
         if std::mem::replace(&mut self.placed, want) != want {
             unsafe {

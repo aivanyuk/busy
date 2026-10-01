@@ -25,21 +25,26 @@ fn rect_in(h: HWND, parent: HWND) -> Option<RECT> {
     }
 }
 
-/// Where the widget may go, in taskbar client pixels: (anchor edge, room). For `NearTray` the edge is the
-/// widget's right side, for `Left` its left side; `room` is the width available before the task buttons.
-pub(super) fn slot(tray: HWND, cfg: &Config, scale: f32, client: &RECT) -> (i32, i32) {
+/// Where the widget may go along the taskbar, in taskbar client pixels: (anchor edge, room). The taskbar runs
+/// along x, or along y when `vertical` (on the left or right edge), and so does everything here: for
+/// `NearTray` the edge is the widget's right (bottom) side, for `Left` its left (top) side; `room` is the
+/// length available beside the task buttons.
+pub(super) fn slot(tray: HWND, cfg: &Config, scale: f32, client: &RECT, vertical: bool) -> (i32, i32) {
     let px = |dip: f32| (dip * scale).round() as i32;
-    let rect = |class| child(tray, class).and_then(|h| rect_in(h, tray));
-    // TrayNotifyWnd is kept in sync with the XAML notification area on Win11 (verified on 26200).
-    let tray_left = rect(w!("TrayNotifyWnd")).map_or(client.right, |r| r.left);
+    let span = |r: RECT| if vertical { (r.top, r.bottom) } else { (r.left, r.right) };
+    let end = span(*client).1;
+    let rect = |class| child(tray, class).and_then(|h| rect_in(h, tray)).map(span);
+    // TrayNotifyWnd is kept in sync with the XAML notification area on Win11 (verified on 26200, and on 26300
+    // with a vertical taskbar, where its top is the "show hidden icons" chevron's).
+    let tray_left = rect(w!("TrayNotifyWnd")).map_or(end, |r| r.0);
     // The (hidden) legacy Start window still tracks the XAML Start button. With centered icons the
     // button group is symmetric around the taskbar center, which gives its right end; ReBarWindow32
     // (the legacy task list) is not kept in sync, so it is only a fallback for left alignment.
     let start = rect(w!("Start"));
-    let left_aligned = start.is_none_or(|r| r.left < px(40.0));
+    let left_aligned = start.is_none_or(|r| r.0 < px(40.0));
     let (tasks_left, tasks_right) = match start {
-        Some(s) if !left_aligned => (s.left, client.right - s.left),
-        _ => (0, rect(w!("ReBarWindow32")).map_or(client.right / 2, |r| r.right)),
+        Some(s) if !left_aligned => (s.0, end - s.0),
+        _ => (0, rect(w!("ReBarWindow32")).map_or(end / 2, |r| r.1)),
     };
     let off = px(cfg.offset_px as f32);
     let gap = px(8.0);

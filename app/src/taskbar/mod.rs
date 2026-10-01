@@ -13,6 +13,7 @@ use busy_ui::cell::{self, CELL_H, Cell, Fonts};
 use busy_ui::ctx::Ctx;
 use busy_ui::render::{Canvas, Gfx, Rect};
 use busy_ui::theme::Theme;
+use busy_win::Edge;
 use std::cell::RefCell;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Direct2D::Common::*;
@@ -28,17 +29,29 @@ use windows::core::{PCWSTR, Result, w};
 const CLASS: PCWSTR = w!("busy.taskbar");
 /// Between cells (design: the widget row's `gap: 2px`).
 const GAP: f32 = 2.0;
-/// NearTray: a 1×20 `--line` divider with 4 px margins after the cells, before the notification area.
+/// NearTray: a 1×20 `--line` divider with 4 px margins after the cells, before the notification area (24×1
+/// below the cells down a vertical taskbar).
 const DIVIDER: f32 = GAP + 4.0 + 1.0 + 4.0;
 
-thread_local! {
-    /// Each drawn cell's horizontal extent in client pixels, for hit-testing in the window procedure.
-    static HITS: RefCell<Vec<(i32, i32, Module)>> = const { RefCell::new(Vec::new()) };
+/// Each drawn cell's extent along the taskbar in client pixels (x, or y when it is vertical), for hit-testing
+/// in the window procedure.
+struct Hits {
+    vertical: bool,
+    cells: Vec<(i32, i32, Module)>,
 }
 
-/// The cell at client x `x`, if any.
-fn hit(x: i32) -> Option<Module> {
-    HITS.with_borrow(|h| h.iter().find(|&&(l, r, _)| (l..r).contains(&x)).map(|&(.., m)| m))
+thread_local! {
+    static HITS: RefCell<Hits> = const { RefCell::new(Hits { vertical: false, cells: Vec::new() }) };
+}
+
+/// The cell under the pointer of mouse message `lp`, if any.
+fn hit(lp: LPARAM) -> Option<Module> {
+    // GET_X_LPARAM / GET_Y_LPARAM.
+    let (x, y) = ((lp.0 & 0xFFFF) as u16 as i16 as i32, ((lp.0 >> 16) & 0xFFFF) as u16 as i16 as i32);
+    HITS.with_borrow(|h| {
+        let at = if h.vertical { y } else { x };
+        h.cells.iter().find(|&&(l, r, _)| (l..r).contains(&at)).map(|&(.., m)| m)
+    })
 }
 
 /// Where the taskbar lets us draw; any change calls for a new layout.
@@ -47,7 +60,9 @@ struct Geometry {
     dpi: u32,
     /// Taskbar client rect.
     client: RECT,
-    /// `explorer::slot`: (anchor edge, room).
+    /// On the left or right edge (taller than wide): cells stack top to bottom in a column.
+    vertical: bool,
+    /// `explorer::slot`: (anchor edge, room), along the taskbar.
     slot: (i32, i32),
 }
 
@@ -57,6 +72,7 @@ struct Frame {
     dpi: u32,
     w_px: i32,
     h_px: i32,
+    vertical: bool,
     hover: Option<Module>,
     active: Option<Module>,
     theme: Theme,
@@ -151,6 +167,11 @@ impl Taskbar {
         unsafe { GetDpiForWindow(self.tray) }
     }
 
+    /// The screen edge of the taskbar we are embedded in (the flyout opens beside it).
+    pub fn edge(&self) -> Edge {
+        busy_win::window_edge(self.tray)
+    }
+
     /// Records the cell under the pointer (drawn as `--hover`); true if that changed and a redraw is due.
     pub fn set_hover(&mut self, hover: Option<Module>) -> bool {
         let changed = std::mem::replace(&mut self.hover, hover) != hover;
@@ -187,8 +208,9 @@ impl Taskbar {
         unsafe {
             let _ = GetClientRect(self.tray, &mut client);
         }
-        let slot = explorer::slot(self.tray, cfg, dpi as f32 / 96.0, &client);
-        Geometry { dpi, client, slot }
+        let vertical = client.bottom - client.top > client.right - client.left;
+        let slot = explorer::slot(self.tray, cfg, dpi as f32 / 96.0, &client, vertical);
+        Geometry { dpi, client, vertical, slot }
     }
 
     /// Timer path: follows taskbar geometry changes, otherwise only restores z-order and visibility.
@@ -209,32 +231,41 @@ impl Taskbar {
             unsafe { self.rt.SetDpi(geom.dpi as f32, geom.dpi as f32) };
         }
         self.geom = geom;
-        let Geometry { dpi, client, slot } = geom;
+        let Geometry { dpi, client, vertical, slot } = geom;
         let scale = dpi as f32 / 96.0;
-        let h_px = client.bottom - client.top;
+        // The taskbar's thickness: its height, or its width when it is vertical.
+        let thick_px = if vertical { client.right - client.left } else { client.bottom - client.top };
+        let col_w = cell::column_width(thick_px as f32 / scale);
         let mut cells = cell::cells(ctx);
-        let mut widths: Vec<f32> = cells.iter().map(|c| c.width(ctx.gfx, &self.fonts)).collect();
+        // Each cell's length along the taskbar: its width, or its height in a column.
+        let mut lens: Vec<f32> =
+            cells.iter().map(|c| if vertical { c.column_height() } else { c.width(ctx.gfx, &self.fonts) }).collect();
         let divider = if ctx.cfg.anchor == Anchor::NearTray { DIVIDER } else { 0.0 };
-        let total = |ws: &[f32]| ws.iter().sum::<f32>() + GAP * ws.len().saturating_sub(1) as f32 + divider;
+        let total = |ls: &[f32]| ls.iter().sum::<f32>() + GAP * ls.len().saturating_sub(1) as f32 + divider;
         // Never cover the task buttons: drop trailing (lowest-priority) cells that don't fit.
-        while !widths.is_empty() && (total(&widths) * scale).ceil() as i32 > slot.1 {
-            widths.pop();
+        while !lens.is_empty() && (total(&lens) * scale).ceil() as i32 > slot.1 {
+            lens.pop();
             cells.pop();
+        }
+        if vertical && col_w <= 0.0 {
+            cells.clear();
+            lens.clear();
         }
         self.tips.clear();
         self.tips.extend(cells.iter().map(|c| (c.module, c.tip())));
         self.sync_tip();
         HITS.with_borrow_mut(|hits| {
-            hits.clear();
-            let mut x = 0.0;
-            for (c, cw) in cells.iter().zip(&widths) {
+            hits.vertical = vertical;
+            hits.cells.clear();
+            let mut at = 0.0;
+            for (c, len) in cells.iter().zip(&lens) {
                 // Each cell owns half the gap on either side, so the pointer is always over some cell.
-                let (l, r) = (x - GAP / 2.0, x + cw + GAP / 2.0);
-                hits.push(((l * scale).round() as i32, (r * scale).round() as i32, c.module));
-                x += cw + GAP;
+                let (l, r) = (at - GAP / 2.0, at + len + GAP / 2.0);
+                hits.cells.push(((l * scale).round() as i32, (r * scale).round() as i32, c.module));
+                at += len + GAP;
             }
         });
-        if cells.is_empty() || h_px <= 0 {
+        if cells.is_empty() || thick_px <= 0 {
             if self.placed != RECT::default() {
                 unsafe {
                     let _ = ShowWindow(self.hwnd, SW_HIDE);
@@ -244,21 +275,28 @@ impl Taskbar {
             self.drawn = None;
             return;
         }
-        let h = h_px as f32 / scale;
-        let w = total(&widths);
-        let w_px = (w * scale).ceil() as i32;
-        let x = if ctx.cfg.anchor == Anchor::NearTray { slot.0 - w_px } else { slot.0 };
-        let x = x.clamp(0, (client.right - w_px).max(0));
-        self.place(RECT { left: x, top: 0, right: x + w_px, bottom: h_px });
+        let len_px = (total(&lens) * scale).ceil() as i32;
+        let end = if vertical { client.bottom } else { client.right };
+        let at = if ctx.cfg.anchor == Anchor::NearTray { slot.0 - len_px } else { slot.0 };
+        let at = at.clamp(0, (end - len_px).max(0));
+        let (w_px, h_px) = if vertical { (thick_px, len_px) } else { (len_px, thick_px) };
+        let rect = if vertical {
+            RECT { left: 0, top: at, right: w_px, bottom: at + h_px }
+        } else {
+            RECT { left: at, top: 0, right: at + w_px, bottom: h_px }
+        };
+        self.place(rect);
+        let (w, h) = (w_px as f32 / scale, h_px as f32 / scale);
 
         let frame = Frame {
             dpi,
             w_px,
             h_px,
+            vertical,
             hover: self.hover,
             active: self.active,
             theme: *ctx.theme,
-            cells: cells.iter().map(Cell::key).zip(widths.iter().copied()).collect(),
+            cells: cells.iter().map(Cell::key).zip(lens.iter().copied()).collect(),
         };
         if self.drawn.as_ref() == Some(&frame) {
             return;
@@ -280,20 +318,30 @@ impl Taskbar {
         }
         if let Ok(cv) = Canvas::new(&self.rt, ctx.gfx) {
             let t = ctx.theme;
-            let y = ((h - CELL_H) / 2.0).max(0.0);
-            let mut x = 0.0;
-            for (c, cw) in cells.iter().zip(&widths) {
-                let r = Rect::new(x, y, *cw, CELL_H);
+            // Cells are centered across the taskbar: 40 high across, `col_w` wide down a column.
+            let (x0, y0) = if vertical { ((w - col_w) / 2.0, 0.0) } else { (0.0, ((h - CELL_H) / 2.0).max(0.0)) };
+            let mut at = 0.0;
+            for (c, len) in cells.iter().zip(&lens) {
+                let r = if vertical { Rect::new(x0, at, col_w, *len) } else { Rect::new(at, y0, *len, CELL_H) };
                 let m = Some(c.module);
                 let bg = if m == self.active { Some(t.active) } else { (m == self.hover).then_some(t.hover) };
                 if let Some(bg) = bg {
                     cv.round(r, 4.0, bg);
                 }
-                c.draw(&cv, ctx.gfx, &self.fonts, t, r);
-                x += cw + GAP;
+                if vertical {
+                    c.draw_column(&cv, ctx.gfx, &self.fonts, t, r);
+                } else {
+                    c.draw(&cv, ctx.gfx, &self.fonts, t, r);
+                }
+                at += len + GAP;
             }
             if divider > 0.0 {
-                cv.fill(Rect::new(x + 4.0, (h - 20.0) / 2.0, 1.0, 20.0), t.line);
+                let line = if vertical {
+                    Rect::new((w - 24.0) / 2.0, at + 4.0, 24.0, 1.0)
+                } else {
+                    Rect::new(at + 4.0, (h - 20.0) / 2.0, 1.0, 20.0)
+                };
+                cv.fill(line, t.line);
             }
         }
         unsafe {
@@ -334,7 +382,8 @@ impl Taskbar {
             let covered = GetWindow(self.hwnd, GW_HWNDPREV).is_ok();
             if moved || covered || !IsWindowVisible(self.hwnd).as_bool() {
                 let (w, h) = (want.right - want.left, want.bottom - want.top);
-                let _ = SetWindowPos(self.hwnd, Some(HWND_TOP), want.left, 0, w, h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                let flags = SWP_NOACTIVATE | SWP_SHOWWINDOW;
+                let _ = SetWindowPos(self.hwnd, Some(HWND_TOP), want.left, want.top, w, h, flags);
             }
         }
     }
@@ -365,7 +414,7 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
                 LRESULT(1)
             }
             WM_MOUSEMOVE => {
-                raise(Event::WidgetHover(hit(x_of(lp))));
+                raise(Event::WidgetHover(hit(lp)));
                 let mut tme = TRACKMOUSEEVENT {
                     cbSize: size_of::<TRACKMOUSEEVENT>() as u32,
                     dwFlags: TME_LEAVE,
@@ -380,7 +429,7 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
                 LRESULT(0)
             }
             WM_LBUTTONUP => {
-                if let Some(m) = hit(x_of(lp)) {
+                if let Some(m) = hit(lp) {
                     raise(Event::WidgetClick(m));
                 }
                 LRESULT(0)
@@ -396,9 +445,4 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
             _ => DefWindowProcW(hwnd, msg, wp, lp),
         }
     }
-}
-
-/// Client x of a mouse message (`GET_X_LPARAM`).
-fn x_of(lp: LPARAM) -> i32 {
-    (lp.0 & 0xFFFF) as u16 as i16 as i32
 }
