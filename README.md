@@ -40,6 +40,8 @@ A small, dependency-light system monitor for Windows 11, in the spirit of macOS 
 
 ## Install
 
+Requires Windows 11 23H2 (build 22631) or later, x64.
+
 1. Download `busy-X.Y.Z-x64.zip` (or just `busy.exe`) from [Releases](https://github.com/aivanyuk/busy/releases).
 2. Optionally check the download: compare `certutil -hashfile busy.exe SHA256` with `SHA256SUMS`, or run `gh attestation verify busy.exe --repo aivanyuk/busy`, which proves it was built by this repository's release workflow.
 3. Put `busy.exe` where it can stay, for example `%LOCALAPPDATA%\Programs\busy\`, and run it. The first start opens a short setup: pick the readings, pick a side of the taskbar.
