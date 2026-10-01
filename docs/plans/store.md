@@ -43,7 +43,7 @@ A new unsigned download gets "Windows protected your PC" until it builds SmartSc
 
 ### S5. Store listing (`docs`)
 - `PRIVACY.md`: busy collects nothing and, from the Store, contacts nothing; sensor readers (LibreHardwareMonitor, HWiNFO) are local.
-- Listing text and screenshots (from `docs/`), the `runFullTrust` justification ("a taskbar system monitor: embeds its widget in the Windows taskbar and reads system performance counters"), age rating, category Utilities & tools.
+- Listing text and screenshots (from `docs/`), the `runFullTrust` justification ("a taskbar system monitor: embeds its widget in the Windows taskbar and reads system performance counters"), age rating, category Utilities & tools, all in [docs/store-listing.md](../store-listing.md), ready to paste into Partner Center.
 - README → Install: the Store first, the portable zip second.
 
 ## Order
