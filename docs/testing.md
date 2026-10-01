@@ -60,8 +60,10 @@ Setting up a VM, once per build:
 3. A local administrator account with a password, signed in automatically (Sysinternals Autologon). Install the VC++ x64 runtime (`vcruntime140.dll`; busy loads it from System32 only). Pause Windows Update so the build stays put; record build and UBR in the VM's notes.
 4. Connect with a Basic session (not Enhanced, which is RDP: a different session, DPI and lock behaviour), set the resolution and scale to test (one per VM, or one VM per scale), sign in, and checkpoint as `busy-ready`.
 
-Hyper-V on an x64 host runs x64 Windows only: for ARM64, run the probe on an ARM64 device, or `run.ps1` on an ARM64 host with ARM64 VMs.
+Hyper-V on an x64 host runs x64 Windows only. For ARM64, CI's `ui-probe` job runs `guest.ps1 -Vm` on the hosted `windows-11-arm` runner (and on `windows-latest` as the control) and uploads the results as `ui-probe-<os>-<sha>`, with failed checks listed in the job summary; it is experimental and never fails the build until the ARM runner's taskbar works (below). Otherwise: the probe on an ARM64 device, or `run.ps1` on an ARM64 host with ARM64 VMs.
 
 Verified so far (record each run here: build.UBR, scale, result):
 
 - 26300.9457, the probe on a workstation: taskbar vertical on the right, left-aligned icons, 200 %. All checks pass (3 of 7 cells dropped for room with all on).
+- 26100.33438 Server Datacenter x64, CI `windows-latest`, 1024×768 @ 100 %, `-Vm`: every check passes in all five variants (185), including re-embedding after each explorer restart; 1 of 4 cells fits with centered icons (86 px of room).
+- 26200.9457 Enterprise ARM64, CI `windows-11-arm`, `-Vm`: explorer's taskbar was empty (no XAML island, zero-size legacy windows, the sign-in screen's accessibility button in the capture), so busy found no room and stayed hidden: a machine problem, not busy's. Not a session problem: the runner's session is the active console session and LogonUI isn't running. The job's Machine step and the probe's `screen-*.png` (taken when the taskbar is empty) are for finding out why.

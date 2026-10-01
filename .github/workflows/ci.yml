@@ -52,3 +52,57 @@ jobs:
           name: busy-arm64-${{ github.sha }}
           path: target/release/busy.exe
           if-no-files-found: ignore
+
+  # tools/vm/guest.ps1 on hosted runners: the widget and flyouts against a real taskbar, natively on ARM64, and on
+  # x64 as the control. Runners are disposable Azure VMs, so -Vm (alignment, theme, explorer restarts) is allowed.
+  # Experimental until it is known that a runner has a signed-in desktop: failed checks are listed in the job
+  # summary, not failed (a failed job is a red check on every PR even with job-level continue-on-error).
+  ui-probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-11-arm, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      # Debug: BUSY_SELFTEST and BUSY_FAKE exist only there.
+      - run: cargo build -p busy --locked
+      # On windows-11-arm explorer's taskbar comes up empty (no XAML island) although the runner's session is the
+      # active console session; what the machine has, for finding out why.
+      - name: Machine
+        shell: powershell
+        run: |
+          Get-CimInstance Win32_ComputerSystem | Format-List Manufacturer, Model, UserName
+          qwinsta
+          Get-CimInstance Win32_VideoController | Format-List Name, Status, CurrentHorizontalResolution, CurrentVerticalResolution
+          $shell = 'explorer', 'sihost', 'ShellExperienceHost', 'StartMenuExperienceHost', 'SearchHost', 'LogonUI', 'dwm', 'ctfmon'
+          Get-Process -Name $shell -ErrorAction SilentlyContinue | Format-Table Name, Id, SessionId -AutoSize
+      - name: Probe
+        continue-on-error: true
+        shell: powershell
+        run: |
+          ./tools/vm/guest.ps1 -Exe target/debug/busy.exe -Out target/vm/ci -Vm
+      - name: Summary
+        if: always()
+        shell: powershell
+        run: |
+          $f = 'target/vm/ci/summary.json'
+          if (-not (Test-Path $f)) { "No probe summary: the probe did not finish." >> $env:GITHUB_STEP_SUMMARY; exit }
+          $s = Get-Content -Raw $f | ConvertFrom-Json
+          $bad = @($s.checks | Where-Object { $_.status -ne 'pass' })
+          $passed = @($s.checks).Count - $bad.Count
+          $out = @("### ui-probe: Windows $($s.build) ($($s.version), $($s.edition), $($s.arch))", '',
+            "$passed of $(@($s.checks).Count) checks pass.", '')
+          if ($bad) {
+            $out += '| variant | phase | check | status | detail |', '|---|---|---|---|---|'
+            $out += $bad | ForEach-Object { "| $($_.variant) | $($_.phase) | $($_.check) | $($_.status) | $($_.detail -replace '\|', '/') |" }
+          }
+          $out >> $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: ui-probe-${{ matrix.os }}-${{ github.sha }}
+          path: target/vm/ci
+          if-no-files-found: ignore
