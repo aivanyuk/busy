@@ -1,6 +1,7 @@
-//! A minimal PNG encoder for the 256-pixel icon image: RGBA, each row filtered "Up" (so the icon's flat
-//! areas become runs of zeros), compressed with one fixed-Huffman deflate block that codes runs as
-//! distance-1 matches. Enough to keep the image a few kilobytes instead of 256.
+//! A minimal PNG encoder for the large icon images and the Store's logos: RGBA, each row filtered "Up" (so the
+//! glyph's flat areas become runs of zeros), compressed with one fixed-Huffman deflate block that codes runs as
+//! distance-1 matches. Enough to keep each image a few kilobytes rather than its raw size (256 KB for the
+//! 256-pixel icon).
 
 /// Writes bits least significant first, as deflate does.
 struct Bits {
