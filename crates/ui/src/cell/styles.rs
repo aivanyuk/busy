@@ -1,6 +1,6 @@
 //! Measuring and drawing a cell in its style, to the design's `MeterWidget` geometry (sizes in DIPs).
 
-use super::{Body, Cell};
+use super::{Body, Cell, Room};
 use crate::render::{Align, Canvas, Gfx, Rect};
 use crate::theme::Theme;
 use std::cell::RefCell;
@@ -74,17 +74,29 @@ impl Fonts {
 
     /// Width of `s`; labels (tracked) and other strings without digits are measured once.
     fn width(&self, gfx: &Gfx, f: Font, s: &str) -> f32 {
-        let tracking = if matches!(f, Font::Small) { TRACKING } else { 0.0 };
-        let measure = || gfx.text_width_tracked(self.format(f), s, tracking);
         if s.bytes().any(|b| b.is_ascii_digit()) {
-            return measure();
+            return self.measure(gfx, f, s);
         }
+        self.cached(gfx, f, s)
+    }
+
+    /// Width of the widest of `room`'s constant strings, each measured once.
+    fn room(&self, gfx: &Gfx, f: Font, room: Room) -> f32 {
+        room.iter().map(|s| self.cached(gfx, f, s)).fold(0.0, f32::max)
+    }
+
+    fn cached(&self, gfx: &Gfx, f: Font, s: &str) -> f32 {
         let mut cache = self.widths.borrow_mut();
-        // Bounded: a config has a handful of labels; a sensor rename could otherwise grow it forever.
-        if cache.len() > 64 {
+        // Bounded: a config has a handful of labels and rooms; a sensor rename could otherwise grow it forever.
+        if cache.len() > 128 {
             cache.clear();
         }
-        *cache.entry((f as u8, s.to_owned())).or_insert_with(measure)
+        *cache.entry((f as u8, s.to_owned())).or_insert_with(|| self.measure(gfx, f, s))
+    }
+
+    fn measure(&self, gfx: &Gfx, f: Font, s: &str) -> f32 {
+        let tracking = if matches!(f, Font::Small) { TRACKING } else { 0.0 };
+        gfx.text_width_tracked(self.format(f), s, tracking)
     }
 }
 
@@ -97,23 +109,27 @@ impl Cell<'_> {
         self.label.as_deref().map_or(0.0, |l| f.width(gfx, Font::Small, l))
     }
 
-    /// Total width, padding included.
+    /// Total width, padding included. Values are measured with their `Room`, so the width only changes when
+    /// a value outgrows it.
     pub fn width(&self, gfx: &Gfx, f: &Fonts) -> f32 {
+        let value_w = |font, value: &str, room| f.width(gfx, font, value).max(f.room(gfx, font, room));
         let content = match &self.body {
-            Body::Text { value, .. } => self.label_w(gfx, f).max(f.width(gfx, Font::Value, value)).max(TEXT_MIN_W),
+            Body::Text { value, room, .. } => {
+                self.label_w(gfx, f).max(value_w(Font::Value, value, room)).max(TEXT_MIN_W)
+            }
             // The label row (label, value) is hidden with the label, as in the design.
-            Body::Graph { value, .. } => match &self.label {
-                Some(_) => GRAPH_W.max(self.label_w(gfx, f) + 4.0 + f.width(gfx, Font::Small, value)),
+            Body::Graph { value, room, .. } => match &self.label {
+                Some(_) => GRAPH_W.max(self.label_w(gfx, f) + 4.0 + value_w(Font::Small, value, room)),
                 None => GRAPH_W,
             },
-            Body::Bar { bars, bar_w, value, .. } => {
-                let text = self.label_w(gfx, f).max(f.width(gfx, Font::Value, value)).max(BAR_TEXT_MIN_W);
+            Body::Bar { bars, bar_w, value, room, .. } => {
+                let text = self.label_w(gfx, f).max(value_w(Font::Value, value, room)).max(BAR_TEXT_MIN_W);
                 bars_w(bars.len(), *bar_w) + 6.0 + text
             }
-            Body::Io { rows } => {
+            Body::Io { rows, room } => {
                 let keys = max_width(gfx, f, Font::IoKey, rows.iter().map(|r| r.0));
-                let values = max_width(gfx, f, Font::Io, rows.iter().map(|r| r.2.as_str())).max(IO_MIN_W);
-                keys + 5.0 + values
+                let values = max_width(gfx, f, Font::Io, rows.iter().map(|r| r.2.as_str()));
+                keys + 5.0 + values.max(f.room(gfx, Font::Io, room)).max(IO_MIN_W)
             }
         };
         (content + 2.0 * PAD_X).ceil()
@@ -129,12 +145,12 @@ impl Cell<'_> {
         };
         let label_h = if self.label.is_some() { LABEL_H } else { 0.0 };
         match &self.body {
-            Body::Text { value, color } => {
+            Body::Text { value, color, .. } => {
                 let y = c.y + (c.h - label_h - VALUE_H) / 2.0;
                 label(c.x, y, c.w, Align::Right);
                 cv.text(value, &f.value, Rect::new(c.x, y + label_h, c.w, VALUE_H), *color, Align::Right);
             }
-            Body::Graph { value, lines, max } => {
+            Body::Graph { value, lines, max, .. } => {
                 let row = if self.label.is_some() { LABEL_H + 2.0 } else { 0.0 };
                 let y = c.y + (c.h - row - GRAPH_H) / 2.0;
                 if self.label.is_some() {
@@ -150,7 +166,7 @@ impl Cell<'_> {
                     cv.graph(inner, s, *max, *col, if i == 0 { 0.3 } else { 0.0 }, 1.2, GRAPH_SPAN);
                 }
             }
-            Body::Bar { bars, bar_w, value, color } => {
+            Body::Bar { bars, bar_w, value, color, .. } => {
                 let y = c.y + (c.h - BAR_H) / 2.0;
                 for (i, (frac, col)) in bars.iter().enumerate() {
                     let b = Rect::new(c.x + i as f32 * (bar_w + 1.0), y, *bar_w, BAR_H);
@@ -162,7 +178,7 @@ impl Cell<'_> {
                 label(x, y, w, Align::Left);
                 cv.text(value, &f.value, Rect::new(x, y + label_h, w, VALUE_H), *color, Align::Left);
             }
-            Body::Io { rows } => {
+            Body::Io { rows, .. } => {
                 let keys = max_width(gfx, f, Font::IoKey, rows.iter().map(|r| r.0));
                 let y0 = c.y + (c.h - 2.0 * IO_ROW_H) / 2.0;
                 for (i, (key, col, value)) in rows.iter().enumerate() {
