@@ -29,6 +29,10 @@ cargo test --workspace
 3. Settings: `cargo run -p busy-settings --example demo`, with `BUSY_FORCE_DARK=1` and `0`, `BUSY_SETUP=1` for setup (onboarding), `BUSY_NEWER=0.2.0` for About naming a newer release, and `BUSY_PACKAGED=1` for the window as installed from the Microsoft Store (About without Releases, no update check). The app's first run: start it with `APPDATA` pointing at an empty directory; setup opens once the widget is embedded. For UI Automation changes, read the window with a UIA client (Accessibility Insights, Narrator, or `System.Windows.Automation` from Windows PowerShell; see docs/areas/settings.md § Gotchas): names, roles, patterns, and the focus events as Tab moves.
 4. Stop your instance (`Stop-Process -Name busy`). Never restart `explorer.exe` (outside a test VM, below); never use SendKeys/SendInput against windows you don't own.
 
+## Store package
+
+`pwsh tools/pack-msix.ps1` builds the release exe and packs `target\msix\busy-X.Y.Z-x64.msix` (unsigned: the Store signs it). It needs `makepri.exe` and `makeappx.exe`: an installed Windows SDK, or, with nothing installed, the `Microsoft.Windows.SDK.BuildTools` package from nuget.org unpacked into `target\sdk-buildtools\<version>` (the `.nupkg` is a zip; about 21 MB). `makeappx` validates the manifest against its schema as it packs. `-Layout` stops at the unpacked layout in `target\msix\layout`.
+
 ## Windows versions
 
 Supported: Windows 11 build 22631 (23H2) and later. What changes between builds is explorer's taskbar: the legacy windows `taskbar/explorer.rs` reads (`TrayNotifyWnd`, `Start`, `ReBarWindow32`) and how they track the XAML taskbar, alignment, and the DWM attributes the flyout sets. Monthly updates and staged feature rollouts change it too, so a result is for a build *and* its UBR.

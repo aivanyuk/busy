@@ -13,6 +13,7 @@ cargo test --workspace                   # unit + real-hardware smoke tests
 cargo run -p busy-metrics --example dump_metrics   # print a live Snapshot
 cargo run -p busy-sensors --example dump_sensors
 cargo run -p busy-settings --example demo          # settings window standalone
+pwsh tools/pack-msix.ps1                           # Microsoft Store package: target/msix/busy-X.Y.Z-x64.msix
 ```
 
 Definition of done for any change: fmt clean, clippy clean with `-D warnings`, tests pass. Changes to UI must be run and visually checked (see docs/testing.md).
