@@ -218,6 +218,7 @@ impl Ui {
                 Control::Dropdown(..) => None,
                 // Their parts are the targets (`Target::Part`).
                 Control::Segmented(..) | Control::Swatches(..) => return,
+                Control::None => return,
                 Control::Button(Command::RunSetup) => {
                     drop(v);
                     return self.enter_setup();

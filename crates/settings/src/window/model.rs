@@ -96,6 +96,8 @@ pub(super) enum Control {
     Swatches(Module, u8),
     /// A button that does something rather than edit the config.
     Button(Command),
+    /// Nothing: the row only tells (About's version, from the Store).
+    None,
 }
 
 /// What a row's button does.
@@ -172,7 +174,7 @@ pub(super) fn items(page: Page, cfg: &Config, ch: &Choices) -> Vec<Item> {
         Page::General => general(cfg, ch),
         Page::Module(Module::Processes) => processes(cfg),
         Page::Module(m) => module(m, cfg, ch),
-        Page::Advanced => advanced(cfg),
+        Page::Advanced => advanced(cfg, ch),
     }
 }
 
@@ -245,7 +247,11 @@ fn general_rows(cfg: &Config, ch: &Choices) -> Vec<Item> {
             cfg.modules.iter().filter(|c| c.module != Module::Processes).map(|c| (c.module, c.taskbar)).collect(),
         ),
         Item::Header("About"),
-        Item::Row(Row { title: "Version", desc: version(ch), control: Control::Button(Command::Releases) }),
+        Item::Row(Row {
+            title: "Version",
+            desc: version(ch),
+            control: if ch.packaged { Control::None } else { Control::Button(Command::Releases) },
+        }),
     ]
 }
 
@@ -318,13 +324,17 @@ fn processes(cfg: &Config) -> Vec<Item> {
     r
 }
 
-/// Only the opt-ins that are built: the others would be switches that do nothing.
-fn advanced(cfg: &Config) -> Vec<Item> {
-    vec![
+/// Only the opt-ins that are built: the others would be switches that do nothing. From the Store, which updates
+/// busy itself, there is no update check.
+fn advanced(cfg: &Config, ch: &Choices) -> Vec<Item> {
+    let mut r = vec![
         Item::Header("Opt-in sources"),
         toggle("Third-party sensor tools", THIRD_PARTY, Flag::ThirdPartySensors, cfg.opt_in.third_party_sensors),
-        toggle("Check for updates", UPDATE_CHECK, Flag::UpdateCheck, cfg.opt_in.update_check),
-    ]
+    ];
+    if !ch.packaged {
+        r.push(toggle("Check for updates", UPDATE_CHECK, Flag::UpdateCheck, cfg.opt_in.update_check));
+    }
+    r
 }
 
 fn updates(m: Module, cfg: &Config) -> [Item; 2] {
@@ -364,6 +374,21 @@ mod tests {
             Release { version: "9.0.0".into(), url: "https://github.com/aivanyuk/busy/releases/tag/v9.0.0".into() };
         let ch = Choices { newer: Some(newer), ..Choices::default() };
         assert_eq!(version(&ch), format!("busy {this} \u{2014} 9.0.0 is available"));
+    }
+
+    #[test]
+    fn from_the_store_there_is_no_update_check_or_releases_link() {
+        let cfg = Config::default();
+        let releases = |ch: &Choices| {
+            items(Page::General, &cfg, ch).iter().any(|i| {
+                matches!(i, Item::Row(Row { title: "Version", control: Control::Button(Command::Releases), .. }))
+            })
+        };
+        let portable = Choices::default();
+        let store = Choices { packaged: true, ..Choices::default() };
+        assert!(releases(&portable) && !releases(&store));
+        assert_eq!(rows(&items(Page::Advanced, &cfg, &portable)), ["Third-party sensor tools", "Check for updates"]);
+        assert_eq!(rows(&items(Page::Advanced, &cfg, &store)), ["Third-party sensor tools"]);
     }
 
     #[test]

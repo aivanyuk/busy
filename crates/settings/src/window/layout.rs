@@ -263,7 +263,7 @@ impl View {
         ];
         for (i, item) in self.items.iter().enumerate() {
             match item {
-                Item::Row(_) => out.push(Target::Ctl(i)),
+                Item::Row(r) if !matches!(r.control, Control::None) => out.push(Target::Ctl(i)),
                 Item::Order(list) => {
                     for j in 0..list.len() {
                         if j > 0 {
@@ -393,6 +393,7 @@ impl View {
                         .position(|s| s.contains(cx, cy))
                         .map(|k| Target::Part(i, k)),
                     Control::Swatches(..) => swatch::hit(p.ctl, cx, cy).map(|k| Target::Part(i, k)),
+                    Control::None => None,
                     _ => Some(Target::Ctl(i)),
                 },
                 Item::Row(_) => None,
@@ -425,6 +426,7 @@ fn place(item: &Item, y: f32, width: f32, preview_h: f32, gfx: &Gfx, f: &Fonts) 
                 Control::Segmented(opts, _) => segmented::size(gfx, f, opts),
                 Control::Swatches(..) => swatch::SIZE,
                 Control::Button(c) => button::size(gfx, f, c.label()),
+                Control::None => (0.0, 0.0),
             };
             let inner = width - CARD_PAD_L - CARD_PAD_R;
             let side = inner - cw - 16.0;

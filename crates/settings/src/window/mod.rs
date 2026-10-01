@@ -194,7 +194,12 @@ fn create(cfg: &Config, host: Rc<dyn Host>) -> Result<()> {
         cfg: RefCell::new(cfg.clone()),
         host,
         view: RefCell::new(View::new(Page::General)),
-        choices: RefCell::new(Choices { newer: live::newer(), edge: busy_win::taskbar_edge(), ..Choices::default() }),
+        choices: RefCell::new(Choices {
+            newer: live::newer(),
+            edge: busy_win::taskbar_edge(),
+            packaged: packaged(),
+            ..Choices::default()
+        }),
         cell_fonts,
         shown: RefCell::new(None),
         cell_h: Cell::new(None),
@@ -492,4 +497,9 @@ impl Ui {
         drop(v);
         self.invalidate();
     }
+}
+
+/// Installed from the Microsoft Store. Debug builds take `BUSY_PACKAGED=1`, to see the window as it is there.
+fn packaged() -> bool {
+    busy_win::package_family().is_some() || cfg!(debug_assertions) && std::env::var_os("BUSY_PACKAGED").is_some()
 }

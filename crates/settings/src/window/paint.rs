@@ -97,6 +97,7 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
                     Control::Segmented(opts, sel) => segmented::draw(cv, s.gfx, ctl, opts, *sel, t, f),
                     Control::Swatches(_, sel) => swatch::draw(cv, ctl, *sel, t),
                     Control::Button(c) => button::draw(cv, ctl, c.label(), hover, t, f),
+                    Control::None => {}
                 }
             }
         }
