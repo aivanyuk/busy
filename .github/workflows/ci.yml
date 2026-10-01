@@ -35,3 +35,20 @@ jobs:
           name: busy-${{ github.sha }}
           path: target/release/busy.exe
           if-no-files-found: ignore
+
+  # Windows on ARM, natively: the smoke tests sample real ARM64 hardware. Audit, licenses and fmt don't depend
+  # on the target (the dependency tree is the same), so only the `check` job runs them.
+  check-arm64:
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - run: cargo build --workspace --release --locked
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: busy-arm64-${{ github.sha }}
+          path: target/release/busy.exe
+          if-no-files-found: ignore
