@@ -71,6 +71,9 @@ struct App {
     /// The modules whose live readings the settings window shows: sampled while shown.
     shown: Vec<Module>,
     updates: Updates,
+    /// Debug builds: `BUSY_SELFTEST=<dir>` reports the widget and flyout after every watch tick.
+    #[cfg(debug_assertions)]
+    selftest: Option<crate::selftest::Selftest>,
 }
 
 /// Runs `f` on the app state unless it is already borrowed (re-entrant message); then returns None.
@@ -156,6 +159,8 @@ pub fn run(open_flyout: bool) -> Result<()> {
         locked: false,
         display_off: false,
         shown: Vec::new(),
+        #[cfg(debug_assertions)]
+        selftest: crate::selftest::Selftest::from_env(),
     };
     let first_run = (!app.cfg.onboarded).then(|| app.cfg.clone());
     APP.with(|a| *a.borrow_mut() = Some(app));
@@ -351,6 +356,15 @@ impl App {
         } else if let Some(tb) = &mut self.taskbar {
             let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
             tb.watch(&ctx);
+        }
+        #[cfg(debug_assertions)]
+        if let Some(st) = &mut self.selftest {
+            let configured = self.cfg.modules.iter().filter(|m| m.taskbar).count();
+            st.report(
+                self.taskbar.as_ref().map(Taskbar::selftest),
+                self.flyout.as_ref().map(Flyout::selftest),
+                configured,
+            );
         }
     }
 

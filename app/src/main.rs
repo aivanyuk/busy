@@ -11,6 +11,8 @@ mod launch;
 mod menu;
 mod presence;
 mod sampler;
+#[cfg(debug_assertions)]
+mod selftest;
 mod sync;
 mod taskbar;
 mod update;

@@ -174,6 +174,27 @@ impl Flyout {
         self.module.filter(|_| self.visible)
     }
 
+    /// Debug builds (`BUSY_SELFTEST`): where the flyout is and whether it got its backdrop.
+    #[cfg(debug_assertions)]
+    pub fn selftest(&self) -> crate::selftest::FlyoutInfo {
+        let mut rect = RECT::default();
+        let mut mi = MONITORINFO { cbSize: size_of::<MONITORINFO>() as u32, ..Default::default() };
+        // SAFETY: valid out-pointers, `mi.cbSize` set; `self.hwnd` is our live window.
+        unsafe {
+            let _ = GetWindowRect(self.hwnd, &mut rect);
+            let _ = GetMonitorInfoW(MonitorFromWindow(self.hwnd, MONITOR_DEFAULTTOPRIMARY), &mut mi);
+        }
+        crate::selftest::FlyoutInfo {
+            hwnd: self.hwnd,
+            // SAFETY: a query by handle on our live window.
+            visible: unsafe { IsWindowVisible(self.hwnd) }.as_bool(),
+            module: self.open_module(),
+            rect,
+            backdrop: self.backdrop,
+            work: mi.rcWork,
+        }
+    }
+
     pub fn is_foreground(&self) -> bool {
         unsafe { GetForegroundWindow() == self.hwnd }
     }

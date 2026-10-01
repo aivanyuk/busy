@@ -30,6 +30,24 @@ fn to_client(r: RECT, parent: HWND) -> RECT {
     RECT { left: pts[0].x, top: pts[0].y, right: pts[1].x, bottom: pts[1].y }
 }
 
+/// Debug builds (`BUSY_SELFTEST`): the windows of explorer's that `slot` and `place` rely on, in screen
+/// coordinates; `None` for one this build of Windows doesn't have.
+#[cfg(debug_assertions)]
+pub(super) fn landmarks(tray: HWND) -> Vec<(&'static str, Option<RECT>)> {
+    let classes = [
+        ("TrayNotifyWnd", w!("TrayNotifyWnd")),
+        ("Start", w!("Start")),
+        ("ReBarWindow32", w!("ReBarWindow32")),
+        ("DesktopWindowContentBridge", w!("Windows.UI.Composition.DesktopWindowContentBridge")),
+    ];
+    let screen = |h| {
+        let mut r = RECT::default();
+        // SAFETY: `r` is a valid out-pointer; a stale `h` fails the call.
+        unsafe { GetWindowRect(h, &mut r) }.ok().map(|()| r)
+    };
+    classes.into_iter().map(|(name, class)| (name, child(tray, class).and_then(screen))).collect()
+}
+
 /// Where the widget may go along the taskbar, in taskbar client pixels: (anchor edge, room). The taskbar runs
 /// along x, or along y when `vertical` (on the left or right edge), and so does everything here: for
 /// `NearTray` the edge is the widget's right (bottom) side, for `Left` its left (top) side; `room` is the
