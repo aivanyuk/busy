@@ -23,7 +23,7 @@ Definition of done for any change: fmt clean, clippy clean with `-D warnings`, t
 - Vendor DLLs load only from System32 (`LoadLibraryExW` + `LOAD_LIBRARY_SEARCH_SYSTEM32`).
 - The UI thread never blocks: our taskbar window is a child of explorer's `Shell_TrayWnd`, so a stalled UI thread freezes the user's taskbar.
 - `Source::sample()` never panics.
-- Never kill or restart `explorer.exe`; never send synthetic input (SendKeys/SendInput) to windows you don't own — post messages to our own HWNDs instead.
+- Never kill or restart `explorer.exe` (except inside a disposable VM — a Hyper-V test VM or a hosted CI runner — through `tools/vm/guest.ps1 -Vm`); never send synthetic input (SendKeys/SendInput) to windows you don't own — post messages to our own HWNDs instead.
 - Don't leave autostart (`HKCU\...\Run\busy`) enabled after testing.
 - Never commit or push to `main`. All changes land via PR from a feature branch, as atomic commits that each build, pass checks and do one reviewable thing (docs/commits.md). Rebase-merge only.
 
