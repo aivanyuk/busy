@@ -4,6 +4,9 @@ What changed for people who run busy, newest first. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+- A vertical taskbar (Windows 11 26H2, on the left or right edge): readings stack top to bottom as narrow columns, their flyouts open beside the taskbar, and Settings, setup and the right-click menu speak of the top instead of the left edge.
+
 ### Fixed
 - Readings in the taskbar keep their width as their values change, so a CPU going from 9% to 10% or 100% no longer nudges every reading after it.
 

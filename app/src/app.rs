@@ -387,7 +387,7 @@ impl App {
     fn toggle_flyout(&mut self, m: Module) {
         let (Some(f), Some(tb)) = (&mut self.flyout, &self.taskbar) else { return };
         let ctx = Ctx { cfg: &self.cfg, snap: &self.snap, hist: &self.hist, theme: &self.theme, gfx: &self.gfx };
-        f.toggle(&ctx, m, tb.screen_rect(), tb.dpi());
+        f.toggle(&ctx, m, tb.screen_rect(), tb.edge(), tb.dpi());
         self.sync_sampler();
         self.sync_active();
     }
