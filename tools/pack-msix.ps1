@@ -61,6 +61,8 @@ if ($Layout) {
 }
 
 if (-not $Out) { $Out = Join-Path $work "busy-$version-x64.msix" }
+$Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out)
+New-Item -ItemType Directory -Force (Split-Path $Out -Parent) | Out-Null
 & "$sdk\makeappx.exe" pack /d $layoutDir /p $Out /o | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'makeappx pack failed' }
 Write-Output $Out
