@@ -1,8 +1,11 @@
 //! A module's taskbar cell: its label, value and colors (design `widget()`), shared by the taskbar widget and
-//! the settings window's preview. How a cell is measured and drawn in its style is `styles.rs`.
+//! the settings window's preview. How a cell is measured and drawn in its style is `styles.rs` across a
+//! horizontal taskbar, `column.rs` down a vertical one.
 
+mod column;
 mod styles;
 
+pub use column::column_width;
 pub use styles::{CELL_H, Fonts};
 
 use crate::ctx::Ctx;
@@ -15,7 +18,8 @@ use busy_core::{CellStyle, Config, CpuBar, Module, ModuleCfg, RateUnit, SensorKi
 
 pub struct Cell<'a> {
     pub module: Module,
-    /// Caption above the value (design `M.short`); `None` when the module's `show_label` is off.
+    /// Caption above the value (design `M.short`); `None` when the module's `show_label` is off, except for Io,
+    /// which draws it only down a vertical taskbar and there always (design `vShowLabel`).
     label: Option<String>,
     body: Body<'a>,
 }
@@ -43,9 +47,11 @@ enum Body<'a> {
         room: Room,
         color: Color,
     },
-    /// Two rows of (key, key color, value), e.g. ↑ upload / ↓ download or R / W.
+    /// Two rows of (key, key color, value), e.g. ↑ upload / ↓ download or R / W; `short` are the values as a
+    /// vertical taskbar's narrow cell shows them ("350K", "1.2M").
     Io {
         rows: [(&'static str, Color, String); 2],
+        short: [String; 2],
         room: Room,
     },
 }
@@ -129,7 +135,9 @@ impl Cell<'_> {
                 key.bars = bars.iter().map(|(f, c)| ((f.clamp(0.0, 1.0) * 255.0).round() as u8, *c)).collect();
                 key.size = *bar_w;
             }
-            Body::Io { rows, .. } => key.texts = rows.iter().map(|(k, c, v)| (format!("{k} {v}"), *c)).collect(),
+            Body::Io { rows, short, .. } => {
+                key.texts = rows.iter().zip(short).map(|((k, c, v), s)| (format!("{k} {v} {s}"), *c)).collect();
+            }
         }
         key
     }
@@ -196,10 +204,12 @@ pub fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
                 max: nice_max(hist.net_rx.max().max(hist.net_tx.max())),
             },
             _ => {
-                let rate = |bps| fmt::rate_in(bps, opts.network.units);
+                let unit = opts.network.units;
+                let rate = |bps| fmt::rate_in(bps, unit);
                 Body::Io {
                     rows: [("↑", second, rate(tx)), ("↓", color, rate(rx))],
-                    room: rate_room(opts.network.units),
+                    short: [fmt::rate_short(tx, unit), fmt::rate_short(rx, unit)],
+                    room: rate_room(unit),
                 }
             }
         }),
@@ -208,7 +218,11 @@ pub fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
             CellStyle::Io => (!snap.disks.is_empty()).then(|| {
                 let r = snap.disks.iter().map(|d| d.read_bps).sum::<f64>();
                 let w = snap.disks.iter().map(|d| d.write_bps).sum::<f64>();
-                Body::Io { rows: [("R", color, fmt::rate(r)), ("W", second, fmt::rate(w))], room: RATE_BYTES }
+                Body::Io {
+                    rows: [("R", color, fmt::rate(r)), ("W", second, fmt::rate(w))],
+                    short: [fmt::rate_short(r, RateUnit::Bytes), fmt::rate_short(w, RateUnit::Bytes)],
+                    room: RATE_BYTES,
+                }
             }),
             _ => select::disk_volume(snap, ctx.cfg).filter(|v| v.total > 0).map(|v| {
                 let p = v.total.saturating_sub(v.free) as f32 * 100.0 / v.total as f32;
@@ -234,7 +248,7 @@ pub fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
         // Flyout-only: `Config::normalize` never leaves it on the taskbar.
         Module::Processes => None,
     };
-    let label = mc.show_label.then(|| label(mc.module, mc.style, ctx));
+    let label = (mc.show_label || mc.style == CellStyle::Io).then(|| label(mc.module, mc.style, ctx));
     Some(Cell { module: mc.module, label, body: body? })
 }
 
@@ -315,7 +329,11 @@ mod tests {
         assert_eq!(text.tip(), "Memory: 35%");
         let io = cell(
             Module::Network,
-            Body::Io { rows: [("↑", c, "24 KB/s".into()), ("↓", c, "3 MB/s".into())], room: RATE_BYTES },
+            Body::Io {
+                rows: [("↑", c, "24 KB/s".into()), ("↓", c, "3 MB/s".into())],
+                short: Default::default(),
+                room: RATE_BYTES,
+            },
         );
         assert_eq!(io.tip(), "Network: ↑ 24 KB/s  ↓ 3 MB/s");
         // Design: a Network graph has no value, so the tip is the name alone.
@@ -338,8 +356,13 @@ mod tests {
                 |v: &str| width(Body::Bar { bars: vec![(0.5, c)], bar_w: 6.0, value: v.into(), room: PCT, color: c });
             assert_eq!(bar(pct), bar("0%"), "Bar {pct}");
         }
-        let io =
-            |v: &str| width(Body::Io { rows: [("↑", c, v.into()), ("↓", c, "0 KB/s".into())], room: RATE_BYTES });
+        let io = |v: &str| {
+            width(Body::Io {
+                rows: [("↑", c, v.into()), ("↓", c, "0 KB/s".into())],
+                short: Default::default(),
+                room: RATE_BYTES,
+            })
+        };
         for rate in ["5.2 KB/s", "350 KB/s", "12.4 MB/s", "999 MB/s"] {
             assert_eq!(io(rate), io("0 KB/s"), "Io {rate}");
         }

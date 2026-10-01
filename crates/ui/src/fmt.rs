@@ -46,6 +46,21 @@ pub fn rate_in(bps: f64, unit: RateUnit) -> String {
     format!("{} {}/s", num(v), units[i])
 }
 
+/// `rate_in` without the unit's B/b and "/s", for a vertical taskbar's narrow cells (design `rateS`):
+/// `"0K"`, `"350K"`, `"1.2M"`, `"15M"`, `"1.1G"`.
+pub fn rate_short(bps: f64, unit: RateUnit) -> String {
+    let v = match unit {
+        RateUnit::Bytes => bps,
+        RateUnit::Bits => bps * 8.0,
+    };
+    let k = v.max(0.0) / 1024.0;
+    if k < 999.5 {
+        return format!("{k:.0}K");
+    }
+    let (v, suffix) = if k / 1024.0 < 999.5 { (k / 1024.0, 'M') } else { (k / 1024.0 / 1024.0, 'G') };
+    if v < 9.95 { format!("{v:.1}{suffix}") } else { format!("{v:.0}{suffix}") }
+}
+
 /// Link speed of a network adapter: `"2.5 Gbps"`, `"866 Mbps"`.
 pub fn link_speed(bps: u64) -> String {
     if bps >= 1_000_000_000 { format!("{} Gbps", bps as f64 / 1e9) } else { format!("{} Mbps", bps / 1_000_000) }
@@ -162,6 +177,11 @@ mod tests {
         assert_eq!(rate_in(0.0, RateUnit::Bits), "0 Kb/s");
         assert_eq!(rate_in(350.0 * 1024.0, RateUnit::Bits), "2.7 Mb/s");
         assert_eq!(rate_in(64.0, RateUnit::Bits), "0.5 Kb/s");
+        let short = |kib: f64| rate_short(kib * 1024.0, RateUnit::Bytes);
+        assert_eq!([0.0, 350.0, 999.0, 1229.0, 15_360.0].map(short), ["0K", "350K", "999K", "1.2M", "15M"]);
+        assert_eq!(short(1.1 * 1024.0 * 1024.0), "1.1G");
+        assert_eq!(rate_short(-5.0, RateUnit::Bytes), "0K");
+        assert_eq!(rate_short(350.0 * 1024.0, RateUnit::Bits), "2.7M");
         assert_eq!(hours_minutes(4500), "1:15");
         assert_eq!((hours_minutes_long(4500), hours_minutes_long(600)), ("1 h 15 min".into(), "10 min".into()));
         assert_eq!((link_speed(2_500_000_000), link_speed(866_000_000)), ("2.5 Gbps".into(), "866 Mbps".into()));
