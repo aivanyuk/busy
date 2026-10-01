@@ -1,4 +1,5 @@
-//! Measuring and drawing a cell in its style, to the design's `MeterWidget` geometry (sizes in DIPs).
+//! Measuring and drawing a cell in its style across a horizontal taskbar, to the design's `MeterWidget` geometry
+//! (sizes in DIPs), and the fonts both orientations draw with.
 
 use super::{Body, Cell, Room};
 use crate::render::{Align, Canvas, Gfx, Rect};
@@ -13,17 +14,17 @@ pub const CELL_H: f32 = 40.0;
 /// Horizontal padding inside a cell.
 const PAD_X: f32 = 8.0;
 /// Labels: 9 px, letter-spacing .06em, line-height 1.15.
-const TRACKING: f32 = 9.0 * 0.06;
-const LABEL_H: f32 = 9.0 * 1.15;
+pub(super) const TRACKING: f32 = 9.0 * 0.06;
+pub(super) const LABEL_H: f32 = 9.0 * 1.15;
 /// Values: 13 px, line-height 1.15; right-aligned in at least 32 px (Text) or left in 30 (Bar).
-const VALUE_H: f32 = 13.0 * 1.15;
+pub(super) const VALUE_H: f32 = 13.0 * 1.15;
 const TEXT_MIN_W: f32 = 32.0;
 const BAR_TEXT_MIN_W: f32 = 30.0;
 /// Graph: 40×20 sparkline, 2 px under its label row.
 const GRAPH_W: f32 = 40.0;
 const GRAPH_H: f32 = 20.0;
 /// Samples on the sparkline: ~2 px each; the whole history would be unreadably dense at this size.
-const GRAPH_SPAN: usize = 20;
+pub(super) const GRAPH_SPAN: usize = 20;
 /// Bars: 26 px high, 1 px apart, 6 px from the text.
 const BAR_H: f32 = 26.0;
 /// IO: two 15 px rows of 11 px text, key 5 px from a value right-aligned in at least 60 px.
@@ -32,20 +33,24 @@ const IO_MIN_W: f32 = 60.0;
 
 pub struct Fonts {
     /// Labels and the Graph row: 9 px semibold.
-    small: IDWriteTextFormat,
+    pub(super) small: IDWriteTextFormat,
     /// Text and Bar values: 13 px semibold.
-    value: IDWriteTextFormat,
+    pub(super) value: IDWriteTextFormat,
+    /// Down a vertical taskbar: Graph values (and Text values too wide for the column) 11 px semibold, Bar values
+    /// 12 px semibold.
+    pub(super) value11: IDWriteTextFormat,
+    pub(super) value12: IDWriteTextFormat,
     /// IO values: 11 px regular.
-    io: IDWriteTextFormat,
+    pub(super) io: IDWriteTextFormat,
     /// IO keys: 11 px bold.
-    io_key: IDWriteTextFormat,
+    pub(super) io_key: IDWriteTextFormat,
     /// Widths of strings without digits (labels, keys), which are constant for a given config.
     widths: RefCell<HashMap<(u8, String), f32>>,
 }
 
 /// Which format a cached width was measured with.
 #[derive(Clone, Copy)]
-enum Font {
+pub(super) enum Font {
     Small,
     Value,
     Io,
@@ -57,6 +62,8 @@ impl Fonts {
         Ok(Self {
             small: gfx.format(9.0, true)?,
             value: gfx.format(13.0, true)?,
+            value11: gfx.format(11.0, true)?,
+            value12: gfx.format(12.0, true)?,
             io: gfx.format(11.0, false)?,
             io_key: gfx.format_weight(11.0, DWRITE_FONT_WEIGHT_BOLD)?,
             widths: RefCell::new(HashMap::new()),
@@ -73,7 +80,7 @@ impl Fonts {
     }
 
     /// Width of `s`; labels (tracked) and other strings without digits are measured once.
-    fn width(&self, gfx: &Gfx, f: Font, s: &str) -> f32 {
+    pub(super) fn width(&self, gfx: &Gfx, f: Font, s: &str) -> f32 {
         if s.bytes().any(|b| b.is_ascii_digit()) {
             return self.measure(gfx, f, s);
         }
@@ -100,7 +107,7 @@ impl Fonts {
     }
 }
 
-fn max_width<'s>(gfx: &Gfx, f: &Fonts, font: Font, ss: impl IntoIterator<Item = &'s str>) -> f32 {
+pub(super) fn max_width<'s>(gfx: &Gfx, f: &Fonts, font: Font, ss: impl IntoIterator<Item = &'s str>) -> f32 {
     ss.into_iter().map(|s| f.width(gfx, font, s)).fold(0.0, f32::max)
 }
 
@@ -126,7 +133,7 @@ impl Cell<'_> {
                 let text = self.label_w(gfx, f).max(value_w(Font::Value, value, room)).max(BAR_TEXT_MIN_W);
                 bars_w(bars.len(), *bar_w) + 6.0 + text
             }
-            Body::Io { rows, room } => {
+            Body::Io { rows, room, .. } => {
                 let keys = max_width(gfx, f, Font::IoKey, rows.iter().map(|r| r.0));
                 let values = max_width(gfx, f, Font::Io, rows.iter().map(|r| r.2.as_str()));
                 keys + 5.0 + values.max(f.room(gfx, Font::Io, room)).max(IO_MIN_W)
