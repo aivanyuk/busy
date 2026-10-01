@@ -302,6 +302,7 @@ pub(in crate::window) fn info(v: &View, cfg: &Config, n: Node, maximized: bool, 
                 // Picked with ←/→, like a radio group.
                 Control::Segmented(opts, sel) => Info { value: opts.get(*sel).map(|o| o.label.clone()), ..base },
                 Control::Button(c) => Info { role: Role::Button, name: c.label().into(), invoke: true, ..base },
+                Control::None => Info { role: Role::Text, focusable: false, ..base },
                 Control::Swatches(_, sel) => {
                     Info { value: Some(format!("Color {} of {}", sel + 1, busy_core::PALETTE_LEN)), ..base }
                 }

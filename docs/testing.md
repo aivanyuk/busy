@@ -26,7 +26,7 @@ cargo test --workspace
 
 1. `cargo run -p busy` (or `-- --open-flyout` to open the flyout after the first sample).
 2. Screenshot the taskbar strip and the flyout; check both anchors (`NearTray`, `Left`) and both themes (set `theme` in `%APPDATA%\busy\config.json`).
-3. Settings: `cargo run -p busy-settings --example demo`, with `BUSY_FORCE_DARK=1` and `0`, `BUSY_SETUP=1` for setup (onboarding), and `BUSY_NEWER=0.2.0` for About naming a newer release. The app's first run: start it with `APPDATA` pointing at an empty directory; setup opens once the widget is embedded. For UI Automation changes, read the window with a UIA client (Accessibility Insights, Narrator, or `System.Windows.Automation` from Windows PowerShell; see docs/areas/settings.md § Gotchas): names, roles, patterns, and the focus events as Tab moves.
+3. Settings: `cargo run -p busy-settings --example demo`, with `BUSY_FORCE_DARK=1` and `0`, `BUSY_SETUP=1` for setup (onboarding), `BUSY_NEWER=0.2.0` for About naming a newer release, and `BUSY_PACKAGED=1` for the window as installed from the Microsoft Store (About without Releases, no update check). The app's first run: start it with `APPDATA` pointing at an empty directory; setup opens once the widget is embedded. For UI Automation changes, read the window with a UIA client (Accessibility Insights, Narrator, or `System.Windows.Automation` from Windows PowerShell; see docs/areas/settings.md § Gotchas): names, roles, patterns, and the focus events as Tab moves.
 4. Stop your instance (`Stop-Process -Name busy`). Never restart `explorer.exe` (outside a test VM, below); never use SendKeys/SendInput against windows you don't own.
 
 ## Windows versions

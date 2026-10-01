@@ -7,6 +7,7 @@
 
 pub mod autostart;
 mod dark;
+mod startup_task;
 mod window;
 
 use busy_core::release::Release;

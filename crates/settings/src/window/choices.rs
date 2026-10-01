@@ -48,6 +48,9 @@ pub(super) struct Choices {
     /// The taskbar's screen edge (`busy_win::taskbar_edge`), which words and draws what is "left" and the
     /// preview; readings leave it alone too.
     pub(super) edge: Edge,
+    /// Installed from the Microsoft Store, which updates busy: About has no Releases button and Advanced no
+    /// update check.
+    pub(super) packaged: bool,
 }
 
 impl Choices {
@@ -73,6 +76,7 @@ impl Choices {
             ),
             newer: None,
             edge: Edge::default(),
+            packaged: false,
         }
     }
 }

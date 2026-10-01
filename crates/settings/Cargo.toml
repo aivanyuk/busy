@@ -9,6 +9,7 @@ busy-ui.workspace = true
 busy-win.workspace = true
 windows-core.workspace = true
 windows = { workspace = true, features = [
+    "ApplicationModel",
     "Win32_Foundation",
     "Win32_Graphics_Direct2D",
     "Win32_Graphics_Direct2D_Common",

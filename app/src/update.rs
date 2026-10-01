@@ -1,7 +1,8 @@
 //! The opt-in update check (`OptIn::update_check`): while it is on, one HTTPS GET of GitHub's latest release
 //! at once and then every 24 hours, on a thread of its own. A newer release goes to the settings window's
 //! About row (`busy_settings::release`); nothing is downloaded and nothing else changes. Errors are silent
-//! and retried at the next check. While it is off, no request is made.
+//! and retried at the next check. While it is off, no request is made; a busy installed from the Microsoft Store,
+//! which updates it, never checks.
 
 use crate::app::{WM_APP_RELEASE, main_hwnd};
 use crate::sync::lock;
@@ -75,6 +76,7 @@ impl Updates {
     /// Turns the check on or off (the config's `opt_in.update_check`); never blocks. Turning it off also
     /// takes a found release out of the settings window.
     pub(crate) fn set(&self, on: bool) {
+        let on = on && busy_win::package_family().is_none();
         if ON.swap(on, Ordering::Relaxed) == on {
             return;
         }

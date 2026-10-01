@@ -1,6 +1,11 @@
 use crate::{CONFIG_VERSION, Module, ModuleOptions, OptIn};
 use serde::{Deserialize, Deserializer, Serialize};
+use std::ffi::OsString;
 use std::path::PathBuf;
+use std::sync::OnceLock;
+
+/// The package family busy runs under (`Config::set_package`), when installed from the Microsoft Store.
+static PACKAGE: OnceLock<String> = OnceLock::new();
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Anchor {
@@ -194,8 +199,14 @@ impl Module {
 }
 
 impl Config {
+    /// Busy runs from this package (`busy_win::package_family`): its config lives in the package's LocalState,
+    /// apart from a portable busy's. Called once at startup, before the first `load`; later calls are ignored.
+    pub fn set_package(family: &str) {
+        let _ = PACKAGE.set(family.into());
+    }
+
     pub fn path() -> Option<PathBuf> {
-        std::env::var_os("APPDATA").map(|d| PathBuf::from(d).join("busy").join("config.json"))
+        path_in(PACKAGE.get().map(String::as_str), |k| std::env::var_os(k))
     }
 
     /// Loads config; missing/invalid file yields defaults. Ensures every module appears exactly once.
@@ -270,6 +281,18 @@ impl Config {
         let borrowed = |o: Module| o.flyout_needs().contains(&m) && (m != Module::Processes || c.flyout);
         c.taskbar || open.is_some_and(|o| o == m || borrowed(o))
     }
+}
+
+/// `%APPDATA%\busy\config.json`, or for a packaged busy `%LOCALAPPDATA%\Packages\<family>\LocalState\config.json`
+/// (`ApplicationData.LocalFolder`). Named outright rather than left to MSIX file-system virtualization, which
+/// redirects only *new* files under `%APPDATA%` and changes existing ones in place: a portable busy's config
+/// would be shared.
+fn path_in(package: Option<&str>, env: impl Fn(&str) -> Option<OsString>) -> Option<PathBuf> {
+    match package {
+        Some(f) => env("LOCALAPPDATA").map(|d| PathBuf::from(d).join("Packages").join(f).join("LocalState")),
+        None => env("APPDATA").map(|d| PathBuf::from(d).join("busy")),
+    }
+    .map(|d| d.join("config.json"))
 }
 
 #[cfg(test)]
@@ -445,5 +468,20 @@ mod tests {
         off.modules.iter_mut().filter(|c| c.module == Module::Processes).for_each(|c| c.flyout = false);
         assert!(!off.is_active(Module::Processes, Some(Module::Disk)));
         assert!(off.is_active(Module::Sensors, Some(Module::Disk)));
+    }
+
+    #[test]
+    fn a_packaged_busy_keeps_its_config_in_local_state() {
+        let env = |k: &str| match k {
+            "APPDATA" => Some(OsString::from(r"C:\Users\u\AppData\Roaming")),
+            "LOCALAPPDATA" => Some(OsString::from(r"C:\Users\u\AppData\Local")),
+            _ => None,
+        };
+        assert_eq!(path_in(None, env), Some(PathBuf::from(r"C:\Users\u\AppData\Roaming\busy\config.json")));
+        assert_eq!(
+            path_in(Some("P.busy_abc"), env),
+            Some(PathBuf::from(r"C:\Users\u\AppData\Local\Packages\P.busy_abc\LocalState\config.json"))
+        );
+        assert_eq!(path_in(Some("P.busy_abc"), |_| None), None);
     }
 }

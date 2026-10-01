@@ -1,4 +1,7 @@
-//! Per-user autostart via `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `busy`.
+//! Per-user autostart via `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `busy`; for a busy installed
+//! from the Microsoft Store, its package's startup task (`crate::startup_task`).
+
+use crate::startup_task;
 
 use busy_win::{from_wide, reg_bytes, reg_string, wide};
 use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, WIN32_ERROR};
@@ -43,6 +46,9 @@ fn command_path(cmd: &str) -> &str {
 
 /// True if the Run entry exists, points at the current executable and isn't disabled in Task Manager.
 pub fn is_enabled() -> bool {
+    if busy_win::package_family().is_some() {
+        return startup_task::is_enabled();
+    }
     let Some(cmd) = reg_string(HKEY_CURRENT_USER, RUN, NAME) else { return false };
     let path = command_path(&cmd);
     let approved = reg_bytes(HKEY_CURRENT_USER, APPROVED, NAME).is_none_or(|b| b.first().is_none_or(|f| f & 1 == 0));
@@ -67,6 +73,9 @@ fn write_run() -> Result<()> {
 }
 
 pub fn set(enabled: bool) -> Result<()> {
+    if busy_win::package_family().is_some() {
+        return startup_task::set(enabled);
+    }
     if enabled {
         write_run()?;
     } else {
@@ -81,6 +90,10 @@ pub fn set(enabled: bool) -> Result<()> {
 /// Manager's enabled/disabled state. Returns whether it rewrote the entry. Blocks on the registry and the file
 /// system: call it off a UI thread.
 pub fn repair() -> Result<bool> {
+    // A package's exe never moves, and its Run key is a private copy.
+    if busy_win::package_family().is_some() {
+        return Ok(false);
+    }
     let Some(cmd) = reg_string(HKEY_CURRENT_USER, RUN, NAME) else { return Ok(false) };
     if std::path::Path::new(command_path(&cmd)).exists() {
         return Ok(false);
