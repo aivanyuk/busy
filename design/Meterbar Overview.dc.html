@@ -20,6 +20,39 @@ a:hover{color:#004E93;text-decoration:underline}
 
   <section style="display:flex;flex-direction:column;gap:24px">
     <div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+      <span style="font-size:13px;font-weight:600;letter-spacing:.08em;color:#5d5d5d">VERTICAL TASKBAR · LEFT OR RIGHT EDGE</span>
+      <span style="font-size:32px;font-weight:600">Readings stack when the taskbar stands up</span>
+      <span style="font-size:16px;color:#4d4d4d;text-wrap:pretty">Widgets become a 56 px column: label on top, value below, graphs and bars stretch to the bar's width, up/down rates shorten to K/M. Flyouts open beside the taskbar, anchored to whichever end the readings sit. Meterbar follows the Windows taskbar setting — nothing extra to configure.</span>
+    </div>
+    <div style="display:flex;gap:40px;flex-wrap:wrap">
+      <div id="2a" style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="padding:2px 8px;border-radius:4px;background:#1a1a1a;color:#fff;font-size:13px;font-weight:600">2a</span><span style="font-size:15px;font-weight:600">Left edge · by the tray</span><span style="font-size:14px;color:#5d5d5d">flyout anchors bottom-left</span></div>
+        <div style="position:relative;width:760px;height:820px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="cpu" flyout-layout="detailed" theme="dark" edge="left" hint-size="760px,820px"></dc-import></div>
+      </div>
+      <div id="2b" style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="padding:2px 8px;border-radius:4px;background:#1a1a1a;color:#fff;font-size:13px;font-weight:600">2b</span><span style="font-size:15px;font-weight:600">Left edge · top of taskbar</span><span style="font-size:14px;color:#5d5d5d">flyout anchors top-left</span></div>
+        <div style="position:relative;width:760px;height:820px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="mem" flyout-layout="compact" theme="dark" edge="left" position="left" widget-preset="graph" hint-size="760px,820px"></dc-import></div>
+      </div>
+      <div id="2c" style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="padding:2px 8px;border-radius:4px;background:#1a1a1a;color:#fff;font-size:13px;font-weight:600">2c</span><span style="font-size:15px;font-weight:600">Right edge · light</span><span style="font-size:14px;color:#5d5d5d">mirrored, tiles flyout</span></div>
+        <div style="position:relative;width:760px;height:820px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="net" flyout-layout="tiles" theme="light" edge="right" hint-size="760px,820px"></dc-import></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;color:#5d5d5d">Default mix</span><div style="position:relative;width:180px;height:820px;border-radius:10px;overflow:hidden"><dc-import name="Meterbar" initial-view="none" theme="dark" edge="left" hint-size="180px,820px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;color:#5d5d5d">All text</span><div style="position:relative;width:180px;height:820px;border-radius:10px;overflow:hidden"><dc-import name="Meterbar" initial-view="none" widget-preset="text" theme="dark" edge="left" hint-size="180px,820px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;color:#5d5d5d">All graphs</span><div style="position:relative;width:180px;height:820px;border-radius:10px;overflow:hidden"><dc-import name="Meterbar" initial-view="none" widget-preset="graph" theme="dark" edge="left" hint-size="180px,820px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;color:#5d5d5d">All bars</span><div style="position:relative;width:180px;height:820px;border-radius:10px;overflow:hidden"><dc-import name="Meterbar" initial-view="none" widget-preset="bar" theme="dark" edge="left" hint-size="180px,820px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;color:#5d5d5d">Light, top, right edge</span><div style="position:relative;width:180px;height:820px;border-radius:10px;overflow:hidden"><dc-import name="Meterbar" initial-view="none" widget-preset="text" theme="light" edge="right" position="left" hint-size="180px,820px"></dc-import></div></div>
+    </div>
+    <div style="display:flex;gap:40px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:12px"><span style="font-size:14px;color:#5d5d5d">Settings · CPU, vertical preview</span><div style="position:relative;width:1180px;height:820px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="settings-cpu" theme="light" edge="left" hint-size="1180px,820px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:12px"><span style="font-size:14px;color:#5d5d5d">First run · position labels follow the edge</span><div style="position:relative;width:1000px;height:820px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15)"><dc-import name="Meterbar" initial-view="onboarding" theme="dark" edge="right" hint-size="1000px,820px"></dc-import></div></div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
       <span style="font-size:13px;font-weight:600;letter-spacing:.08em;color:#5d5d5d">MODULE FLYOUTS · 3 LAYOUTS</span>
       <span style="font-size:32px;font-weight:600">What opens when you click a reading</span>
       <span style="font-size:16px;color:#4d4d4d;text-wrap:pretty">Same data, three densities. <a href="#1a">1a</a> mirrors Task Manager's depth, <a href="#1b">1b</a> is closest to the Stats popup — narrow rows, no cards — and <a href="#1c">1c</a> leans into Windows 11 tiles with a gauge ring. All artboards are live.</span>
