@@ -12,7 +12,7 @@ cargo test --workspace
 | Smoke (real hardware) | `crates/metrics/tests/smoke.rs`, `crates/sensors/tests/smoke.rs` | Build all sources, sample twice, assert no panic and sane ranges. Hardware-dependent fields (GPU, battery, sensors) are range-checked only when present, so they pass on CI runners without a GPU. |
 | Live dump | `cargo run -p busy-metrics --example dump_metrics`, `-p busy-sensors --example dump_sensors` | Human sanity check against Task Manager / `Get-Counter` / `nvidia-smi`. Prints per-source sample cost and heap allocations (a counting global allocator in the example). |
 | UI manual | see below | Taskbar/flyout/settings can't be meaningfully unit-tested. |
-| Windows versions | `tools/vm/guest.ps1` | The widget and flyout against the taskbar of the build it runs on (below). |
+| Windows versions | `tools/vm/` | The widget and flyout against each supported build's taskbar, in Hyper-V VMs (below). |
 
 ## What to test when
 
@@ -44,7 +44,23 @@ It writes `summary.json`, each variant's reports, the explorer buttons it compar
 
 **Anywhere (a probe):** `powershell -File tools\vm\guest.ps1 -Exe target\debug\busy.exe -Out target\vm\local` on your own machine, or on an ARM64 device, changes nothing outside `-Out` (a config of its own in `APPDATA`); variants whose alignment isn't the current one are skipped, and explorer is left alone. Exit busy first.
 
-**In VMs:** with `-Vm`, which refuses to run outside a Hyper-V guest, each variant also sets the taskbar alignment and the system theme (light/dark) and restarts explorer. Start it in the signed-in user's session.
+**In VMs:** with `-Vm`, which refuses to run outside a Hyper-V guest, each variant also sets the taskbar alignment and the system theme (light/dark) and restarts explorer. `tools\vm\run.ps1` drives a set of VMs from an elevated shell on the host:
+
+```
+cargo build -p busy
+tools\vm\run.ps1 -VMName busy-22631, busy-26100, busy-26200, busy-insider -Credential (Get-Credential tester)
+```
+
+It reverts each VM to its `busy-ready` checkpoint, copies the exe in over PowerShell Direct, starts `guest.ps1` in the signed-in user's session through a scheduled task (PowerShell Direct has no desktop), and collects the results into `target\vm\<time>\<vm>`, with a table of failures and warnings per VM and variant at the end.
+
+Setting up a VM, once per build:
+
+1. Hyper-V (Windows Pro/Enterprise host). A Generation 2 VM with TPM, 4 GB, `Set-VM -CheckpointType Standard` (the checkpoint keeps the signed-in desktop).
+2. Install from an ISO: the current release from Microsoft's download page, older builds from Visual Studio subscription downloads, Insider builds from the Insider ISO page. One VM per build that matters: 22631, 26100 (24H2, also LTSC 2024), 26200 (25H2), and an Insider channel to see explorer changes coming.
+3. A local administrator account with a password, signed in automatically (Sysinternals Autologon). Install the VC++ x64 runtime (`vcruntime140.dll`; busy loads it from System32 only). Pause Windows Update so the build stays put; record build and UBR in the VM's notes.
+4. Connect with a Basic session (not Enhanced, which is RDP: a different session, DPI and lock behaviour), set the resolution and scale to test (one per VM, or one VM per scale), sign in, and checkpoint as `busy-ready`.
+
+Hyper-V on an x64 host runs x64 Windows only: for ARM64, run the probe on an ARM64 device, or `run.ps1` on an ARM64 host with ARM64 VMs.
 
 Verified so far (record each run here: build.UBR, scale, result):
 
