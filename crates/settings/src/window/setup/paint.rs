@@ -1,7 +1,7 @@
 //! Drawing setup (design onboarding): title bar with Close, the hero text, the reading cards, the two
 //! position cards and the footer with Start with Windows, Skip and Start monitoring.
 
-use super::{BOX, HEADLINE, Layout, PLACES, POSITION, READINGS, SKIP, START, STARTUP, SUB, Target, View, W};
+use super::{BOX, HEADLINE, Layout, POSITION, READINGS, SKIP, START, STARTUP, SUB, Target, View, W};
 use crate::window::controls::button;
 use crate::window::frame;
 use crate::window::layout::{self, LINE_12, LINE_14};
@@ -35,7 +35,7 @@ pub(in crate::window) fn paint(cv: &Canvas, v: &View, s: &State) {
     }
     cv.text(POSITION, &f.strong, l.position, t.fg, Align::Left);
     let chosen = super::place(s.cfg);
-    for (i, ((_, label, desc), r)) in PLACES.iter().zip(&l.places).enumerate() {
+    for (i, ((_, label, desc), r)) in super::places(s.edge.is_vertical()).iter().zip(&l.places).enumerate() {
         let hot = v.hover == Some(Target::Place(i));
         cv.round(*r, 6.0, if hot { t.active } else { t.card });
         cv.round_outline(*r, 6.0, t.card_line);

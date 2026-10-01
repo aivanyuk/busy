@@ -4,7 +4,7 @@
 
 use super::node::{Entry, Info, Node, Role, Tree};
 use crate::window::layout::TITLE_H;
-use crate::window::setup::{self, PLACES, POSITION, READINGS, SKIP, START, STARTUP, SUB, Target, View, W};
+use crate::window::setup::{self, POSITION, READINGS, SKIP, START, STARTUP, SUB, Target, View, W};
 use busy_core::Config;
 use busy_ui::render::Rect;
 
@@ -46,8 +46,8 @@ fn info(role: Role, name: &str) -> Info {
     }
 }
 
-/// Setup's elements as its view and the config show them.
-pub(in crate::window) fn tree(v: &View, cfg: &Config, autostart_busy: bool) -> Tree {
+/// Setup's elements as its view and the config show them, the positions worded for a ertical taskbar or not.
+pub(in crate::window) fn tree(v: &View, cfg: &Config, autostart_busy: bool, vertical: bool) -> Tree {
     let entry =
         |node: Node, info: Info, rect: Option<Rect>| Entry { node, key: 0, parent: None, info, rect, offscreen: false };
     let l = v.layout.as_ref();
@@ -65,7 +65,7 @@ pub(in crate::window) fn tree(v: &View, cfg: &Config, autostart_busy: bool) -> T
     }
     entries.push(entry(Node::Header(1), heading(POSITION), l.map(|l| l.position)));
     let chosen = setup::place(cfg);
-    for (i, (_, label, desc)) in PLACES.iter().enumerate() {
+    for (i, (_, label, desc)) in setup::places(vertical).iter().enumerate() {
         let place =
             Info { help: (*desc).into(), selected: Some(i == chosen), invoke: true, ..info(Role::RadioButton, label) };
         entries.push(entry(Node::Place(i), place, rect(Target::Place(i))));
@@ -87,18 +87,23 @@ mod tests {
     fn setup_reads_as_checkboxes_radios_and_buttons() {
         let mut cfg = Config::default();
         let v = View { focus: Some(Target::Card(1)), ..View::default() };
-        let t = tree(&v, &cfg, false);
+        let t = tree(&v, &cfg, false, false);
         let named = |t: &Tree, name: &str| t.entries.iter().find(|e| e.info.name == name).cloned();
         let cpu = named(&t, "CPU").map(|e| (e.node, e.info.role, e.info.toggle));
         assert_eq!(cpu, Some((Node::Card(0), Role::CheckBox, Some(true))));
         let tray = named(&t, "Next to the system tray").map(|e| (e.info.role, e.info.selected));
         assert_eq!(tray, Some((Role::RadioButton, Some(true))));
+        // Named as drawn: down a vertical taskbar the other position is its top.
+        let vertical = tree(&v, &cfg, false, true);
+        let top = named(&vertical, "Top of the taskbar").map(|e| (e.node, e.info.help));
+        assert_eq!(top, Some((Node::Place(1), "Above the app icons".into())));
+        assert!(named(&t, "Left edge of the taskbar").is_some());
         assert!(named(&t, "Start with Windows").is_some_and(|e| e.info.toggle == Some(false)));
         assert!(named(&t, "Start monitoring").is_some_and(|e| e.info.invoke));
         assert_eq!(t.focus, Some((Node::Card(1), 0)));
         // Nodes and targets map both ways; the busy autostart checkbox is disabled.
         assert!(t.entries.iter().all(|e| target(e.node).is_none_or(|x| node(x) == e.node)));
         cfg.autostart = true;
-        assert!(!tree(&v, &cfg, true).entries.iter().any(|e| e.node == Node::Startup && e.info.enabled));
+        assert!(!tree(&v, &cfg, true, false).entries.iter().any(|e| e.node == Node::Startup && e.info.enabled));
     }
 }

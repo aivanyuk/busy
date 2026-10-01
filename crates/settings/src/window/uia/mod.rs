@@ -57,7 +57,8 @@ impl Ui {
     fn uia_tree(&self) -> Option<Tree> {
         let cfg = self.cfg.try_borrow().ok()?;
         if self.in_setup() {
-            return Some(setup::tree(&*self.setup.try_borrow().ok()?, &cfg, self.autostart_busy()));
+            let vertical = self.choices.try_borrow().ok()?.edge.is_vertical();
+            return Some(setup::tree(&*self.setup.try_borrow().ok()?, &cfg, self.autostart_busy(), vertical));
         }
         let v = self.view.try_borrow().ok()?;
         Some(node::tree(&v, &cfg, self.maximized(), self.autostart_busy()))

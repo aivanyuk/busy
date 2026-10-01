@@ -101,6 +101,15 @@ The original plan follows.
 - Shown when `onboarded == false`; re-runnable from Settings → General → Run setup. Lives with the Phase 4 window code (same controls and worker), a page set of its own; the router opens it at startup after the widget is embedded.
 - Reading cards (checkbox, name, live sample in module color), position radio cards, Start with Windows (written on the settings worker), Skip / Start monitoring. Toggling updates the real taskbar live through `submit_config`; the sampler follows through `Params` like any config change.
 
+### 6. Vertical taskbar
+
+**Status: done** (branch `feat/vertical-taskbar-design-300b74`). Windows 26H2 can put the taskbar on the left or right edge, and the design gained a vertical variant (`edge: left | right`). As built:
+- `busy_win::window_edge`/`taskbar_edge` read the edge from window rects. The widget is vertical when the taskbar is taller than wide: the free slot runs along y, cells stack as columns (`busy_ui::cell` `column.rs`), the divider sits below them, and the flyout opens beside the taskbar at the widget's end.
+- Deviation (decided with the maintainer): Windows' vertical taskbar is 48 DIPs wide, not the design's 64, so cells are the taskbar's width less 4 per side (40), not 56; fonts keep the design's sizes, Io rates shorten to K/M, and a Text value too wide drops to 11 px.
+- With left/top-aligned icons the task buttons' extent comes from UI Automation on a worker thread, since `ReBarWindow32` is stale (`taskbar/tasks.rs`).
+- Settings and setup follow the edge: "Top of taskbar", "top to bottom", the vertical preview, and onboarding's position cards.
+- Along the way, cells across a horizontal taskbar reserve room for their widest value, so their width no longer changes with the value ("1%" vs "100%").
+
 ## Opt-in sources
 
 All default **off**, listed under Settings → Advanced with the risk shown verbatim. Enabling asks for confirmation.

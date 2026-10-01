@@ -7,6 +7,7 @@ use super::model::{self, Control, Flag, Item, Page};
 use busy_core::{Config, Module, ModuleCfg};
 use busy_ui::render::{Align, Canvas, Gfx, Rect};
 use busy_ui::theme::Theme;
+use busy_win::Edge;
 
 /// What painting needs besides the view.
 pub(super) struct State<'a> {
@@ -20,6 +21,8 @@ pub(super) struct State<'a> {
     pub(super) maximized: bool,
     /// The autostart toggle waits for the registry (first read or a write in flight).
     pub(super) autostart_busy: bool,
+    /// The taskbar's edge, which words the taskbar order and setup's positions and shapes the preview.
+    pub(super) edge: Edge,
 }
 
 pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
@@ -69,8 +72,10 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
                 let text_r = Rect::new(r.x + CARD_PAD_L, r.y + CARD_PAD_Y, p.text_w, r.h - 2.0 * CARD_PAD_Y);
                 cv.text(text, &f.desc, text_r, t.fg, Align::Left);
             }
-            Item::Order(list) => order::draw(cv, r, list, dot, v.hover, t, f),
-            Item::Preview(m) => preview::draw(cv, r, *m, s.cfg, s.data.as_ref(), (s.gfx, s.cell_fonts), t, f),
+            Item::Order(list) => order::draw(cv, r, list, dot, v.hover, s.edge.is_vertical(), t, f),
+            Item::Preview(m) => {
+                preview::draw(cv, r, *m, s.cfg, s.data.as_ref(), (s.gfx, s.cell_fonts), s.edge, t, f);
+            }
             Item::Row(row) => {
                 cv.round(r, 4.0, t.card);
                 cv.round_outline(r, 4.0, t.card_line);
