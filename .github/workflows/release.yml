@@ -61,6 +61,20 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $text = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes('target\release\busy.exe'))
           if ($text.Contains($env:GITHUB_WORKSPACE) -or $text.Contains($cargoHome)) { throw 'a build path is left in busy.exe' }
+          # The Store package step builds with the same flags, so cargo reuses this exe.
+          "RUSTFLAGS=$env:RUSTFLAGS" >> $env:GITHUB_ENV
+          "EXE_SHA256=$((Get-FileHash target\release\busy.exe -Algorithm SHA256).Hash)" >> $env:GITHUB_ENV
+
+      # The Microsoft Store package (docs/plans/store.md): the same exe, unsigned, as the Store signs it. Not a
+      # Release asset, as nobody can install an unsigned package; it is submitted in Partner Center.
+      - name: Store package
+        shell: pwsh
+        run: |
+          $v = '${{ steps.version.outputs.version }}'
+          ./tools/pack-msix.ps1 -Out "store\busy-$v-x64.msix"
+          $exe = (Get-FileHash target\msix\layout\busy.exe -Algorithm SHA256).Hash
+          if ($exe -ne $env:EXE_SHA256) { throw 'the package holds another busy.exe' }
+          Get-ChildItem store
 
       - name: Package
         shell: pwsh
@@ -90,6 +104,11 @@ jobs:
         with:
           name: release-${{ steps.version.outputs.version }}
           path: dist/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: store-${{ steps.version.outputs.version }}
+          path: store/
           if-no-files-found: error
 
   # Only for a tag: attests what `build` made and drafts the Release. The only job with a write token.
