@@ -85,6 +85,7 @@ Every thread the app starts is listed here.
 | Autostart repair | Yes (registry, file system) | runs `autostart::repair` once at startup (a Run entry naming an exe that is gone now names this one); ends on its own, never joined |
 | Settings registry (one per open settings window) | Yes (registry, shell) | reads autostart and `AppsUseLightTheme`, writes autostart, opens About's link (`ShellExecuteW`), posts results to the window; ends with the window, never joined |
 | Debug dump (debug builds, per render) | Yes (file I/O) | one `taskbar.bmp` or `settings.bmp` write |
+| Selftest writer (`busy-selftest`, debug builds with `BUSY_SELFTEST`) | Yes (file I/O) | writes the latest `selftest.json` (temp file + rename) once per watch tick, older pending reports are dropped; joined when the app drops, after the widget is destroyed |
 
 Rules:
 

@@ -396,6 +396,33 @@ impl Taskbar {
         }
     }
 
+    /// Debug builds (`BUSY_SELFTEST`): what the widget found in the taskbar and where it is.
+    #[cfg(debug_assertions)]
+    pub fn selftest(&self) -> crate::selftest::TaskbarInfo {
+        let (mut tray_rect, mut client) = (RECT::default(), RECT::default());
+        // SAFETY: valid out-pointers; a stale `self.tray` fails the calls and leaves them empty.
+        unsafe {
+            let _ = GetWindowRect(self.tray, &mut tray_rect);
+            let _ = GetClientRect(self.tray, &mut client);
+        }
+        crate::selftest::TaskbarInfo {
+            tray: self.tray,
+            tray_rect,
+            client,
+            dpi: self.dpi(),
+            vertical: self.geom.vertical,
+            landmarks: explorer::landmarks(self.tray),
+            widget: self.hwnd,
+            // SAFETY (these three): window queries by handle; a stale `self.hwnd` gives an error or false.
+            parent: unsafe { GetParent(self.hwnd) }.unwrap_or_default(),
+            visible: unsafe { IsWindowVisible(self.hwnd) }.as_bool(),
+            covered: unsafe { GetWindow(self.hwnd, GW_HWNDPREV) }.is_ok(),
+            rect: self.screen_rect(),
+            slot: self.geom.slot,
+            cells: HITS.with_borrow(|h| h.cells.clone()),
+        }
+    }
+
     pub fn destroy(&mut self) {
         self.tip = None;
         self.surf = None;

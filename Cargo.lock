@@ -12,6 +12,7 @@ dependencies = [
  "busy-settings",
  "busy-ui",
  "busy-win",
+ "serde_json",
  "windows",
 ]
 
