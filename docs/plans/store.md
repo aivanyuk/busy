@@ -39,7 +39,7 @@ A new unsigned download gets "Windows protected your PC" until it builds SmartSc
 ### S4. Checked as a package (`docs`)
 - Register the layout without signing (`Add-AppxPackage -Register <layout>\AppxManifest.xml`; needs Developer Mode, a Windows setting the user turns on), then check: the widget embeds in the taskbar and follows explorer restarts; the flyout and Settings open; settings land in `LocalState` and survive a restart; Start with Windows turns the startup task on and off and the next sign-in starts busy; a portable busy started alongside exits at once.
 - Afterwards turn the startup task off and `Remove-AppxPackage`, as with the Run entry today.
-- `docs/testing.md` gains these steps.
+- `docs/testing.md` gains these steps (§ Store package). Done on 26300 with every check passing, except the next sign-in and explorer restarts, which need signing out and a VM.
 
 ### S5. Store listing (`docs`)
 - `PRIVACY.md`: busy collects nothing and, from the Store, contacts nothing; sensor readers (LibreHardwareMonitor, HWiNFO) are local.
