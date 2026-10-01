@@ -2,9 +2,11 @@
 
 mod explorer;
 mod surface;
+mod tasks;
 mod tip;
 
 use surface::Surface;
+use tasks::Tasks;
 use tip::Tip;
 
 use crate::win::{self, Event, raise};
@@ -96,6 +98,8 @@ pub struct Taskbar {
     tip: Option<Tip>,
     /// Each drawn cell's tooltip text, from the last layout.
     tips: Vec<(Module, String)>,
+    /// Where the task buttons are, scanned off the UI thread.
+    tasks: Tasks,
 }
 
 impl Taskbar {
@@ -149,6 +153,7 @@ impl Taskbar {
                 active: None,
                 tip: Tip::create(hwnd),
                 tips: Vec::new(),
+                tasks: Tasks::start(),
             })
         }
     }
@@ -209,13 +214,16 @@ impl Taskbar {
             let _ = GetClientRect(self.tray, &mut client);
         }
         let vertical = client.bottom - client.top > client.right - client.left;
-        let slot = explorer::slot(self.tray, cfg, dpi as f32 / 96.0, &client, vertical);
+        let slot = explorer::slot(self.tray, cfg, dpi as f32 / 96.0, &client, vertical, self.tasks.latest());
         Geometry { dpi, client, vertical, slot }
     }
 
     /// Timer path: follows taskbar geometry changes, otherwise only restores z-order and visibility.
     /// Content changes arrive through `render`, so an unchanged taskbar costs no layout or drawing here.
     pub fn watch(&mut self, ctx: &Ctx) {
+        // Task buttons come and go with apps and nothing announces it: rescan each tick. The result lands in
+        // the geometry of a later tick.
+        self.tasks.request(self.tray);
         if self.geometry(ctx.cfg) != self.geom {
             self.render(ctx);
         } else if self.placed != RECT::default() {
