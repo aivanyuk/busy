@@ -32,6 +32,7 @@ pub trait Source {
 
 ## Config
 
+- The file is `%APPDATA%usy\config.json`; a busy installed from the Microsoft Store keeps its own in `%LOCALAPPDATA%\Packages\<family>\LocalState\config.json`, once the app has called `Config::set_package` at startup (core has no Win32; `busy_win::package_family` tells). It is named outright because MSIX file-system virtualization redirects only new files under `%APPDATA%` and changes existing ones in place, which would share a portable busy's file. Uninstalling the package removes it.
 - `Config::load()` never fails: missing/invalid file → defaults, then `normalize()` (dedup modules, append missing ones, clamp interval 250..10000 ms and history 10..3600 s).
 - A file with a later `version` than `CONFIG_VERSION` (written by a newer busy) loads as far as this build understands it and is marked `newer` (not stored); `save` then refuses, so the file, with the fields this build doesn't know, survives going back a version. Changes still apply for the session.
 - Schema version: `version` (`CONFIG_VERSION` = 2, `migrate.rs`). A file without it is v1 (the schema before the design migration); `normalize()` runs `Config::migrate()` first and stamps the current version. v1 → v2: `onboarded = true` (an existing file means an existing user, so first-run setup is skipped), Disk `Text` → `Io` (v1's Disk text cell showed read/write rates). A fresh install (no file) or an unreadable file gets `Config::default()`: v2, `onboarded = false`.
