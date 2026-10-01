@@ -46,20 +46,28 @@ fn layers(edge: f32) -> Vec<(Shape, [u8; 3])> {
 
 /// `size`² straight-alpha RGBA pixels, top row first, 4×4 samples a pixel.
 fn draw(size: u32) -> Vec<[u8; 4]> {
+    draw_in(size, size)
+}
+
+/// The icon `size` wide, centered on a transparent `canvas`² (the Store's logos), as `draw`.
+pub fn draw_in(canvas: u32, size: u32) -> Vec<[u8; 4]> {
     let s = size as f32 / 48.0;
+    let o = canvas.saturating_sub(size) as f32 / 2.0;
     // The edge is one pixel wide at every size.
     let layers = layers(1.0 / s);
-    let mut px = Vec::with_capacity((size * size) as usize);
-    for y in 0..size {
-        for x in 0..size {
+    let mut px = Vec::with_capacity((canvas * canvas) as usize);
+    for y in 0..canvas {
+        for x in 0..canvas {
             // Composite each layer's coverage over the ones below (premultiplied).
             let (mut r, mut g, mut b, mut a) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
             for (shape, c) in &layers {
                 let mut hits = 0;
                 for sy in 0..4 {
                     for sx in 0..4 {
-                        let (ux, uy) =
-                            ((x as f32 + (sx as f32 + 0.5) / 4.0) / s, (y as f32 + (sy as f32 + 0.5) / 4.0) / s);
+                        let (ux, uy) = (
+                            (x as f32 - o + (sx as f32 + 0.5) / 4.0) / s,
+                            (y as f32 - o + (sy as f32 + 0.5) / 4.0) / s,
+                        );
                         hits += u32::from(shape.contains(ux, uy));
                     }
                 }
