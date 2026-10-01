@@ -7,6 +7,7 @@
 </head>
 <body>
 <x-dc>
+<sc-if value="{{ w.horizontal }}" hint-placeholder-val="{{ true }}">
 <div onClick="{{ w.onClick }}" title="{{ w.tip }}" style="height:40px;padding:0 8px;border-radius:4px;display:flex;align-items:center;gap:6px;cursor:default;background:{{ w.bg }};font-family:'Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--fg,#fff);line-height:1.15;user-select:none" style-hover="background:var(--hover,rgba(255,255,255,.07))">
   <sc-if value="{{ w.isText }}" hint-placeholder-val="{{ true }}">
     <div style="display:flex;flex-direction:column;align-items:flex-end">
@@ -46,13 +47,47 @@
     </div>
   </sc-if>
 </div>
+</sc-if>
+<sc-if value="{{ w.vertical }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ w.onClick }}" title="{{ w.tip }}" style="width:56px;padding:5px 4px;border-radius:4px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:default;background:{{ w.bg }};font-family:'Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--fg,#fff);line-height:1.15;user-select:none" style-hover="background:var(--hover,rgba(255,255,255,.07))">
+  <sc-if value="{{ w.vShowLabel }}" hint-placeholder-val="{{ true }}"><span style="font-size:9px;font-weight:600;letter-spacing:.06em;color:var(--fg3,#a6a6a6);white-space:nowrap">{{ w.vLabel }}</span></sc-if>
+  <sc-if value="{{ w.isText }}" hint-placeholder-val="{{ true }}">
+    <span style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ w.valueColor }}">{{ w.value }}</span>
+  </sc-if>
+  <sc-if value="{{ w.isGraph }}" hint-placeholder-val="{{ false }}">
+    <span style="font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ w.valueColor }}">{{ w.value }}</span>
+    <svg width="48" height="16" style="display:block;border-radius:2px;background:var(--track,rgba(255,255,255,.1))">
+      <polygon points="{{ w.area }}" style="fill:{{ w.color }};fill-opacity:.3"></polygon>
+      <polyline points="{{ w.line }}" style="fill:none;stroke:{{ w.color }};stroke-width:1.2;stroke-linejoin:round"></polyline>
+      <polyline points="{{ w.line2 }}" style="fill:none;stroke:{{ w.color2 }};stroke-width:1.2;stroke-linejoin:round"></polyline>
+    </svg>
+  </sc-if>
+  <sc-if value="{{ w.isBar }}" hint-placeholder-val="{{ false }}">
+    <span style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ w.valueColor }}">{{ w.value }}</span>
+    <sc-if value="{{ w.isCoreBars }}" hint-placeholder-val="{{ false }}">
+      <div style="width:48px;height:12px;display:flex;gap:2px">
+        <sc-for list="{{ w.bars }}" as="b" hint-placeholder-count="8"><div style="flex:1;height:12px;border-radius:1px;background:var(--track,rgba(255,255,255,.12));display:flex;align-items:flex-end;overflow:hidden"><div style="width:100%;height:{{ b.h }};background:{{ b.color }}"></div></div></sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ w.isTotalBar }}" hint-placeholder-val="{{ true }}">
+      <div style="width:48px;height:4px;border-radius:2px;background:var(--track,rgba(255,255,255,.12));overflow:hidden"><div style="height:100%;width:{{ w.pctW }};background:{{ w.color }};border-radius:2px"></div></div>
+    </sc-if>
+  </sc-if>
+  <sc-if value="{{ w.isIo }}" hint-placeholder-val="{{ false }}">
+    <div style="width:48px;display:grid;grid-template-columns:auto 1fr;column-gap:3px;font-size:11px;line-height:14px;font-variant-numeric:tabular-nums">
+      <span style="font-weight:700;color:{{ w.c1 }}">{{ w.k1 }}</span><span style="text-align:right">{{ w.sv1 }}</span>
+      <span style="font-weight:700;color:{{ w.c2 }}">{{ w.k2 }}</span><span style="text-align:right">{{ w.sv2 }}</span>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:140,&quot;height&quot;:48},&quot;w&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}">class Component extends DCLogic {
   renderVals() {
     if (this.props.w) return { w: this.props.w };
     const a = [18,22,20,31,26,24,40,35,28,22,25,30,27,45,38,30,26,24,29,33];
     const pts = a.map((v, i) => `${(i / (a.length - 1) * 40).toFixed(1)},${(19 - v / 100 * 18).toFixed(1)}`).join(' ');
-    return { w: { label: 'CPU', showLabel: true, isText: false, isGraph: true, isBar: false, isIo: false, value: '33%', valueColor: '#fff', color: '#60CDFF', color2: '#FF9B7A', area: `0,20 ${pts} 40,20`, line: pts, line2: '', bars: [], bg: 'rgba(28,28,28,.9)', tip: 'CPU: 33%', onClick: () => {} } };
+    return { w: { horizontal: true, vertical: false, label: 'CPU', showLabel: true, isText: false, isGraph: true, isBar: false, isIo: false, value: '33%', valueColor: '#fff', color: '#60CDFF', color2: '#FF9B7A', area: `0,20 ${pts} 40,20`, line: pts, line2: '', bars: [], bg: 'rgba(28,28,28,.9)', tip: 'CPU: 33%', onClick: () => {} } };
   }
 }</script>
 </body>

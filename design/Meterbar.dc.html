@@ -20,7 +20,7 @@ html,body{margin:0;height:100%}
 <div data-mb="1" data-theme="{{ themeName }}" onClick="{{ closeAll }}" style="position:absolute;inset:0;overflow:hidden;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;color:var(--fg);background:var(--desk);user-select:none;-webkit-font-smoothing:antialiased">
 
   <sc-if value="{{ settings }}" hint-placeholder-val="{{ false }}">
-    <div onClick="{{ stopSel }}" data-screen-label="Settings" style="position:absolute;left:50%;top:calc(50% - 24px);transform:translate(-50%,-50%);width:min(1000px,calc(100% - 32px));height:min(700px,calc(100% - 96px));display:flex;flex-direction:column;background:var(--win);border:1px solid var(--win-line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden">
+    <div onClick="{{ stopSel }}" data-screen-label="Settings" style="position:absolute;left:{{ winX }};top:{{ winY }};transform:translate(-50%,-50%);width:min(1000px,calc(100% - {{ winPadW }}));height:min(700px,calc(100% - {{ winPadH }}));display:flex;flex-direction:column;background:var(--win);border:1px solid var(--win-line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden">
       <div style="height:40px;flex:none;display:flex;align-items:center;gap:12px;padding-left:16px">
         <div style="display:flex;align-items:flex-end;gap:2px;height:14px"><span style="width:3px;height:6px;border-radius:1px;background:var(--link)"></span><span style="width:3px;height:14px;border-radius:1px;background:var(--link)"></span><span style="width:3px;height:9px;border-radius:1px;background:var(--link)"></span></div>
         <span style="font-size:12px">Meterbar Settings</span>
@@ -53,10 +53,21 @@ html,body{margin:0;height:100%}
             <sc-if value="{{ isModule }}" hint-placeholder-val="{{ false }}">
               <div style="padding:14px 16px 16px;border-radius:4px;background:var(--card);border:1px solid var(--card-line);display:flex;flex-direction:column;gap:10px">
                 <div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--fg2)"><span>Preview</span><span>{{ pwNote }}</span></div>
+                <sc-if value="{{ isBottom }}" hint-placeholder-val="{{ true }}">
                 <div style="height:48px;border-radius:4px;background:var(--tb);border:1px solid var(--tb-line);display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 8px">
                   <div style="opacity:{{ pwOpacity }}"><dc-import name="MeterWidget" w="{{ pw }}" hint-size="60px,40px"></dc-import></div>
                   <div style="display:flex;flex-direction:column;align-items:flex-end;font-size:12px;line-height:16px;padding:0 8px"><span>{{ time }}</span><span>{{ date }}</span></div>
                 </div>
+                </sc-if>
+                <sc-if value="{{ isVertical }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;justify-content:{{ pvJustify }}">
+                    <div style="width:64px;padding:6px 0;border-radius:4px;background:var(--tb);border:1px solid var(--tb-line);display:flex;flex-direction:column;align-items:center;gap:6px">
+                      <div style="opacity:{{ pwOpacity }}"><dc-import name="MeterWidget" w="{{ pw }}" hint-size="56px,44px"></dc-import></div>
+                      <div style="width:24px;height:1px;background:var(--line)"></div>
+                      <div style="display:flex;flex-direction:column;align-items:center;font-size:12px;line-height:16px;padding:2px 0"><span>{{ time }}</span><span>{{ dateShort }}</span></div>
+                    </div>
+                  </div>
+                </sc-if>
               </div>
             </sc-if>
             <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
@@ -111,7 +122,7 @@ html,body{margin:0;height:100%}
             <sc-if value="{{ isGeneral }}" hint-placeholder-val="{{ true }}">
               <div style="font-size:14px;font-weight:600;margin:14px 0 4px">Taskbar order</div>
               <div style="border-radius:4px;background:var(--card);border:1px solid var(--card-line);display:flex;flex-direction:column">
-                <div style="padding:12px 16px 10px 20px;font-size:12px;color:var(--fg2)">Widgets appear left to right in this order.</div>
+                <div style="padding:12px 16px 10px 20px;font-size:12px;color:var(--fg2)">{{ orderNote }}</div>
                 <sc-for list="{{ orderItems }}" as="o" hint-placeholder-count="7">
                   <div style="height:48px;padding:0 12px 0 20px;display:flex;align-items:center;gap:14px;border-top:1px solid var(--line)">
                     <span style="width:10px;height:10px;border-radius:3px;background:{{ o.color }}"></span>
@@ -132,7 +143,7 @@ html,body{margin:0;height:100%}
   </sc-if>
 
   <sc-if value="{{ onboarding }}" hint-placeholder-val="{{ false }}">
-    <div onClick="{{ stop }}" data-screen-label="Onboarding" style="position:absolute;left:50%;top:calc(50% - 24px);transform:translate(-50%,-50%);width:min(680px,calc(100% - 32px));max-height:calc(100% - 80px);display:flex;flex-direction:column;background:var(--win);border:1px solid var(--win-line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden">
+    <div onClick="{{ stop }}" data-screen-label="Onboarding" style="position:absolute;left:{{ winX }};top:{{ winY }};transform:translate(-50%,-50%);width:min(680px,calc(100% - {{ winPadW }}));max-height:calc(100% - {{ obPadH }});display:flex;flex-direction:column;background:var(--win);border:1px solid var(--win-line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden">
       <div style="height:40px;flex:none;display:flex;align-items:center;gap:12px;padding-left:16px">
         <div style="display:flex;align-items:flex-end;gap:2px;height:14px"><span style="width:3px;height:6px;border-radius:1px;background:var(--link)"></span><span style="width:3px;height:14px;border-radius:1px;background:var(--link)"></span><span style="width:3px;height:9px;border-radius:1px;background:var(--link)"></span></div>
         <span style="font-size:12px">Meterbar</span>
@@ -179,7 +190,7 @@ html,body{margin:0;height:100%}
   </sc-if>
 
   <sc-if value="{{ isDetailed }}" hint-placeholder-val="{{ false }}">
-    <div onClick="{{ stop }}" data-screen-label="Flyout detailed" style="position:absolute;bottom:60px;left:{{ flyLeft }};right:{{ flyRight }};width:360px;max-height:calc(100% - 72px);overflow:auto;display:flex;flex-direction:column;background:var(--fly);backdrop-filter:blur(48px) saturate(1.5);border:1px solid var(--fly-line);border-radius:8px;box-shadow:var(--shadow)">
+    <div onClick="{{ stop }}" data-screen-label="Flyout detailed" style="position:absolute;top:{{ flyTop }};bottom:{{ flyBottom }};left:{{ flyLeft }};right:{{ flyRight }};width:360px;max-height:{{ flyMaxH }};overflow:auto;display:flex;flex-direction:column;background:var(--fly);backdrop-filter:blur(48px) saturate(1.5);border:1px solid var(--fly-line);border-radius:8px;box-shadow:var(--shadow)">
       <div style="padding:16px 16px 14px;display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
           <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-weight:600">{{ fly.title }}</span><span style="font-size:12px;color:var(--fg2)">{{ fly.sub }}</span></div>
@@ -247,7 +258,7 @@ html,body{margin:0;height:100%}
   </sc-if>
 
   <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ false }}">
-    <div onClick="{{ stop }}" data-screen-label="Flyout compact" style="position:absolute;bottom:60px;left:{{ flyLeft }};right:{{ flyRight }};width:300px;max-height:calc(100% - 72px);overflow:auto;display:flex;flex-direction:column;font-size:12px;background:var(--fly);backdrop-filter:blur(48px) saturate(1.5);border:1px solid var(--fly-line);border-radius:8px;box-shadow:var(--shadow)">
+    <div onClick="{{ stop }}" data-screen-label="Flyout compact" style="position:absolute;top:{{ flyTop }};bottom:{{ flyBottom }};left:{{ flyLeft }};right:{{ flyRight }};width:300px;max-height:{{ flyMaxH }};overflow:auto;display:flex;flex-direction:column;font-size:12px;background:var(--fly);backdrop-filter:blur(48px) saturate(1.5);border:1px solid var(--fly-line);border-radius:8px;box-shadow:var(--shadow)">
       <div style="padding:12px 12px 10px;display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:13px;font-weight:600">{{ fly.title }}</span><span style="flex:1;min-width:0;font-size:11px;color:var(--fg3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ fly.sub }}</span><span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums">{{ fly.big }}</span></div>
         <div style="position:relative;height:58px;border-radius:4px;background:var(--well);border:1px solid var(--line);overflow:hidden">
@@ -300,7 +311,7 @@ html,body{margin:0;height:100%}
   </sc-if>
 
   <sc-if value="{{ isTiles }}" hint-placeholder-val="{{ false }}">
-    <div onClick="{{ stop }}" data-screen-label="Flyout tiles" style="position:absolute;bottom:60px;left:{{ flyLeft }};right:{{ flyRight }};width:380px;max-height:calc(100% - 72px);overflow:auto;display:flex;flex-direction:column;background:var(--fly);backdrop-filter:blur(48px) saturate(1.5);border:1px solid var(--fly-line);border-radius:8px;box-shadow:var(--shadow)">
+    <div onClick="{{ stop }}" data-screen-label="Flyout tiles" style="position:absolute;top:{{ flyTop }};bottom:{{ flyBottom }};left:{{ flyLeft }};right:{{ flyRight }};width:380px;max-height:{{ flyMaxH }};overflow:auto;display:flex;flex-direction:column;background:var(--fly);backdrop-filter:blur(48px) saturate(1.5);border:1px solid var(--fly-line);border-radius:8px;box-shadow:var(--shadow)">
       <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;align-items:center;gap:14px">
           <div style="position:relative;width:56px;height:56px;flex:none">
@@ -364,6 +375,7 @@ html,body{margin:0;height:100%}
     </div>
   </sc-if>
 
+  <sc-if value="{{ isBottom }}" hint-placeholder-val="{{ true }}">
   <div data-screen-label="Taskbar" style="position:absolute;left:0;right:0;bottom:0;height:48px;display:grid;grid-template-columns:minmax(max-content,1fr) auto minmax(max-content,1fr);align-items:center;column-gap:8px;padding:0 4px 0 8px;background:var(--tb);backdrop-filter:blur(30px) saturate(1.25);border-top:1px solid var(--tb-line)">
     <div style="display:flex;align-items:center;gap:2px">
       <sc-if value="{{ widgetsLeft }}" hint-placeholder-val="{{ false }}">
@@ -392,9 +404,42 @@ html,body{margin:0;height:100%}
       <div style="height:40px;padding:0 8px;border-radius:4px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;font-size:12px;line-height:16px" style-hover="background:var(--hover)"><span>{{ time }}</span><span>{{ date }}</span></div>
     </div>
   </div>
+  </sc-if>
+
+  <sc-if value="{{ isVertical }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Taskbar vertical" style="position:absolute;top:0;bottom:0;left:{{ tbL }};right:{{ tbR }};width:64px;display:grid;grid-template-rows:minmax(max-content,1fr) auto minmax(max-content,1fr);justify-items:center;row-gap:8px;padding:6px 0 4px;background:var(--tb);backdrop-filter:blur(30px) saturate(1.25);border-left:1px solid {{ tbLineL }};border-right:1px solid {{ tbLineR }}">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+      <sc-if value="{{ widgetsLeft }}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{ widgets }}" as="w" hint-placeholder-count="0"><dc-import name="MeterWidget" w="{{ w }}" hint-size="56px,44px"></dc-import></sc-for>
+        <div style="width:24px;height:1px;margin:4px 0;background:var(--line)"></div>
+      </sc-if>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="display:grid;grid-template-columns:9px 9px;gap:1.5px"><span style="height:9px;background:var(--link);border-radius:1px"></span><span style="height:9px;background:var(--link);border-radius:1px"></span><span style="height:9px;background:var(--link);border-radius:1px"></span><span style="height:9px;background:var(--link);border-radius:1px"></span></div></div>
+      <div style="width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:14px;height:14px;border:1.5px solid var(--fg);border-radius:50%"></div></div>
+      <div style="position:relative;width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:24px;height:24px;border-radius:5px;background:var(--tile)"></div><span style="position:absolute;top:17px;left:{{ indL }};right:{{ indR }};width:3px;height:6px;border-radius:2px;background:var(--fg3)"></span></div>
+      <div style="position:relative;width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:24px;height:24px;border-radius:5px;background:var(--tile)"></div><span style="position:absolute;top:17px;left:{{ indL }};right:{{ indR }};width:3px;height:6px;border-radius:2px;background:var(--fg3)"></span></div>
+      <div style="width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:24px;height:24px;border-radius:5px;background:var(--tile)"></div></div>
+      <div style="width:40px;height:40px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:24px;height:24px;border-radius:5px;background:var(--tile)"></div></div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px">
+      <sc-if value="{{ widgetsRight }}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{ widgets }}" as="w" hint-placeholder-count="4"><dc-import name="MeterWidget" w="{{ w }}" hint-size="56px,44px"></dc-import></sc-for>
+        <div style="width:24px;height:1px;margin:4px 0;background:var(--line)"></div>
+      </sc-if>
+      <div style="width:40px;height:28px;border-radius:4px;display:grid;place-items:center" style-hover="background:var(--hover)"><div style="width:6px;height:6px;border-left:1.5px solid var(--fg);border-top:1.5px solid var(--fg);transform:translateY(2px) rotate(45deg)"></div></div>
+      <div style="width:48px;padding:8px 0;border-radius:4px;display:flex;flex-direction:column;align-items:center;gap:10px" style-hover="background:var(--hover)">
+        <div style="display:flex;align-items:flex-end;gap:1.5px;height:13px"><span style="width:3px;height:4px;background:var(--fg)"></span><span style="width:3px;height:7px;background:var(--fg)"></span><span style="width:3px;height:10px;background:var(--fg)"></span><span style="width:3px;height:13px;background:var(--fg)"></span></div>
+        <div style="display:flex;align-items:center"><span style="width:4px;height:6px;background:var(--fg)"></span><span style="width:0;height:0;border-right:6px solid var(--fg);border-top:5px solid transparent;border-bottom:5px solid transparent;margin-left:-1px"></span></div>
+        <div style="display:flex;align-items:center;gap:1px"><div style="width:22px;height:11px;padding:1.5px;border:1.5px solid var(--fg);border-radius:3px"><div style="height:100%;width:{{ batW }};background:var(--fg);border-radius:1px"></div></div><span style="width:2px;height:5px;background:var(--fg);border-radius:0 1px 1px 0"></span></div>
+      </div>
+      <div style="width:56px;padding:6px 0;border-radius:4px;display:flex;flex-direction:column;align-items:center;font-size:12px;line-height:16px;white-space:nowrap" style-hover="background:var(--hover)"><span>{{ time }}</span><span>{{ dateShort }}</span></div>
+    </div>
+  </div>
+  </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;initialView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;cpu&quot;,&quot;gpu&quot;,&quot;mem&quot;,&quot;disk&quot;,&quot;net&quot;,&quot;bat&quot;,&quot;sens&quot;,&quot;settings&quot;,&quot;settings-cpu&quot;,&quot;settings-net&quot;,&quot;onboarding&quot;],&quot;default&quot;:&quot;cpu&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;,&quot;system&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;position&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;tray&quot;,&quot;left&quot;],&quot;default&quot;:&quot;tray&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;load&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;idle&quot;,&quot;normal&quot;,&quot;heavy&quot;],&quot;default&quot;:&quot;normal&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Simulation&quot;},&quot;widgetPreset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;default&quot;,&quot;text&quot;,&quot;graph&quot;,&quot;bar&quot;],&quot;default&quot;:&quot;default&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Simulation&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;initialView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;cpu&quot;,&quot;gpu&quot;,&quot;mem&quot;,&quot;disk&quot;,&quot;net&quot;,&quot;bat&quot;,&quot;sens&quot;,&quot;settings&quot;,&quot;settings-cpu&quot;,&quot;settings-net&quot;,&quot;onboarding&quot;],&quot;default&quot;:&quot;cpu&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;,&quot;system&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;edge&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;bottom&quot;,&quot;left&quot;,&quot;right&quot;],&quot;default&quot;:&quot;bottom&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;position&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;tray&quot;,&quot;left&quot;],&quot;default&quot;:&quot;tray&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;load&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;idle&quot;,&quot;normal&quot;,&quot;heavy&quot;],&quot;default&quot;:&quot;normal&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Simulation&quot;},&quot;widgetPreset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;default&quot;,&quot;text&quot;,&quot;graph&quot;,&quot;bar&quot;],&quot;default&quot;:&quot;default&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Simulation&quot;}}">
 class Component extends DCLogic {
   N = 60;
   PAL = { dark: ['#60CDFF', '#C3A1FF', '#6FD49A', '#E8C46A', '#FF9B7A', '#FF8AC6'], light: ['#0067C0', '#7A4FC4', '#0E7A45', '#8A5E00', '#C24A26', '#B8327A'] };
@@ -507,6 +552,9 @@ class Component extends DCLogic {
     const bits = this.state.mods.net.units === 'bits', v = bits ? kb * 8 : kb;
     return v < 1000 ? `${Math.round(v)} ${bits ? 'Kb/s' : 'KB/s'}` : `${(v / 1024).toFixed(v < 10240 ? 1 : 0)} ${bits ? 'Mb/s' : 'MB/s'}`;
   }
+  isVert() { return (this.props.edge ?? 'bottom') !== 'bottom'; }
+  rateS(kb) { const v = this.state.mods.net.units === 'bits' ? kb * 8 : kb; return v < 1000 ? `${Math.round(v)}K` : `${(v / 1024).toFixed(v < 10240 ? 1 : 0)}M`; }
+  mbpsS(mb) { return mb < 1 ? `${Math.round(mb * 1024)}K` : `${mb.toFixed(mb < 10 ? 1 : 0)}M`; }
   mbps(mb) { return mb < 1 ? `${Math.round(mb * 1024)} KB/s` : `${mb.toFixed(mb < 10 ? 1 : 0)} MB/s`; }
   tempStr(c) { return this.state.mods.sens.unit === 'F' ? `${Math.round(c * 9 / 5 + 32)}°F` : `${Math.round(c)}°C`; }
   uptime() { const s = this.state.secs, p = n => String(n).padStart(2, '0'); return `${Math.floor(s / 86400)}:${p(Math.floor(s / 3600) % 24)}:${p(Math.floor(s / 60) % 60)}:${p(s % 60)}`; }
@@ -519,12 +567,12 @@ class Component extends DCLogic {
   setGen(p) { this.setState(s => ({ gen: { ...s.gen, ...p } })); }
 
   widget(m, live = true) {
-    const st = this.state, c = st.mods[m], h = st.h, M = this.MODS[m], L = a => a[a.length - 1], W = 40, H = 20;
+    const st = this.state, c = st.mods[m], h = st.h, M = this.MODS[m], L = a => a[a.length - 1], vert = this.isVert(), W = vert ? 48 : 40, H = vert ? 16 : 20;
     const s = M.styles.includes(c.style) ? c.style : M.styles[0];
-    let pct = 0, arr = null, arr2 = null, max = 100, value = '', label = M.short, k1 = '', v1 = '', k2 = '', v2 = '';
+    let pct = 0, arr = null, arr2 = null, max = 100, value = '', label = M.short, k1 = '', v1 = '', k2 = '', v2 = '', sv1 = '', sv2 = '';
     if (m === 'cpu' || m === 'gpu' || m === 'mem') { pct = L(h[m]); arr = h[m]; value = `${Math.round(pct)}%`; }
-    else if (m === 'disk') { const d = this.drives()[c.drive === 'E' ? 1 : 0]; pct = d.pct; value = `${pct}%`; label = `${c.drive}:`; k1 = 'R'; v1 = this.mbps(L(h.dr)); k2 = 'W'; v2 = this.mbps(L(h.dw)); }
-    else if (m === 'net') { arr = h.nd; arr2 = h.nu; max = Math.max(100, ...h.nd, ...h.nu) * 1.1; k1 = '↑'; v1 = this.rate(L(h.nu)); k2 = '↓'; v2 = this.rate(L(h.nd)); }
+    else if (m === 'disk') { const d = this.drives()[c.drive === 'E' ? 1 : 0]; pct = d.pct; value = `${pct}%`; label = `${c.drive}:`; k1 = 'R'; v1 = this.mbps(L(h.dr)); k2 = 'W'; v2 = this.mbps(L(h.dw)); sv1 = this.mbpsS(L(h.dr)); sv2 = this.mbpsS(L(h.dw)); }
+    else if (m === 'net') { arr = h.nd; arr2 = h.nu; max = Math.max(100, ...h.nd, ...h.nu) * 1.1; k1 = '↑'; v1 = this.rate(L(h.nu)); k2 = '↓'; v2 = this.rate(L(h.nd)); sv1 = this.rateS(L(h.nu)); sv2 = this.rateS(L(h.nd)); }
     else if (m === 'bat') { pct = st.bat; value = `${Math.round(pct)}%`; if (c.remaining) label = this.remaining(true); }
     else if (m === 'sens') { const k = { cpu: 1, gpu: .88, ssd: .8 }[c.sensor]; arr = h.temp.map(x => x * k); pct = L(arr); value = this.tempStr(pct); }
     const color = this.col(m, pct), up = this.upColor();
@@ -535,6 +583,8 @@ class Component extends DCLogic {
       id: m, label, showLabel: c.label, isText: s === 'text', isGraph: s === 'graph', isBar: s === 'bar', isIo: s === 'io',
       value, valueColor: c.byLoad ? color : 'var(--fg)', color, color2: up,
       area: arr ? this.area(arr, W, H, max) : '', line: arr ? this.pts(arr, W, H, max) : '', line2: arr2 ? this.pts(arr2, W, H, max) : '',
+      vertical: vert, horizontal: !vert, vLabel: s === 'io' ? M.short : label, vShowLabel: s === 'io' || c.label, sv1, sv2,
+      isCoreBars: m === 'cpu' && c.bar === 'cores', isTotalBar: !(m === 'cpu' && c.bar === 'cores'), pctW: `${this.clamp(pct)}%`,
       bars, k1, v1, k2, v2, c1: m === 'net' ? up : color, c2: m === 'net' ? color : up,
       bg: live && st.open === m ? 'var(--active)' : 'transparent',
       tip: `${M.name}${value ? ': ' + value : ''}`,
@@ -640,7 +690,7 @@ class Component extends DCLogic {
       return [
         this.hdr('Behavior'),
         this.tog('Start with Windows', 'Launch Meterbar when you sign in', g.startup, v => sg({ startup: v })),
-        this.sel('pos', 'Widget position', 'Where readings sit on the taskbar', [['tray', 'Next to system tray'], ['left', 'Left edge of taskbar']], g.position, v => sg({ position: v })),
+        this.sel('pos', 'Widget position', 'Where readings sit on the taskbar', [['tray', 'Next to system tray'], ['left', this.isVert() ? 'Top of taskbar' : 'Left edge of taskbar']], g.position, v => sg({ position: v })),
         this.sel('iv', 'Default update interval', 'Each widget can override this on its own page', [[1, 'Every second'], [2, 'Every 2 seconds'], [5, 'Every 5 seconds']], g.interval, v => sg({ interval: v })),
         this.hdr('Appearance'),
         this.sel('theme', 'Theme', 'Flyouts and this window', [['system', 'Use system setting'], ['dark', 'Dark'], ['light', 'Light']], g.theme, v => sg({ theme: v })),
@@ -675,6 +725,7 @@ class Component extends DCLogic {
 
   renderVals() {
     const st = this.state, T = this.theme(), left = st.gen.position === 'left', layout = this.props.flyoutLayout ?? 'detailed';
+    const vert = this.isVert(), R = this.props.edge === 'right';
     const mod = this.MODS[st.page], isModule = !!mod;
     const check = on => ({ boxBg: on ? 'var(--accent)' : 'transparent', boxLine: on ? 'var(--accent)' : 'var(--ctl-strong)', check: on ? '✓' : '' });
     const fly = st.open ? this.fly(st.open, layout) : null;
@@ -690,7 +741,15 @@ class Component extends DCLogic {
       date: st.clock.toLocaleDateString('en-US'),
       batW: `${st.bat}%`,
       fly, isDetailed: !!fly && layout === 'detailed', isCompact: !!fly && layout === 'compact', isTiles: !!fly && layout === 'tiles',
-      flyLeft: left ? '12px' : 'auto', flyRight: left ? 'auto' : '12px',
+      isBottom: !vert, isVertical: vert,
+      dateShort: st.clock.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' }),
+      tbL: R ? 'auto' : '0', tbR: R ? '0' : 'auto', tbLineL: R ? 'var(--tb-line)' : 'transparent', tbLineR: R ? 'transparent' : 'var(--tb-line)',
+      indL: R ? 'auto' : '2px', indR: R ? '2px' : 'auto', pvJustify: R ? 'flex-end' : 'flex-start',
+      flyLeft: vert ? (R ? 'auto' : '76px') : (left ? '12px' : 'auto'), flyRight: vert ? (R ? '76px' : 'auto') : (left ? 'auto' : '12px'),
+      flyTop: vert && left ? '12px' : 'auto', flyBottom: vert ? (left ? 'auto' : '12px') : '60px', flyMaxH: vert ? 'calc(100% - 24px)' : 'calc(100% - 72px)',
+      winX: vert ? (R ? 'calc(50% - 32px)' : 'calc(50% + 32px)') : '50%', winY: vert ? '50%' : 'calc(50% - 24px)',
+      winPadW: vert ? '96px' : '32px', winPadH: vert ? '32px' : '96px', obPadH: vert ? '32px' : '80px',
+      orderNote: vert ? 'Widgets appear top to bottom in this order.' : 'Widgets appear left to right in this order.',
       settings: st.settings,
       closeSettings: e => { e.stopPropagation(); this.setState({ settings: false, select: null }); },
       enabledText: `${enabled.length} readings on the taskbar`,
@@ -712,7 +771,7 @@ class Component extends DCLogic {
       onboarding: st.onboarding,
       finishOnboarding: e => { e.stopPropagation(); this.setState({ onboarding: false }); },
       obItems: st.order.map(m => { const w = this.widget(m, false), on = st.mods[m].on; return { name: this.MODS[m].name, color: this.baseColor(m), sample: w.value || w.v2, cardLine: on ? 'var(--accent)' : 'var(--card-line)', ...check(on), onClick: e => { e.stopPropagation(); this.setMod(m, { on: !on }); } }; }),
-      obPos: [['tray', 'Next to the system tray', 'Right side, beside the clock'], ['left', 'Left edge of the taskbar', 'Where Widgets usually sits']].map(([v, label, desc]) => {
+      obPos: (vert ? [['tray', 'Next to the system tray', 'Bottom, just above the clock'], ['left', 'Top of the taskbar', 'Above the app icons']] : [['tray', 'Next to the system tray', 'Right side, beside the clock'], ['left', 'Left edge of the taskbar', 'Where Widgets usually sits']]).map(([v, label, desc]) => {
         const on = st.gen.position === v;
         return { label, desc, ring: on ? '5px solid var(--accent)' : '1px solid var(--ctl-strong)', fill: on ? 'var(--on-accent)' : 'transparent', onClick: e => { e.stopPropagation(); this.setGen({ position: v }); } };
       }),
