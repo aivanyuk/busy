@@ -5,6 +5,7 @@ What changed for people who run busy, newest first. The format follows [Keep a C
 ## [Unreleased]
 
 ### Added
+- A Microsoft Store package of the same busy, which installs without the SmartScreen warning and is updated by the Store. Installed from there, busy keeps its own settings (apart from a portable busy's), starts with Windows through the package's startup task, and has no update check or Releases link, as the Store updates it.
 - A vertical taskbar (Windows 11 26H2, on the left or right edge): readings stack top to bottom as narrow columns, their flyouts open beside the taskbar, and Settings, setup and the right-click menu speak of the top instead of the left edge.
 
 ### Fixed
