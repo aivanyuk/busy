@@ -91,6 +91,32 @@ The images the README shows, in this order, each with its caption:
 
 Optional. Without a 1:1 app tile icon (300 × 300) the Store uses the package's logos (store plan S2).
 
+### Search terms
+
+Up to 7, each ≤ 30 characters, ≤ 21 words in all (these are 12):
+
+```
+system monitor
+taskbar
+cpu usage
+ram usage
+gpu monitor
+network speed
+temperature
+```
+
+### Copyright and trademark info
+
+≤ 200 characters; the copyright line of `LICENSE`, and busy has no registered trademark:
+
+```
+Copyright (c) 2026 busy contributors. Open source under the MIT License.
+```
+
+### Additional license terms
+
+Paste `LICENSE` (the MIT License) as it is. Left empty, the Store's standard application license terms apply, which grant less than the MIT License does; with it, a copy from the Store comes with the same rights as one from GitHub.
+
 ## Properties
 
 | Field | Value |
@@ -125,6 +151,14 @@ Free, all markets, no trial, discoverable in the Store.
 ## Submission options
 
 ### Restricted capabilities: `runFullTrust`
+
+The field ("Why do you need the runFullTrust capability, and how will it be used in your product?") takes about 500 characters, so it gets the short form:
+
+```
+busy is a system monitor whose widget lives inside the Windows taskbar. It needs runFullTrust because its window is a child of the taskbar (explorer's Shell_TrayWnd), placed from the taskbar's own windows and UI Automation, and because it reads system-wide performance data: PDH counters, NtQuerySystemInformation, network, battery and GPU APIs, and the GPU vendors' libraries (NVML, ADL) from System32. It runs as the user: no admin rights, no driver or service, no network access.
+```
+
+The long form, for certification if it asks for more:
 
 ```
 busy is a full-trust Win32 desktop app (one native executable, no runtime) that shows system performance readings in the Windows taskbar. It needs runFullTrust because:
