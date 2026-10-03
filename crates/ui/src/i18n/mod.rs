@@ -175,6 +175,7 @@ pub fn strings(lang: Lang) -> &'static Strings {
     match lang {
         Lang::En => &EN,
         Lang::It => &lang::IT,
+        Lang::Es => &lang::ES,
         _ => &EN,
     }
 }
