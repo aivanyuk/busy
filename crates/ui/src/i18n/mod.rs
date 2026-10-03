@@ -38,6 +38,7 @@ mod choices;
 mod common;
 mod dialogs;
 mod flyout;
+mod lang;
 mod menu;
 mod settings;
 mod setup;
@@ -173,6 +174,7 @@ pub fn t() -> &'static Strings {
 pub fn strings(lang: Lang) -> &'static Strings {
     match lang {
         Lang::En => &EN,
+        Lang::It => &lang::IT,
         _ => &EN,
     }
 }
