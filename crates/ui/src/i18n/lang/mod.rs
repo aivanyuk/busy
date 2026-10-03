@@ -12,3 +12,6 @@ pub(super) use fr::FR;
 mod ja;
 
 pub(super) use ja::JA;
+mod pt_br;
+
+pub(super) use pt_br::PT_BR;
