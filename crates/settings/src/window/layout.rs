@@ -5,6 +5,7 @@
 use super::choices::Opt;
 use super::controls::{button, dropdown, order, preview, segmented, swatch, toggle};
 use super::model::{Control, Item, Page};
+use busy_ui::i18n::{self, t};
 use busy_ui::render::{Gfx, Rect};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -194,12 +195,12 @@ impl View {
         if !self.searching() {
             return (self.page.title(), self.page.sub().into());
         }
-        let q = self.query.trim();
-        match self.items.iter().filter(|i| matches!(i, Item::Row(_))).count() {
-            0 => ("Search results", format!("No settings match \u{201c}{q}\u{201d}")),
-            1 => ("Search results", format!("1 setting matches \u{201c}{q}\u{201d}")),
-            n => ("Search results", format!("{n} settings match \u{201c}{q}\u{201d}")),
-        }
+        let (s, q) = (&t().settings, self.query.trim());
+        let sub = match self.items.iter().filter(|i| matches!(i, Item::Row(_))).count() as u64 {
+            0 => i18n::fill(s.no_matches, &[&q]),
+            n => i18n::plural_with(&s.matches, n, &[&n, &q]),
+        };
+        (s.search_results, sub)
     }
 
     /// The content pane, in window coordinates.

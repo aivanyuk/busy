@@ -36,12 +36,14 @@ mod cell;
 mod common;
 mod flyout;
 mod menu;
+mod settings;
 mod time;
 
 pub use cell::Cell;
 pub use common::Common;
 pub use flyout::Flyout;
 pub use menu::Menu;
+pub use settings::Settings;
 pub use time::Time;
 
 use busy_core::Lang;
@@ -55,6 +57,7 @@ pub struct Strings {
     pub cell: Cell,
     pub flyout: Flyout,
     pub menu: Menu,
+    pub settings: Settings,
 }
 
 /// The forms of a string that depends on a count `n`, in CLDR's plural categories as far as busy's languages
@@ -77,6 +80,7 @@ impl Strings {
         v.extend(self.cell.texts());
         v.extend(self.flyout.texts());
         v.extend(self.menu.texts());
+        v.extend(self.settings.texts());
         v
     }
 }
@@ -105,7 +109,14 @@ impl Text for Plural {
     }
 }
 
-static EN: Strings = Strings { common: common::EN, time: time::EN, cell: cell::EN, flyout: flyout::EN, menu: menu::EN };
+static EN: Strings = Strings {
+    common: common::EN,
+    time: time::EN,
+    cell: cell::EN,
+    flyout: flyout::EN,
+    menu: menu::EN,
+    settings: settings::EN,
+};
 
 /// The language the system asks for (`init`), and the one shown, as `Lang::index`.
 static SYSTEM: AtomicU8 = AtomicU8::new(0);
