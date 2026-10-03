@@ -1,11 +1,13 @@
 //! Shared types between collectors (`busy-metrics`, `busy-sensors`) and UI (`busy`, `busy-settings`).
 
 mod config;
+mod lang;
 mod migrate;
 mod opt_in;
 mod options;
 pub mod release;
 pub use config::*;
+pub use lang::Lang;
 pub use migrate::CONFIG_VERSION;
 pub use opt_in::*;
 pub use options::*;
