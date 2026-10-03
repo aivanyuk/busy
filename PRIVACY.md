@@ -8,6 +8,8 @@ busy reads your computer's own performance data to show it: CPU, memory, GPU, di
 
 **Third-party sensor tools** (Settings → Advanced, off by default): when you turn this on, busy also reads the sensor data that LibreHardwareMonitor (through WMI) or HWiNFO (through shared memory) publishes, if you run one of them. This is read locally, from the program you installed; busy doesn't contact it over a network.
 
+**Per-process network traffic** (Settings → Advanced, off by default): while the Network flyout is open, busy lists the processes using the network by how much they send and receive. It learns this from a Windows event trace of network transfers (which process, how many bytes), counted in memory and never written to disk; it doesn't see what is sent, or to whom. The trace needs busy to run as administrator; otherwise, and with the setting off, the flyout lists processes by their open connections, which Windows reports to any program.
+
 ## Network
 
 - **From the Microsoft Store:** busy makes no network requests. The Store updates it, so there is no update check.

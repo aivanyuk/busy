@@ -51,7 +51,7 @@ PRs in order: `busy-core` + workspace → `busy-metrics` → `busy-sensors` → 
 - Layout: `flyout/detail.rs` (what a module's flyout shows) + `flyout/modules/<module>.rs` (design `fly()` from real data, rows without data left out) + `flyout/draw.rs` (the design's detailed measures, chart hover readout, footer). The old sections, painter and Processes tabs are gone; top processes are part of the CPU, Memory, Disk, GPU and Network flyouts (Network's by open connections), with the design's `tile` placeholder as icon.
 - Footer: "Open Task Manager" (`ShellExecuteW`, System32 path, on a new launcher worker) and "<Module> settings" (`busy_settings::open(…, Some(module))` selects the row in today's native window).
 - Choices added to `select.rs`: busiest GPU, busy engines (idle ones dropped), the interface the Network flyout describes, a part's temperature without fallback.
-- Not built (opt-ins, Phase 4 UI): Public IP, per-process network, per-app battery usage, memory speed. Real process icons need file I/O off the UI thread and are left out.
+- Not built (opt-ins, Phase 4 UI): Public IP, per-app battery usage, memory speed. Per-process network is built: open connections without rights, traffic with its opt-in (§ Opt-in sources). Real process icons need file I/O off the UI thread and are left out.
 
 ### 4. Settings window (custom D2D, `crates/settings/src/window/`)
 
@@ -117,7 +117,7 @@ All default **off**, listed under Settings → Advanced with the risk shown verb
 | Source | What it enables | Risk shown to user |
 |---|---|---|
 | Public IP lookup | "Public IP" in Network flyout | Contacts an external service (endpoint shown, configurable) which sees your IP; cached 10 min, only while flyout is open. |
-| Per-process network (ETW) | "Top processes" in Network flyout | Requires running busy as administrator; kernel event tracing session. |
+| Per-process network traffic (ETW) | "Top processes" by traffic in Network flyout | Requires running busy as administrator; starts a kernel event tracing session while the Network flyout is open. Without it, the flyout lists processes by open connections. |
 | Per-app battery usage | "Power usage" in Battery flyout | Requires administrator; reads the Windows SRUM database. Experimental. |
 | Memory speed (WMI) | "Speed" in Memory flyout | One slow WMI query at startup (~100 ms+ on the sampler thread). |
 | Third-party sensor tools | Reading LibreHardwareMonitor (WMI) / HWiNFO (shared memory) | Reads data published by another program you installed. Needed for CPU temps, fans, SSD temp/health, CPU power, throttling. |

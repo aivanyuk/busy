@@ -17,6 +17,11 @@ pub(super) const THIRD_PARTY: &str = "Reading LibreHardwareMonitor (WMI) / HWiNF
      published by another program you installed. Needed for CPU temps, fans, SSD temp/health, CPU power, \
      throttling.";
 
+/// Per-process network traffic (`OptIn::process_network`): what it does and its risk, verbatim from the plan.
+pub(super) const PROCESS_NETWORK: &str = "Top processes by traffic in the Network flyout. Requires running busy as \
+     administrator; starts a kernel event tracing session while the Network flyout is open. Without it, the \
+     flyout lists processes by open connections.";
+
 /// The update check (`OptIn::update_check`): what it does and its risk, verbatim from docs/plans/release.md.
 pub(super) const UPDATE_CHECK: &str = "Contacts api.github.com once a day while busy runs, to see whether a newer \
      release exists; GitHub sees your IP address. Nothing is downloaded or installed.";
@@ -133,6 +138,8 @@ pub(super) enum Flag {
     ThirdPartySensors,
     /// `opt_in.update_check`; turning it on asks first.
     UpdateCheck,
+    /// `opt_in.process_network`; turning it on asks first.
+    ProcessNetwork,
 }
 
 impl Flag {
@@ -141,6 +148,7 @@ impl Flag {
         match self {
             Flag::ThirdPartySensors => Some(THIRD_PARTY),
             Flag::UpdateCheck => Some(UPDATE_CHECK),
+            Flag::ProcessNetwork => Some(PROCESS_NETWORK),
             _ => None,
         }
     }
@@ -330,6 +338,7 @@ fn advanced(cfg: &Config, ch: &Choices) -> Vec<Item> {
     let mut r = vec![
         Item::Header("Opt-in sources"),
         toggle("Third-party sensor tools", THIRD_PARTY, Flag::ThirdPartySensors, cfg.opt_in.third_party_sensors),
+        toggle("Per-process network traffic", PROCESS_NETWORK, Flag::ProcessNetwork, cfg.opt_in.process_network),
     ];
     if !ch.packaged {
         r.push(toggle("Check for updates", UPDATE_CHECK, Flag::UpdateCheck, cfg.opt_in.update_check));
@@ -387,8 +396,14 @@ mod tests {
         let portable = Choices::default();
         let store = Choices { packaged: true, ..Choices::default() };
         assert!(releases(&portable) && !releases(&store));
-        assert_eq!(rows(&items(Page::Advanced, &cfg, &portable)), ["Third-party sensor tools", "Check for updates"]);
-        assert_eq!(rows(&items(Page::Advanced, &cfg, &store)), ["Third-party sensor tools"]);
+        assert_eq!(
+            rows(&items(Page::Advanced, &cfg, &portable)),
+            ["Third-party sensor tools", "Per-process network traffic", "Check for updates"]
+        );
+        assert_eq!(
+            rows(&items(Page::Advanced, &cfg, &store)),
+            ["Third-party sensor tools", "Per-process network traffic"]
+        );
     }
 
     #[test]
@@ -458,7 +473,7 @@ mod tests {
         let mut cfg = Config::default();
         let ch = Choices::default();
         let off = items(Page::Advanced, &cfg, &ch);
-        assert_eq!(rows(&off), ["Third-party sensor tools", "Check for updates"]);
+        assert_eq!(rows(&off), ["Third-party sensor tools", "Per-process network traffic", "Check for updates"]);
         let Some(Item::Row(Row { control: Control::Toggle(Flag::ThirdPartySensors, false), desc, .. })) = off.get(1)
         else {
             panic!("no opt-in toggle")
@@ -469,6 +484,11 @@ mod tests {
         assert!(matches!(on.get(1), Some(Item::Row(Row { control: Control::Toggle(_, true), .. }))));
         assert_eq!(rows(&search("hwinfo", &cfg, &ch)), ["Third-party sensor tools"]);
         assert_eq!(rows(&search("github", &cfg, &ch)), ["Check for updates"]);
+        assert_eq!(rows(&search("administrator", &cfg, &ch)), ["Per-process network traffic"]);
+        cfg.opt_in.process_network = true;
+        let on = items(Page::Advanced, &cfg, &ch);
+        assert!(matches!(on.get(2), Some(Item::Row(Row { control: Control::Toggle(Flag::ProcessNetwork, true), .. }))));
+        assert_eq!(Flag::ProcessNetwork.risk(), Some(PROCESS_NETWORK));
         assert_eq!(Flag::UpdateCheck.risk(), Some(UPDATE_CHECK));
         assert_eq!(Flag::Autostart.risk(), None);
     }
@@ -482,8 +502,11 @@ mod tests {
         // Network's default style is Io, which has no label row; Battery's time left "replaces the label".
         assert_eq!(headers, ["CPU", "Memory", "GPU", "Disk", "Sensors", "Battery"]);
         assert!(rows(&found).iter().all(|&t| t == "Show label" || t == "Show time remaining"));
-        // A page's name finds all of its rows.
-        assert_eq!(rows(&search("processes", &cfg, &ch)), ["Top processes", "Update interval"]);
+        // A page's name finds all of its rows, and other pages' rows that mention it.
+        assert_eq!(
+            rows(&search("processes", &cfg, &ch)),
+            ["Top processes", "Update interval", "Per-process network traffic"]
+        );
         assert!(search("zzz", &cfg, &ch).is_empty());
     }
 

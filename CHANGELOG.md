@@ -6,6 +6,7 @@ What changed for people who run busy, newest first. The format follows [Keep a C
 
 ### Added
 - The Network flyout lists the processes using the network most, by their open connections.
+- An opt-in for per-process network traffic (Settings → Advanced, off by default): with busy running as administrator, the Network flyout lists processes by how much they send and receive instead.
 
 ## [0.2.0] - 2026-10-01
 
