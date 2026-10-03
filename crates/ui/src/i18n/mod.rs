@@ -32,18 +32,22 @@ macro_rules! section {
     };
 }
 
+mod a11y;
 mod cell;
 mod choices;
 mod common;
+mod dialogs;
 mod flyout;
 mod menu;
 mod settings;
 mod setup;
 mod time;
 
+pub use a11y::A11y;
 pub use cell::Cell;
 pub use choices::Choices;
 pub use common::Common;
+pub use dialogs::Dialogs;
 pub use flyout::Flyout;
 pub use menu::Menu;
 pub use settings::Settings;
@@ -64,6 +68,8 @@ pub struct Strings {
     pub settings: Settings,
     pub choices: Choices,
     pub setup: Setup,
+    pub a11y: A11y,
+    pub dialogs: Dialogs,
 }
 
 /// The forms of a string that depends on a count `n`, in CLDR's plural categories as far as busy's languages
@@ -89,6 +95,8 @@ impl Strings {
         v.extend(self.settings.texts());
         v.extend(self.choices.texts());
         v.extend(self.setup.texts());
+        v.extend(self.a11y.texts());
+        v.extend(self.dialogs.texts());
         v
     }
 }
@@ -126,6 +134,8 @@ static EN: Strings = Strings {
     settings: settings::EN,
     choices: choices::EN,
     setup: setup::EN,
+    a11y: a11y::EN,
+    dialogs: dialogs::EN,
 };
 
 /// The language the system asks for (`init`), and the one shown, as `Lang::index`.

@@ -52,7 +52,7 @@ pub(in crate::window) fn tree(v: &View, cfg: &Config, autostart_busy: bool, vert
         |node: Node, info: Info, rect: Option<Rect>| Entry { node, key: 0, parent: None, info, rect, offscreen: false };
     let l = v.layout.as_ref();
     let rect = |t: Target| l.and_then(|l| l.rect(t));
-    let close = Info { invoke: true, focusable: false, ..info(Role::Button, "Close") };
+    let close = Info { invoke: true, focusable: false, ..info(Role::Button, busy_ui::i18n::t().a11y.close) };
     let mut entries = vec![entry(Node::Close, close, rect(Target::Close))];
     let s = &busy_ui::i18n::t().setup;
     let headline = Info { help: s.sub.into(), focusable: false, ..info(Role::Text, s.headline) };

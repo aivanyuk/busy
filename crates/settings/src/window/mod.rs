@@ -325,7 +325,7 @@ impl Ui {
     /// Asks before an opt-in source is turned on, stating its risk. The box is modal (its own message loop, so
     /// the UI thread keeps running); no borrow is held across it. False also when the window closed meanwhile.
     fn confirm_opt_in(&self, risk: &str) -> bool {
-        let msg = HSTRING::from(format!("Turn this on?\n\n{risk}\n\nYou can turn it off again under Advanced."));
+        let msg = HSTRING::from(busy_ui::i18n::fill(busy_ui::i18n::t().dialogs.confirm_opt_in, &[&risk]));
         // SAFETY: our window as owner; the strings outlive the call.
         let yes = unsafe { MessageBoxW(Some(self.hwnd), &msg, w!("busy"), MB_ICONWARNING | MB_YESNO | MB_DEFBUTTON2) };
         // SAFETY: only checks whether the handle still names a window.
@@ -367,7 +367,7 @@ impl Ui {
                 self.reg_autostart.set(Some(autostart));
                 let close = self.pending.take() == Some(true);
                 if let Some(e) = error {
-                    let msg = HSTRING::from(format!("Couldn't update the startup entry.\n\n{e}"));
+                    let msg = HSTRING::from(busy_ui::i18n::fill(busy_ui::i18n::t().dialogs.autostart_failed, &[&e]));
                     // SAFETY: our window as owner; the strings outlive the call.
                     unsafe { MessageBoxW(Some(self.hwnd), &msg, w!("busy"), MB_ICONERROR | MB_OK) };
                 }
