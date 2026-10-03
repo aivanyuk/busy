@@ -37,14 +37,12 @@ fn enabled(s: StartupTaskState) -> bool {
 
 /// Why the task is still off after asking to turn it on, as the settings window shows it; None if it's on.
 fn refusal(s: StartupTaskState) -> Option<&'static str> {
+    let d = &busy_ui::i18n::t().dialogs;
     match s {
-        StartupTaskState::DisabledByUser => Some(
-            "Start with Windows is turned off for busy in Windows Settings \u{2192} Apps \u{2192} Startup. Turn it \
-             on there.",
-        ),
-        StartupTaskState::DisabledByPolicy => Some("Your organization keeps busy from starting with Windows."),
+        StartupTaskState::DisabledByUser => Some(d.startup_off_by_user),
+        StartupTaskState::DisabledByPolicy => Some(d.startup_off_by_policy),
         s if enabled(s) => None,
-        _ => Some("Windows left the startup task off."),
+        _ => Some(d.startup_off),
     }
 }
 

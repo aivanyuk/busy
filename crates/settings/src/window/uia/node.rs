@@ -6,6 +6,7 @@ use crate::window::frame;
 use crate::window::layout::{PAGE_TITLE_H, Target, View};
 use crate::window::model::{self, Control, Flag, Item, Page};
 use busy_core::Config;
+use busy_ui::i18n::{self, t};
 use busy_ui::render::Rect;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
@@ -253,27 +254,30 @@ pub(in crate::window) fn info(v: &View, cfg: &Config, n: Node, maximized: bool, 
     if !exists(v, n) {
         return None;
     }
-    let order_name = |j: usize, dir: &str| {
+    let (a, s) = (&t().a11y, &t().settings);
+    // `pattern` is Move up or Move down, filled with the module's name.
+    let order_name = |j: usize, pattern: &str| {
         let m = v.items.iter().find_map(|it| match it {
             Item::Order(list) => list.get(j).map(|&(m, _)| m),
             _ => None,
         })?;
-        Some(format!("Move {} {dir}", busy_ui::i18n::t().common.module(m)))
+        Some(i18n::fill(pattern, &[&t().common.module(m)]))
     };
     Some(match n {
-        Node::Min => caption("Minimize"),
-        Node::Max => caption(if maximized { "Restore" } else { "Maximize" }),
-        Node::Close => caption("Close"),
-        Node::Search => Info { value: Some(v.query.clone()), focusable: true, ..plain(Role::Edit, "Find a setting") },
+        Node::Min => caption(a.minimize),
+        Node::Max => caption(if maximized { a.restore } else { a.maximize }),
+        Node::Close => caption(a.close),
+        Node::Search => Info { value: Some(v.query.clone()), focusable: true, ..plain(Role::Edit, s.find) },
         Node::Nav(p) => {
-            let mut status = match p {
-                Page::Module(m) if model::is_on(cfg, m) => "On".to_string(),
-                Page::Module(_) => "Off".to_string(),
-                _ => String::new(),
+            let on = match p {
+                Page::Module(m) => Some(if model::is_on(cfg, m) { s.on } else { s.off }),
+                _ => None,
             };
-            if p == v.page && !v.searching() {
-                status = if status.is_empty() { "Selected".into() } else { format!("{status}, selected") };
-            }
+            let status = match on {
+                _ if p != v.page || v.searching() => on.unwrap_or_default().to_string(),
+                Some(on) => i18n::fill(a.status_selected, &[&on]),
+                None => a.selected.to_string(),
+            };
             Info { status, invoke: true, focusable: true, ..plain(Role::ListItem, p.title()) }
         }
         Node::Title => {
@@ -284,8 +288,8 @@ pub(in crate::window) fn info(v: &View, cfg: &Config, n: Node, maximized: bool, 
             Item::Header(h) | Item::Notice(h) => plain(Role::Text, *h),
             _ => return None,
         },
-        Node::Up(j) => button(order_name(j, "up")?),
-        Node::Down(j) => button(order_name(j, "down")?),
+        Node::Up(j) => button(order_name(j, a.move_up)?),
+        Node::Down(j) => button(order_name(j, a.move_down)?),
         Node::Ctl(i) => {
             let Item::Row(row) = v.items.get(i)? else { return None };
             let base = Info { help: row.desc.clone(), focusable: true, ..plain(Role::Group, row.title) };
@@ -304,7 +308,7 @@ pub(in crate::window) fn info(v: &View, cfg: &Config, n: Node, maximized: bool, 
                 Control::Button(c) => Info { role: Role::Button, name: c.label().into(), invoke: true, ..base },
                 Control::None => Info { role: Role::Text, focusable: false, ..base },
                 Control::Swatches(_, sel) => {
-                    Info { value: Some(format!("Color {} of {}", sel + 1, busy_core::PALETTE_LEN)), ..base }
+                    Info { value: Some(i18n::fill(a.color_of, &[&(sel + 1), &busy_core::PALETTE_LEN])), ..base }
                 }
             }
         }
@@ -314,7 +318,7 @@ pub(in crate::window) fn info(v: &View, cfg: &Config, n: Node, maximized: bool, 
         }
         Node::Opt(_, k) => {
             let (opts, sel) = v.options()?;
-            let status = if k == sel { "Selected" } else { "" };
+            let status = if k == sel { a.selected } else { "" };
             Info { status: status.into(), invoke: true, focusable: true, ..plain(Role::ListItem, &opts.get(k)?.label) }
         }
         Node::Card(_) | Node::Place(_) | Node::Startup | Node::Skip | Node::Start => return None,
