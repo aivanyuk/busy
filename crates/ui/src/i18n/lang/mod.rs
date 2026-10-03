@@ -9,3 +9,6 @@ pub(super) use es::ES;
 mod fr;
 
 pub(super) use fr::FR;
+mod ja;
+
+pub(super) use ja::JA;
