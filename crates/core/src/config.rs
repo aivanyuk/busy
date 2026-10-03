@@ -1,4 +1,4 @@
-use crate::{CONFIG_VERSION, Module, ModuleOptions, OptIn};
+use crate::{CONFIG_VERSION, Lang, Module, ModuleOptions, OptIn};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -124,6 +124,9 @@ pub struct Config {
     /// Extra horizontal offset from the anchor, in logical (96-dpi) pixels. Positive = away from anchor.
     pub offset_px: i32,
     pub theme: ThemeMode,
+    /// UI language; `None` = the first of Windows' display languages busy has (`Lang::pick`).
+    #[serde(deserialize_with = "crate::lang::lenient")]
+    pub language: Option<Lang>,
     pub autostart: bool,
     pub history_secs: u32,
     pub temp_unit: TempUnit,
@@ -159,6 +162,7 @@ impl Default for Config {
             anchor: Anchor::NearTray,
             offset_px: 0,
             theme: ThemeMode::System,
+            language: None,
             autostart: false,
             history_secs: 120,
             temp_unit: TempUnit::Celsius,
@@ -317,6 +321,17 @@ mod tests {
         assert_eq!(cfg.modules[0].module, Module::Cpu);
         assert_eq!(cfg.interval_ms, 250);
         assert_eq!(cfg.history_secs, 3600);
+    }
+
+    #[test]
+    fn language_round_trips_and_tolerates_unknown() {
+        let cfg = Config { language: Some(Lang::PtBr), ..Config::default() };
+        let json = serde_json::to_vec(&cfg).unwrap_or_default();
+        assert!(String::from_utf8_lossy(&json).contains(r#""language":"pt-BR""#));
+        assert_eq!(Config::from_json(&json).language, Some(Lang::PtBr));
+        let cfg = Config::from_json(br#"{"language": "tlh", "interval_ms": 2000}"#);
+        assert_eq!((cfg.language, cfg.interval_ms), (None, 2000));
+        assert_eq!(Config::from_json(br#"{"language": null}"#).language, None);
     }
 
     #[test]
