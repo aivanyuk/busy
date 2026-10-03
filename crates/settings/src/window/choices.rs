@@ -6,6 +6,7 @@ use busy_core::release::Release;
 use busy_core::{
     Anchor, CellStyle, CpuBar, Module, NetInterface, RateUnit, SensorKind, SensorPick, Snapshot, TempUnit, ThemeMode,
 };
+use busy_ui::i18n::{self, Plural, t};
 use busy_win::Edge;
 
 /// A value a dropdown option sets.
@@ -100,15 +101,14 @@ fn fixed(opts: &[(&str, Pick)], current: Pick) -> (Vec<Opt>, usize) {
 
 /// Down a vertical taskbar the far end from the tray is its top (design `isVert()`).
 pub(super) fn anchor(a: Anchor, vertical: bool) -> (Vec<Opt>, usize) {
-    let left = if vertical { "Top of taskbar" } else { "Left edge of taskbar" };
-    fixed(
-        &[("Next to system tray", Pick::Anchor(Anchor::NearTray)), (left, Pick::Anchor(Anchor::Left))],
-        Pick::Anchor(a),
-    )
+    let c = &t().choices;
+    let left = if vertical { c.top } else { c.left_edge };
+    fixed(&[(c.near_tray, Pick::Anchor(Anchor::NearTray)), (left, Pick::Anchor(Anchor::Left))], Pick::Anchor(a))
 }
 
 fn px(v: i32) -> String {
-    if v == 0 { "None".into() } else { format!("{v} px") }
+    let c = &t().choices;
+    if v == 0 { c.no_offset.into() } else { i18n::fill(c.px, &[&v]) }
 }
 
 pub(super) fn offset(v: i32) -> (Vec<Opt>, usize) {
@@ -116,8 +116,14 @@ pub(super) fn offset(v: i32) -> (Vec<Opt>, usize) {
     list(opts, Pick::Offset(v), |_| px(v))
 }
 
+/// `secs` in `whole`'s form for it when a whole number, else in `fraction`.
+fn in_seconds(whole: &Plural, fraction: &str, secs: f64) -> String {
+    if secs >= 0.0 && secs.fract() == 0.0 { i18n::plural(whole, secs as u64) } else { i18n::fill(fraction, &[&secs]) }
+}
+
 fn every(secs: f64) -> String {
-    if secs == 1.0 { "Every second".into() } else { format!("Every {secs} seconds") }
+    let c = &t().choices;
+    in_seconds(&c.every, c.every_fraction, secs)
 }
 
 pub(super) fn interval(ms: u32) -> (Vec<Opt>, usize) {
@@ -126,10 +132,11 @@ pub(super) fn interval(ms: u32) -> (Vec<Opt>, usize) {
 }
 
 fn minutes(secs: u32) -> String {
-    match secs {
-        60 => "1 minute".into(),
-        s if s.is_multiple_of(60) => format!("{} minutes", s / 60),
-        s => format!("{s} seconds"),
+    let c = &t().choices;
+    if secs.is_multiple_of(60) {
+        i18n::plural(&c.minutes, u64::from(secs / 60))
+    } else {
+        i18n::plural(&c.seconds, u64::from(secs))
     }
 }
 
@@ -138,44 +145,45 @@ pub(super) fn history(secs: u32) -> (Vec<Opt>, usize) {
     list(opts, Pick::HistorySecs(secs), |_| minutes(secs))
 }
 
-pub(super) fn theme(t: ThemeMode) -> (Vec<Opt>, usize) {
+pub(super) fn theme(theme: ThemeMode) -> (Vec<Opt>, usize) {
+    let c = &t().choices;
     fixed(
         &[
-            ("Use system setting", Pick::Theme(ThemeMode::System)),
-            ("Dark", Pick::Theme(ThemeMode::Dark)),
-            ("Light", Pick::Theme(ThemeMode::Light)),
+            (c.theme_system, Pick::Theme(ThemeMode::System)),
+            (c.dark, Pick::Theme(ThemeMode::Dark)),
+            (c.light, Pick::Theme(ThemeMode::Light)),
         ],
-        Pick::Theme(t),
+        Pick::Theme(theme),
     )
 }
 
 pub(super) fn cpu_bar(b: CpuBar) -> (Vec<Opt>, usize) {
-    fixed(&[("Each core", Pick::CpuBar(CpuBar::Cores)), ("Total", Pick::CpuBar(CpuBar::Total))], Pick::CpuBar(b))
+    let c = &t().choices;
+    fixed(&[(c.each_core, Pick::CpuBar(CpuBar::Cores)), (c.total, Pick::CpuBar(CpuBar::Total))], Pick::CpuBar(b))
 }
 
 fn volume_label((mount, label): &(String, String)) -> String {
-    if label.is_empty() { mount.clone() } else { format!("{label} ({mount})") }
+    if label.is_empty() { mount.clone() } else { i18n::fill(t().choices.volume, &[label, mount]) }
 }
 
 pub(super) fn drive(current: Option<&str>, ch: &Choices) -> (Vec<Opt>, usize) {
-    let mut opts = vec![("System drive".to_string(), Pick::Drive(None))];
+    let mut opts = vec![(t().choices.system_drive.to_string(), Pick::Drive(None))];
     opts.extend(ch.volumes.iter().map(|v| (volume_label(v), Pick::Drive(Some(v.0.clone())))));
     let current = current.map(str::to_string);
     list(opts, Pick::Drive(current.clone()), |_| current.unwrap_or_default())
 }
 
 pub(super) fn units(u: RateUnit) -> (Vec<Opt>, usize) {
-    fixed(
-        &[("Bytes (MB/s)", Pick::Units(RateUnit::Bytes)), ("Bits (Mb/s)", Pick::Units(RateUnit::Bits))],
-        Pick::Units(u),
-    )
+    let c = &t().choices;
+    fixed(&[(c.bytes, Pick::Units(RateUnit::Bytes)), (c.bits, Pick::Units(RateUnit::Bits))], Pick::Units(u))
 }
 
 pub(super) fn interface(current: &NetInterface, ch: &Choices) -> (Vec<Opt>, usize) {
+    let c = &t().choices;
     let mut opts = vec![
-        ("Automatic".to_string(), Pick::Interface(NetInterface::Auto)),
-        ("Wi\u{2011}Fi".to_string(), Pick::Interface(NetInterface::WiFi)),
-        ("Ethernet".to_string(), Pick::Interface(NetInterface::Ethernet)),
+        (c.automatic.to_string(), Pick::Interface(NetInterface::Auto)),
+        (c.wifi.to_string(), Pick::Interface(NetInterface::WiFi)),
+        (c.ethernet.to_string(), Pick::Interface(NetInterface::Ethernet)),
     ];
     opts.extend(ch.adapters.iter().map(|a| (a.clone(), Pick::Interface(NetInterface::Named(a.clone())))));
     let name = match current {
@@ -191,10 +199,11 @@ fn sensor_label(key: &str) -> String {
 }
 
 pub(super) fn sensor(current: &SensorPick, ch: &Choices) -> (Vec<Opt>, usize) {
+    let c = &t().choices;
     let mut opts = vec![
-        ("CPU package".to_string(), Pick::Sensor(SensorPick::Cpu)),
-        ("GPU".to_string(), Pick::Sensor(SensorPick::Gpu)),
-        ("Drive".to_string(), Pick::Sensor(SensorPick::Storage)),
+        (c.cpu_package.to_string(), Pick::Sensor(SensorPick::Cpu)),
+        (c.gpu.to_string(), Pick::Sensor(SensorPick::Gpu)),
+        (c.drive.to_string(), Pick::Sensor(SensorPick::Storage)),
     ];
     opts.extend(ch.sensors.iter().map(|s| (sensor_label(s), Pick::Sensor(SensorPick::Named(s.clone())))));
     let name = match current {
@@ -206,12 +215,13 @@ pub(super) fn sensor(current: &SensorPick, ch: &Choices) -> (Vec<Opt>, usize) {
 
 /// Design `styleName`: Io reads "Read / write" for Disk, "Up / down" for Network.
 fn style_name(m: Module, s: CellStyle) -> &'static str {
+    let c = &t().choices;
     match s {
-        CellStyle::Text => "Text",
-        CellStyle::Graph => "Graph",
-        CellStyle::Bar => "Bar",
-        CellStyle::Io if m == Module::Disk => "Read / write",
-        CellStyle::Io => "Up / down",
+        CellStyle::Text => c.text,
+        CellStyle::Graph => c.graph,
+        CellStyle::Bar => c.bar,
+        CellStyle::Io if m == Module::Disk => c.read_write,
+        CellStyle::Io => c.up_down,
     }
 }
 
@@ -228,8 +238,8 @@ pub(super) fn temp_unit(u: TempUnit) -> (Vec<Opt>, usize) {
 
 /// A module's own interval; the first option follows the default (design "Default (1 second)").
 pub(super) fn module_interval(m: Module, secs: Option<u32>, default_ms: u32) -> (Vec<Opt>, usize) {
-    let d = default_ms as f64 / 1000.0;
-    let default = if d == 1.0 { "Default (1 second)".to_string() } else { format!("Default ({d} seconds)") };
+    let c = &t().choices;
+    let default = in_seconds(&c.default_every, c.default_every_fraction, default_ms as f64 / 1000.0);
     let mut opts = vec![(default, Pick::ModuleInterval(m, None))];
     opts.extend([1, 2, 5].map(|s| (every(s as f64), Pick::ModuleInterval(m, Some(s)))));
     list(opts, Pick::ModuleInterval(m, secs), |_| every(secs.unwrap_or(1) as f64))

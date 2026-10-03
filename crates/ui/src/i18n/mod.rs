@@ -33,6 +33,7 @@ macro_rules! section {
 }
 
 mod cell;
+mod choices;
 mod common;
 mod flyout;
 mod menu;
@@ -40,6 +41,7 @@ mod settings;
 mod time;
 
 pub use cell::Cell;
+pub use choices::Choices;
 pub use common::Common;
 pub use flyout::Flyout;
 pub use menu::Menu;
@@ -58,6 +60,7 @@ pub struct Strings {
     pub flyout: Flyout,
     pub menu: Menu,
     pub settings: Settings,
+    pub choices: Choices,
 }
 
 /// The forms of a string that depends on a count `n`, in CLDR's plural categories as far as busy's languages
@@ -81,6 +84,7 @@ impl Strings {
         v.extend(self.flyout.texts());
         v.extend(self.menu.texts());
         v.extend(self.settings.texts());
+        v.extend(self.choices.texts());
         v
     }
 }
@@ -116,6 +120,7 @@ static EN: Strings = Strings {
     flyout: flyout::EN,
     menu: menu::EN,
     settings: settings::EN,
+    choices: choices::EN,
 };
 
 /// The language the system asks for (`init`), and the one shown, as `Lang::index`.
