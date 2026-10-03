@@ -174,16 +174,16 @@ pub fn t() -> &'static Strings {
 pub fn strings(lang: Lang) -> &'static Strings {
     match lang {
         Lang::En => &EN,
-        Lang::It => &lang::IT,
+        Lang::De => &lang::DE,
         Lang::Es => &lang::ES,
         Lang::Fr => &lang::FR,
+        Lang::It => &lang::IT,
         Lang::Ja => &lang::JA,
-        Lang::PtBr => &lang::PT_BR,
-        Lang::De => &lang::DE,
-        Lang::Pl => &lang::PL,
-        Lang::ZhHans => &lang::ZH_HANS,
         Lang::Ko => &lang::KO,
+        Lang::Pl => &lang::PL,
+        Lang::PtBr => &lang::PT_BR,
         Lang::Ru => &lang::RU,
+        Lang::ZhHans => &lang::ZH_HANS,
     }
 }
 

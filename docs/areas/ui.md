@@ -8,14 +8,14 @@
 
 ## Text and languages (`i18n/`)
 
-Every string a window shows comes from `i18n::t()`, the current language's `Strings`; none is a literal at the call site. `Strings` is split into sections by the part of the UI that shows them (`common.rs`: module names, …), each declared once with `section!`: the field, its type and its English text. The ten translations are `i18n/lang/<lang>.rs`, each a whole `Strings` value, so a string added to a section without its translations doesn't build. All tables are compiled in: no file is read, no lookup can fail, and a `&'static str` API stays one.
+Every string a window shows comes from `i18n::t()`, the current language's `Strings`; none is a literal at the call site. `Strings` is split into sections by the part of the UI that shows them (`common.rs`: module names, …), each declared once with `section!`: the field, its type and its English text. The ten translations are `i18n/lang/<lang>/` (`mod.rs`: the app's sections and the `Strings` value; `settings.rs`: the settings window's sections, as consts), each a whole `Strings`, so a string added to a section without its translations doesn't build. All tables are compiled in: no file is read, no lookup can fail, and a `&'static str` API stays one.
 
 - Language: `i18n::init(system, cfg.language)` at startup, `system` being `Lang::pick` over `busy_win::ui_languages()` (Windows' display languages, read before the widget is embedded); `i18n::select(cfg.language)` when the config changes. One process-wide value; windows read it when they build their text and formats.
 - Values in a string: a pattern with numbered slots, `"{0} free of {1}"`, filled by `i18n::fill`, so a translation can put them in its own order. Never `format!` a translated word into a sentence, or concatenate pieces: word order and case differ by language.
 - Counts: a `Plural` (`one`, `few`, `other`) and `i18n::plural(&p, n)`, or `i18n::plural_with(&p, n, &[&n, &more])` when the string holds other values too (`{1}`…); the rules (`form`) cover English, German, Spanish, Italian (1 is `one`), French and Portuguese (0 and 1), Russian and Polish (`few` for 2–4 except 12–14), and Japanese, Korean and Chinese (one form).
 - Tests check every language for every string, non-empty and with the same slots as English (a `Plural` form may drop `{0}`: "one minute"). Unit tests elsewhere assert English text: they never select another language, and the default is English.
 - DirectWrite formats take the language's tag as their locale (`Gfx::format_weight`), which decides font fallback's glyphs for Han characters.
-- Adding a string: a field in its section's `section!` with the English text, then the same field in each `lang/*.rs`.
+- Adding a string: a field in its section's `section!` with the English text, then the same field in each `lang/*/`, translated (Windows' own terms for that language; a label no longer than about 1.4× the English, since most UI text is one line). Translators' notes on terms and tight fits were left in the PR that added them; check a long language (`de`, `ru`) and a CJK one with `BUSY_LANG` in the settings demo.
 
 Everything here runs on the UI thread and never blocks, except `Theme::resolve`, which reads the registry for `ThemeMode::System` (call it on a worker, or at startup before a window exists).
 
