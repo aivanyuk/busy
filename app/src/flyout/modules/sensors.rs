@@ -1,6 +1,7 @@
 use super::super::detail::{BarRow, Chart, Detail, Value, series_span};
 use busy_core::{Module, ModuleCfg, SensorKind, SensorReading};
 use busy_ui::ctx::Ctx;
+use busy_ui::i18n;
 use busy_ui::render::nice_max;
 use busy_ui::tone;
 use busy_ui::{fmt, select};
@@ -10,16 +11,15 @@ use busy_ui::{fmt, select};
 pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
     let (snap, cfg, t, hist) = (ctx.snap, ctx.cfg, ctx.theme, ctx.hist);
     let mut d = Detail::new(Module::Sensors);
-    d.sub = "Temperatures, fans and power".into();
+    let f = &i18n::t().flyout;
+    d.sub = f.sens_sub.into();
     if snap.sensors.is_empty() {
         d.note = Some(
             if cfg.opt_in.third_party_sensors {
-                "No sensors available. Run LibreHardwareMonitor or HWiNFO (with shared memory enabled) for CPU \
-             temperatures."
+                f.sens_none
             } else {
                 // No UI for opt-ins until the Phase 4 settings window (Advanced page).
-                "No sensors available. Reading LibreHardwareMonitor / HWiNFO is off; enable \
-             opt_in.third_party_sensors in config.json for CPU temperatures."
+                f.sens_none_off
             }
             .into(),
         );
@@ -46,7 +46,7 @@ pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
         });
     }
     let temps = snap.sensors.iter().filter(|s| s.kind == SensorKind::Temperature);
-    d.bars_title = "Temperatures";
+    d.bars_title = f.sens_temperatures;
     d.bars = temps
         .map(|s| BarRow {
             label: name(s),

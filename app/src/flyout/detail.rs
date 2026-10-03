@@ -5,6 +5,7 @@
 use busy_core::{Module, RateUnit, SensorKind, TempUnit};
 use busy_ui::fmt;
 use busy_ui::history::Series;
+use busy_ui::i18n::{self, t};
 use busy_ui::theme::Color;
 
 pub(super) struct Detail<'a> {
@@ -76,7 +77,7 @@ impl<'a> Detail<'a> {
     pub(super) fn new(module: Module) -> Self {
         Self {
             module,
-            title: busy_ui::i18n::t().common.module(module),
+            title: t().common.module(module),
             sub: String::new(),
             big: String::new(),
             big_label: String::new(),
@@ -87,7 +88,7 @@ impl<'a> Detail<'a> {
             stats: Vec::new(),
             bars_title: "",
             bars: Vec::new(),
-            procs_title: "Top processes",
+            procs_title: t().flyout.top_processes,
             procs: Vec::new(),
             note: None,
         }
@@ -95,7 +96,7 @@ impl<'a> Detail<'a> {
 
     /// A module whose first sample hasn't arrived.
     pub(super) fn waiting(module: Module) -> Self {
-        Self { note: Some("Waiting for data…".into()), ..Self::new(module) }
+        Self { note: Some(t().flyout.waiting.into()), ..Self::new(module) }
     }
 
     /// Adds a stat row when there is a value.
@@ -108,7 +109,8 @@ impl<'a> Detail<'a> {
 
 /// Design `span`: "Last 60 seconds" up to two minutes, then minutes.
 pub(super) fn span(secs: u64) -> String {
-    if secs < 120 { format!("Last {secs} seconds") } else { format!("Last {} minutes", secs / 60) }
+    let f = &t().flyout;
+    if secs < 120 { i18n::plural(&f.span_seconds, secs) } else { i18n::plural(&f.span_minutes, secs / 60) }
 }
 
 /// The time a series spans when full.

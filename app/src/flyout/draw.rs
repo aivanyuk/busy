@@ -4,6 +4,7 @@
 use super::Action;
 use super::detail::{Chart, Detail};
 use busy_ui::fmt;
+use busy_ui::i18n;
 use busy_ui::render::{Align, Canvas, Gfx, Rect};
 use busy_ui::theme::{Color, Theme};
 use windows::Win32::Graphics::DirectWrite::IDWriteTextFormat;
@@ -227,7 +228,7 @@ impl Pen<'_> {
             .collect::<Vec<_>>()
             .join("  ");
         if secs > 0 {
-            label = format!("{label}  · {} ago", fmt::duration(secs));
+            label = i18n::fill(i18n::t().flyout.ago, &[&label, &fmt::duration(secs)]);
         }
         let lw = self.gfx.text_width(&self.f.small, &label) + 12.0;
         // Placed from the sample, not the pointer: the readout repaints only when the sample changes.
@@ -283,7 +284,8 @@ impl Pen<'_> {
 
     /// "Logical processors" over a 16-column grid of bars, 36 DIPs high in all.
     fn cores(&mut self, cores: &[(f32, Color)]) {
-        self.text("Logical processors", &self.f.small, Rect::new(PAD, self.y, W, LINE_11), self.t.fg3, Align::Left);
+        let heading = i18n::t().flyout.logical_processors;
+        self.text(heading, &self.f.small, Rect::new(PAD, self.y, W, LINE_11), self.t.fg3, Align::Left);
         self.y += LINE_11 + 6.0;
         let rows = cores.len().div_ceil(16);
         let cw = (W - 3.0 * 15.0) / 16.0;
@@ -355,9 +357,10 @@ impl Pen<'_> {
         }
         let y = self.y + 11.0;
         let hot = |r: Rect| self.mouse.is_some_and(|(x, y)| r.contains(x, y));
-        let link = "Open Task Manager";
+        let s = &i18n::t().flyout;
+        let link = s.open_task_manager;
         let lr = Rect::new(8.0, y, self.gfx.text_width(&self.f.stat, link) + 20.0, 32.0);
-        let label = format!("{title} settings");
+        let label = i18n::fill(s.module_settings, &[&title]);
         let bw = self.gfx.text_width(&self.f.stat, &label) + 28.0;
         let br = Rect::new(WIDTH - 12.0 - bw, y, bw, 32.0);
         if let Some(cv) = self.cv {
