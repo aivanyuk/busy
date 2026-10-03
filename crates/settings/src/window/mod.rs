@@ -171,7 +171,7 @@ fn create(cfg: &Config, host: Rc<dyn Host>) -> Result<()> {
         CreateWindowExW(
             WINDOW_EX_STYLE(0),
             CLASS,
-            &HSTRING::from("busy Settings"),
+            &HSTRING::from(busy_ui::i18n::t().settings.window_title),
             WS_OVERLAPPEDWINDOW,
             work.left,
             work.top,

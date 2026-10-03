@@ -49,7 +49,8 @@ pub(in crate::window) fn hit(r: Rect, n: usize, x: f32, y: f32) -> Option<Target
 
 /// The intro line (design `orderNote`): a vertical taskbar stacks the cells top to bottom.
 fn note(vertical: bool) -> &'static str {
-    if vertical { "Widgets appear top to bottom in this order." } else { "Widgets appear left to right in this order." }
+    let s = &busy_ui::i18n::t().settings;
+    if vertical { s.order_note_vertical } else { s.order_note }
 }
 
 /// `color(m)` is a module's palette color; `hover` the hovered button; `vertical` whether the taskbar is.
@@ -83,7 +84,8 @@ pub(in crate::window) fn draw(
             t.fg,
             Align::Left,
         );
-        let status = if shown { "Shown" } else { "Hidden" };
+        let s = &busy_ui::i18n::t().settings;
+        let status = if shown { s.shown } else { s.hidden };
         cv.text(status, &f.small, Rect::new(status_x, rr.y, STATUS_W, ROW_H), t.fg3, Align::Left);
         let arrows = [(up, "\u{2191}", i > 0, Target::Up(i)), (down, "\u{2193}", i + 1 < n, Target::Down(i))];
         for (b, glyph, enabled, target) in arrows {

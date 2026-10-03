@@ -31,7 +31,7 @@ pub(in crate::window) fn search(cv: &Canvas, r: Rect, query: &str, focused: bool
     face(cv, r, t.ctl, t.ctl_strong, t);
     let text = Rect::new(r.x + 12.0, r.y, r.w - 40.0, r.h);
     if query.is_empty() {
-        cv.text("Find a setting", &f.body, text, t.fg3, Align::Left);
+        cv.text(busy_ui::i18n::t().settings.find, &f.body, text, t.fg3, Align::Left);
     } else {
         cv.text(query, &f.body, text, t.fg, Align::Left);
     }
