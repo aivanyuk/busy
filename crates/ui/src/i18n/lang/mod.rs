@@ -15,3 +15,6 @@ pub(super) use ja::JA;
 mod pt_br;
 
 pub(super) use pt_br::PT_BR;
+mod de;
+
+pub(super) use de::DE;
