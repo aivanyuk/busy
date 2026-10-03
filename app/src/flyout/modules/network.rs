@@ -2,6 +2,7 @@ use super::super::detail::{Chart, Detail, Value, series_span};
 use super::procs;
 use busy_core::{Module, ModuleCfg, NetKind, NetRank};
 use busy_ui::ctx::Ctx;
+use busy_ui::i18n::{self, fill};
 use busy_ui::render::nice_max;
 use busy_ui::tone::{self, SECOND};
 use busy_ui::{fmt, select};
@@ -19,28 +20,29 @@ pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
     let rate = |bps: f64| fmt::rate_in(bps, units);
     let nif = select::net_interface(snap, cfg);
     let mut d = Detail::new(Module::Network);
+    let f = &i18n::t().flyout;
     if let Some(i) = nif {
         d.sub = match (i.kind, &i.wifi) {
-            (NetKind::Wifi, Some(w)) if !w.ssid.is_empty() => format!("Wi‑Fi · {}", w.ssid),
-            (NetKind::Ethernet, _) => format!("Ethernet · {}", i.name),
+            (NetKind::Wifi, Some(w)) if !w.ssid.is_empty() => format!("{} · {}", f.net_wifi, w.ssid),
+            (NetKind::Ethernet, _) => format!("{} · {}", f.net_ethernet, i.name),
             _ => i.name.clone(),
         };
     }
     d.big = rate(rx);
-    d.big_label = "Download".into();
+    d.big_label = f.net_download.into();
     let peak = hist.net_rx.max().max(hist.net_tx.max());
     d.chart = Some(Chart {
         lines: vec![(&hist.net_rx, color), (&hist.net_tx, second)],
         max: nice_max(peak),
         span: series_span(&hist.net_rx),
-        max_label: format!("Peak {}", rate(peak as f64)),
+        max_label: fill(f.peak, &[&rate(peak as f64)]),
         value: Value::Rate(units),
     });
-    d.legend = vec![("Download".into(), rate(rx), color), ("Upload".into(), rate(tx), second)];
+    d.legend = vec![(f.net_download.into(), rate(rx), color), (f.net_upload.into(), rate(tx), second)];
     if let Some(i) = nif {
         let medium = match i.kind {
-            NetKind::Wifi => "Wi‑Fi",
-            NetKind::Ethernet => "Ethernet",
+            NetKind::Wifi => f.net_wifi,
+            NetKind::Ethernet => f.net_ethernet,
             NetKind::Other => "",
         };
         let detail = match (&i.wifi, i.link_speed_bps) {
@@ -49,25 +51,25 @@ pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
             (_, bps) => Some(fmt::link_speed(bps)),
         };
         let interface = [Some(medium.to_string()).filter(|m| !m.is_empty()), detail].into_iter().flatten();
-        d.stat("Interface", Some(interface.collect::<Vec<_>>().join(" · ")).filter(|s| !s.is_empty()));
+        d.stat(f.net_interface, Some(interface.collect::<Vec<_>>().join(" · ")).filter(|s| !s.is_empty()));
         let signal = match (&i.wifi, i.kind) {
             // Design: a real minus sign ("−52 dBm").
             (Some(w), _) => Some(
                 w.rssi_dbm.map_or(format!("{}%", w.signal_pct), |dbm| format!("{dbm} dBm").replace('-', "\u{2212}")),
             ),
-            (None, NetKind::Ethernet) => Some("Wired".into()),
+            (None, NetKind::Ethernet) => Some(f.net_wired.into()),
             _ => None,
         };
-        d.stat("Signal", signal);
+        d.stat(f.net_signal, signal);
         d.stat("IPv4", i.ipv4.first().cloned());
     }
-    d.stat("Received", Some(fmt::bytes(n.rx_total)));
-    d.stat("Sent", Some(fmt::bytes(n.tx_total)));
+    d.stat(f.net_received, Some(fmt::bytes(n.rx_total)));
+    d.stat(f.net_sent, Some(fmt::bytes(n.tx_total)));
     let top = &snap.top;
     d.procs = match top.net_rank {
         NetRank::Traffic => procs(ctx, &top.by_net, |p| rate(p.net_bps)),
         NetRank::Connections => {
-            d.procs_title = "Open connections";
+            d.procs_title = f.open_connections;
             procs(ctx, &top.by_net, |p| fmt::count(p.connections as u64))
         }
     };

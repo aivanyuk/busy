@@ -34,10 +34,12 @@ macro_rules! section {
 
 mod cell;
 mod common;
+mod flyout;
 mod time;
 
 pub use cell::Cell;
 pub use common::Common;
+pub use flyout::Flyout;
 pub use time::Time;
 
 use busy_core::Lang;
@@ -49,6 +51,7 @@ pub struct Strings {
     pub common: Common,
     pub time: Time,
     pub cell: Cell,
+    pub flyout: Flyout,
 }
 
 /// The forms of a string that depends on a count `n`, in CLDR's plural categories as far as busy's languages
@@ -69,6 +72,7 @@ impl Strings {
         let mut v = self.common.texts();
         v.extend(self.time.texts());
         v.extend(self.cell.texts());
+        v.extend(self.flyout.texts());
         v
     }
 }
@@ -97,7 +101,7 @@ impl Text for Plural {
     }
 }
 
-static EN: Strings = Strings { common: common::EN, time: time::EN, cell: cell::EN };
+static EN: Strings = Strings { common: common::EN, time: time::EN, cell: cell::EN, flyout: flyout::EN };
 
 /// The language the system asks for (`init`), and the one shown, as `Lang::index`.
 static SYSTEM: AtomicU8 = AtomicU8::new(0);
