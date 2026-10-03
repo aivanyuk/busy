@@ -12,7 +12,7 @@ pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
     let (t, hist) = (ctx.theme, ctx.hist);
     let mut d = Detail::new(Module::Battery);
     let f = &i18n::t().flyout;
-    let wh = |mwh: u32| format!("{:.1} Wh", mwh as f32 / 1000.0);
+    let wh = |mwh: u32| format!("{} Wh", fmt::decimal(f64::from(mwh) / 1000.0, 1));
     d.sub = match b.design_capacity_mwh.filter(|&c| c > 0) {
         Some(c) => fill(f.bat_internal_design, &[&wh(c)]),
         None => f.bat_internal.into(),
