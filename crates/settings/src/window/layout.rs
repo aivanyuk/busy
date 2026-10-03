@@ -68,10 +68,22 @@ pub(super) struct Fonts {
     pub(super) desc: IDWriteTextFormat,
     pub(super) sub: IDWriteTextFormat,
     pub(super) title: IDWriteTextFormat,
+    /// `title`, wrapping: setup's headline when a language makes it longer than a line.
+    pub(super) title_wrap: IDWriteTextFormat,
     /// Segment labels: 13 px.
     pub(super) seg: IDWriteTextFormat,
-    /// Widths of segment labels, which are constant: measured once, not on every paint or pointer move.
-    seg_widths: RefCell<HashMap<String, f32>>,
+    /// Widths of labels, which are constant for a language (segments, On/Off, Shown/Hidden): measured once
+    /// per font and string, not on every paint or pointer move. By string, so another language's are measured
+    /// anew.
+    widths: RefCell<HashMap<(Label, String), f32>>,
+}
+
+/// The font a label is measured in (`Fonts::label_width`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(super) enum Label {
+    Body,
+    Small,
+    Seg,
 }
 
 impl Fonts {
@@ -86,18 +98,25 @@ impl Fonts {
             desc: gfx.wrapping(12.0)?,
             sub: gfx.format(13.0, false)?,
             title: gfx.format_weight(28.0, DWRITE_FONT_WEIGHT_SEMI_BOLD)?,
+            title_wrap: gfx.wrapping_weight(28.0, DWRITE_FONT_WEIGHT_SEMI_BOLD)?,
             seg: gfx.format(13.0, false)?,
-            seg_widths: RefCell::new(HashMap::new()),
+            widths: RefCell::new(HashMap::new()),
         })
     }
 
-    pub(super) fn seg_width(&self, gfx: &Gfx, s: &str) -> f32 {
-        let mut cache = self.seg_widths.borrow_mut();
+    /// The width of `s`, a label that doesn't change while the language doesn't, in `font`.
+    pub(super) fn label_width(&self, gfx: &Gfx, font: Label, s: &str) -> f32 {
+        let f = match font {
+            Label::Body => &self.body,
+            Label::Small => &self.small,
+            Label::Seg => &self.seg,
+        };
+        let mut cache = self.widths.borrow_mut();
         // Bounded: the labels are a handful of constant strings.
         if cache.len() > 64 {
             cache.clear();
         }
-        *cache.entry(s.to_owned()).or_insert_with(|| gfx.text_width(&self.seg, s))
+        *cache.entry((font, s.to_owned())).or_insert_with(|| gfx.text_width(f, s))
     }
 }
 
@@ -422,7 +441,7 @@ fn place(item: &Item, y: f32, width: f32, preview_h: f32, gfx: &Gfx, f: &Fonts) 
         }
         Item::Row(row) => {
             let (cw, ch) = match &row.control {
-                Control::Toggle(..) => toggle::SIZE,
+                Control::Toggle(..) => toggle::size(gfx, f),
                 Control::Dropdown(opts, _) => dropdown::size(gfx, &f.body, opts),
                 Control::Segmented(opts, _) => segmented::size(gfx, f, opts),
                 Control::Swatches(..) => swatch::SIZE,

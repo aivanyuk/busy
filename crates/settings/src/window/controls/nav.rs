@@ -2,7 +2,7 @@
 //! dot, name and On/Off status; the selected one gets `--hover` and an accent pill.
 
 use super::{face, pill};
-use crate::window::layout::{Fonts, HEADER_Y, LINE_12, LINE_14};
+use crate::window::layout::{Fonts, HEADER_Y, LINE_12, LINE_14, Label};
 use busy_ui::render::{Align, Canvas, Gfx, Rect};
 use busy_ui::theme::{Color, Theme};
 
@@ -44,11 +44,19 @@ pub(in crate::window) fn search(cv: &Canvas, r: Rect, query: &str, focused: bool
     cv.round_stroke(icon, 5.5, 1.5, t.fg3);
 }
 
+/// The items' status column: the longer of On and Off, at least the design's 32.
+pub(in crate::window) fn status_w(gfx: &Gfx, f: &Fonts) -> f32 {
+    let s = &busy_ui::i18n::t().settings;
+    [s.on, s.off].iter().map(|l| f.label_width(gfx, Label::Small, l)).fold(32.0, f32::max)
+}
+
 pub(in crate::window) struct Item<'a> {
     pub(in crate::window) label: &'a str,
     pub(in crate::window) dot: Color,
     /// "On"/"Off"; empty for General.
     pub(in crate::window) status: &'a str,
+    /// The status column's width (`status_w`).
+    pub(in crate::window) status_w: f32,
     pub(in crate::window) selected: bool,
     pub(in crate::window) hover: bool,
 }
@@ -61,7 +69,7 @@ pub(in crate::window) fn item(cv: &Canvas, r: Rect, it: &Item, t: &Theme, f: &Fo
         pill(cv, r, 18.0, t);
     }
     cv.round(Rect::new(r.x + 16.0, r.y + r.h / 2.0 - 5.0, 10.0, 10.0), 3.0, it.dot);
-    let sw = if it.status.is_empty() { 0.0 } else { 32.0 };
+    let sw = if it.status.is_empty() { 0.0 } else { it.status_w };
     let x = r.x + 16.0 + 10.0 + 14.0;
     cv.text(it.label, &f.body, Rect::new(x, r.y, r.right() - 12.0 - sw - x, r.h), t.fg, Align::Left);
     cv.text(it.status, &f.small, Rect::new(r.right() - 12.0 - sw, r.y, sw, r.h), t.fg3, Align::Right);

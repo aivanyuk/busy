@@ -1,7 +1,7 @@
 //! Drawing setup (design onboarding): title bar with Close, the hero text, the reading cards, the two
 //! position cards and the footer with Start with Windows, Skip and Start monitoring.
 
-use super::{BOX, Layout, Target, View, W};
+use super::{BOX, HEADLINE_H, Layout, PLACE_TEXT_X, Target, View, W};
 use crate::window::controls::button;
 use crate::window::frame;
 use crate::window::layout::{self, LINE_12, LINE_14};
@@ -19,7 +19,10 @@ pub(in crate::window) fn paint(cv: &Canvas, v: &View, s: &State) {
     frame::draw(cv, W, &bar, t, f);
     let Some(l) = &v.layout else { return };
     let text = &busy_ui::i18n::t().setup;
-    cv.text(text.headline, &f.title, l.headline, t.fg, Align::Left);
+    // A headline or card text that fits on its line is drawn as the design's (vertically centered), one that
+    // doesn't wraps into the room the layout made for it.
+    let headline = if l.headline.h > HEADLINE_H { &f.title_wrap } else { &f.title };
+    cv.text(text.headline, headline, l.headline, t.fg, Align::Left);
     cv.text(text.sub, &f.body_wrap, l.sub, t.fg2, Align::Left);
     cv.text(text.readings, &f.strong, l.readings, t.fg, Align::Left);
     for (i, ((m, on), r)) in super::cards(s.cfg).into_iter().zip(&l.cards).enumerate() {
@@ -41,16 +44,21 @@ pub(in crate::window) fn paint(cv: &Canvas, v: &View, s: &State) {
         cv.text(&sample, &f.small_strong, Rect::new(name_x, r.y, r.right() - 14.0 - name_x, r.h), color, Align::Right);
     }
     cv.text(text.position, &f.strong, l.position, t.fg, Align::Left);
-    let chosen = super::place(s.cfg);
-    for (i, ((_, label, desc), r)) in super::places(s.edge.is_vertical()).iter().zip(&l.places).enumerate() {
+    let (chosen, vertical) = (super::place(s.cfg), s.edge.is_vertical());
+    let (label_h, desc_h) = l.place_text[usize::from(vertical)];
+    for (i, ((_, label, desc), r)) in super::places(vertical).iter().zip(&l.places).enumerate() {
         let hot = v.hover == Some(Target::Place(i));
         cv.round(*r, 6.0, if hot { t.active } else { t.card });
         cv.round_outline(*r, 6.0, t.card_line);
         radio(cv, Rect::new(r.x + 14.0, r.y + 14.0, BOX, BOX), i == chosen, t);
-        let tx = r.x + 14.0 + BOX + 12.0;
+        let tx = r.x + PLACE_TEXT_X;
         let tw = r.right() - 14.0 - tx;
-        cv.text(label, &f.body, Rect::new(tx, r.y + 14.0, tw, LINE_14), t.fg, Align::Left);
-        cv.text(desc, &f.small, Rect::new(tx, r.y + 14.0 + LINE_14 + 2.0, tw, LINE_12), t.fg2, Align::Left);
+        let label_r = Rect::new(tx, r.y + 14.0, tw, label_h);
+        let label_f = if label_h > LINE_14 { &f.body_wrap } else { &f.body };
+        cv.text(label, label_f, label_r, t.fg, Align::Left);
+        let desc_r = Rect::new(tx, label_r.bottom() + 2.0, tw, desc_h);
+        let desc_f = if desc_h > LINE_12 { &f.desc } else { &f.small };
+        cv.text(desc, desc_f, desc_r, t.fg2, Align::Left);
     }
     footer(cv, l, v, s);
     // Keyboard focus (WinUI's focus visual): a 2-DIP `--fg` ring 3 outside the target.

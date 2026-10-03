@@ -1,14 +1,15 @@
 //! The General page's "Taskbar order" card (design `orderItems`): an intro line, then one 48-high row per
 //! module with its color, name, Shown/Hidden and 32×32 ↑/↓ buttons (dimmed at the ends).
 
-use crate::window::layout::{CARD_PAD_L, Fonts, LINE_12, Target};
+use crate::window::layout::{CARD_PAD_L, Fonts, LINE_12, Label, Target};
 use busy_core::Module;
-use busy_ui::render::{Align, Canvas, Rect};
+use busy_ui::render::{Align, Canvas, Gfx, Rect};
 use busy_ui::theme::{Color, Theme, alpha};
 
 const INTRO_H: f32 = 12.0 + LINE_12 + 10.0;
 const ROW_H: f32 = 48.0;
 const BTN: f32 = 32.0;
+/// The design's Shown/Hidden column.
 const STATUS_W: f32 = 48.0;
 
 pub(in crate::window) fn height(n: usize) -> f32 {
@@ -53,6 +54,12 @@ fn note(vertical: bool) -> &'static str {
     if vertical { s.order_note_vertical } else { s.order_note }
 }
 
+/// The status column: the longer of Shown and Hidden, at least the design's 48.
+fn status_w(gfx: &Gfx, f: &Fonts) -> f32 {
+    let s = &busy_ui::i18n::t().settings;
+    [s.shown, s.hidden].iter().map(|l| f.label_width(gfx, Label::Small, l)).fold(STATUS_W, f32::max)
+}
+
 /// `color(m)` is a module's palette color; `hover` the hovered button; `vertical` whether the taskbar is.
 #[allow(clippy::too_many_arguments)] // One call site, in `paint`; the arguments are what the card needs to draw.
 pub(in crate::window) fn draw(
@@ -62,21 +69,21 @@ pub(in crate::window) fn draw(
     color: impl Fn(Module) -> Color,
     hover: Option<Target>,
     vertical: bool,
-    t: &Theme,
+    (gfx, t): (&Gfx, &Theme),
     f: &Fonts,
 ) {
     cv.round(r, 4.0, t.card);
     cv.round_outline(r, 4.0, t.card_line);
     let intro = Rect::new(r.x + CARD_PAD_L, r.y + 12.0, r.w - CARD_PAD_L - 16.0, LINE_12);
     cv.text(note(vertical), &f.small, intro, t.fg2, Align::Left);
-    let n = list.len();
+    let (n, sw, s) = (list.len(), status_w(gfx, f), &busy_ui::i18n::t().settings);
     for (i, &(m, shown)) in list.iter().enumerate() {
         let rr = row(r, i);
         cv.fill(Rect::new(rr.x + 1.0, rr.y, rr.w - 2.0, 1.0), t.line);
         cv.round(Rect::new(rr.x + CARD_PAD_L, rr.y + ROW_H / 2.0 - 5.0, 10.0, 10.0), 3.0, color(m));
         let (up, down) = buttons(r, i);
         let name_x = rr.x + CARD_PAD_L + 10.0 + 14.0;
-        let status_x = up.x - 14.0 - STATUS_W;
+        let status_x = up.x - 14.0 - sw;
         cv.text(
             busy_ui::i18n::t().common.module(m),
             &f.body,
@@ -84,9 +91,8 @@ pub(in crate::window) fn draw(
             t.fg,
             Align::Left,
         );
-        let s = &busy_ui::i18n::t().settings;
         let status = if shown { s.shown } else { s.hidden };
-        cv.text(status, &f.small, Rect::new(status_x, rr.y, STATUS_W, ROW_H), t.fg3, Align::Left);
+        cv.text(status, &f.small, Rect::new(status_x, rr.y, sw, ROW_H), t.fg3, Align::Left);
         let arrows = [(up, "\u{2191}", i > 0, Target::Up(i)), (down, "\u{2193}", i + 1 < n, Target::Down(i))];
         for (b, glyph, enabled, target) in arrows {
             if enabled && hover == Some(target) {
