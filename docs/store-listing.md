@@ -14,6 +14,10 @@ busy — system monitor
 
 The package's `DisplayName` (store plan S2) is the same string, so the listing and the installed app match.
 
+## Other languages
+
+busy's UI is in eleven languages (`busy_core::Lang`), and the package lists them all, so each gets its own listing in Partner Center (Store listings → Manage additional languages). The translated text is in [store-listing/](store-listing/), one file per language: [de-DE](store-listing/de-DE.md), [es-ES](store-listing/es-ES.md), [fr-FR](store-listing/fr-FR.md), [it-IT](store-listing/it-IT.md), [ja-JP](store-listing/ja-JP.md), [ko-KR](store-listing/ko-KR.md), [pl-PL](store-listing/pl-PL.md), [pt-BR](store-listing/pt-BR.md), [ru-RU](store-listing/ru-RU.md), [zh-CN](store-listing/zh-CN.md). The English below is the source: change it first, then each translation. The product name is the same in every listing; screenshots may be the English ones or taken with `language` set to that language.
+
 ## Store listing (English)
 
 ### Description

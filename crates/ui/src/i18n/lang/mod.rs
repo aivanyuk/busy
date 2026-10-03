@@ -1,32 +1,23 @@
 //! The translations: one `Strings` per language besides English, whose text is declared with its sections.
 
-mod it;
-
-pub(super) use it::IT;
-mod es;
-
-pub(super) use es::ES;
-mod fr;
-
-pub(super) use fr::FR;
-mod ja;
-
-pub(super) use ja::JA;
-mod pt_br;
-
-pub(super) use pt_br::PT_BR;
 mod de;
-
-pub(super) use de::DE;
+mod es;
+mod fr;
+mod it;
+mod ja;
+mod ko;
 mod pl;
-
-pub(super) use pl::PL;
+mod pt_br;
+mod ru;
 mod zh_hans;
 
-pub(super) use zh_hans::ZH_HANS;
-mod ko;
-
+pub(super) use de::DE;
+pub(super) use es::ES;
+pub(super) use fr::FR;
+pub(super) use it::IT;
+pub(super) use ja::JA;
 pub(super) use ko::KO;
-mod ru;
-
+pub(super) use pl::PL;
+pub(super) use pt_br::PT_BR;
 pub(super) use ru::RU;
+pub(super) use zh_hans::ZH_HANS;
