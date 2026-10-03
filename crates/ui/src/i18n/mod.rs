@@ -33,8 +33,10 @@ macro_rules! section {
 }
 
 mod common;
+mod time;
 
 pub use common::Common;
+pub use time::Time;
 
 use busy_core::Lang;
 use std::fmt::{Display, Write};
@@ -43,6 +45,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 /// One language's text, by the part of the UI that shows it.
 pub struct Strings {
     pub common: Common,
+    pub time: Time,
 }
 
 /// The forms of a string that depends on a count `n`, in CLDR's plural categories as far as busy's languages
@@ -60,7 +63,9 @@ impl Strings {
     /// Every string in declaration order.
     #[cfg(test)]
     fn texts(&self) -> Vec<Entry> {
-        self.common.texts()
+        let mut v = self.common.texts();
+        v.extend(self.time.texts());
+        v
     }
 }
 
@@ -88,7 +93,7 @@ impl Text for Plural {
     }
 }
 
-static EN: Strings = Strings { common: common::EN };
+static EN: Strings = Strings { common: common::EN, time: time::EN };
 
 /// The language the system asks for (`init`), and the one shown, as `Lang::index`.
 static SYSTEM: AtomicU8 = AtomicU8::new(0);
