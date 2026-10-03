@@ -29,11 +29,14 @@ pub struct OptIn {
 pub struct SourceOptions {
     /// Read LibreHardwareMonitor and HWiNFO (`OptIn::third_party_sensors`).
     pub third_party_sensors: bool,
+    /// The Network flyout is open and lists processes: rank them by network use (`TopProcesses::by_net`). Not a
+    /// setting: the sampler sets it from the open flyout, as the Processes source also serves other flyouts.
+    pub network_processes: bool,
 }
 
 impl Config {
     pub fn source_options(&self) -> SourceOptions {
-        SourceOptions { third_party_sensors: self.opt_in.third_party_sensors }
+        SourceOptions { third_party_sensors: self.opt_in.third_party_sensors, ..SourceOptions::default() }
     }
 }
 
@@ -87,6 +90,6 @@ mod tests {
         cfg.opt_in = OptIn { public_ip: true, memory_speed: true, ..OptIn::default() };
         assert!(!cfg.source_options().third_party_sensors);
         cfg.opt_in.third_party_sensors = true;
-        assert_eq!(cfg.source_options(), SourceOptions { third_party_sensors: true });
+        assert_eq!(cfg.source_options(), SourceOptions { third_party_sensors: true, ..SourceOptions::default() });
     }
 }

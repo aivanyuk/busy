@@ -1,5 +1,5 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
-use busy_core::Snapshot;
+use busy_core::{Snapshot, SourceOptions};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
@@ -36,7 +36,13 @@ fn main() {
     let t = Instant::now();
     let mut sources = busy_metrics::sources();
     println!("init: {:?}", t.elapsed());
-    let n: u32 = std::env::args().nth(1).and_then(|a| a.parse().ok()).unwrap_or(5);
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let n: u32 = args.iter().find_map(|a| a.parse().ok()).unwrap_or(5);
+    // `--net`: rank processes by network use, as while the Network flyout is open.
+    let opts = SourceOptions { network_processes: args.iter().any(|a| a == "--net"), ..SourceOptions::default() };
+    for s in &mut sources {
+        s.configure(opts);
+    }
     let mut snap = Snapshot::default();
     for i in 1..=n {
         std::thread::sleep(Duration::from_secs(1));

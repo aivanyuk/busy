@@ -291,6 +291,8 @@ impl Source for Fake {
                         mem_bytes: (self.walk(i * 4 + 1, 50.0, 2500.0, 40.0) * MB) as u64,
                         io_bps: self.burst(i * 4 + 2, 100.0 * 1024.0, 20.0 * MB),
                         gpu_pct: self.walk(i * 4 + 3, 0.0, 20.0, 3.0),
+                        net_bps: self.burst(i * 4 + 2, 10.0 * 1024.0, 5.0 * MB),
+                        connections: 0,
                     })
                     .collect();
                 let top = |key: fn(&ProcEntry) -> f64| {
@@ -304,6 +306,8 @@ impl Source for Fake {
                     by_mem: top(|p| p.mem_bytes as f64),
                     by_disk: top(|p| p.io_bps),
                     by_gpu: top(|p| p.gpu_pct as f64),
+                    by_net: top(|p| p.net_bps),
+                    net_rank: NetRank::Traffic,
                 };
             }
         }

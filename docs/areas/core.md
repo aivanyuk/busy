@@ -12,7 +12,7 @@ pub trait Source {
 }
 ```
 
-- `configure` is called on the sampler thread before the first `sample` and again whenever the `SourceOptions` change (also for inactive modules). `SourceOptions` (`opt_in.rs`, built by `Config::source_options()`) carries only the settings sources act on — today `third_party_sensors` — never the whole `Config` (architecture: workers get only what they use). A setting a source needs is added there, with a test. `configure` must be cheap (no I/O — defer work to the next `sample`) and must not panic.
+- `configure` is called on the sampler thread before the first `sample` and again whenever the `SourceOptions` change (also for inactive modules). `SourceOptions` (`opt_in.rs`, built by `Config::source_options()`) carries only the settings sources act on — today `third_party_sensors` — never the whole `Config` (architecture: workers get only what they use). A setting a source needs is added there, with a test. One field is not a setting: `network_processes` (the Network flyout is open and lists processes) is set by `sampler::Params::new` from the open flyout, because the Processes source that fills `top.by_net` also serves the CPU, Memory and Disk flyouts, which don't need it. `configure` must be cheap (no I/O — defer work to the next `sample`) and must not panic.
 
 - Constructed and called only on the sampler thread (COM MTA initialized). Not `Send` on purpose.
 - Must not panic; on failure leave fields untouched (`None` / empty).
