@@ -1,5 +1,6 @@
 //! Human-readable formatting of metric values.
 
+use crate::i18n::{fill, t};
 use busy_core::{RateUnit, SensorKind, TempUnit};
 
 const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
@@ -78,8 +79,8 @@ pub fn wifi_band(mhz: u32) -> String {
 
 /// Time left in words (design `remaining(false)`): `4500` -> `"1 h 15 min"`, `600` -> `"10 min"`.
 pub fn hours_minutes_long(secs: u32) -> String {
-    let m = secs.div_ceil(60);
-    if m < 60 { format!("{m} min") } else { format!("{} h {} min", m / 60, m % 60) }
+    let (m, t) = (secs.div_ceil(60), &t().time);
+    if m < 60 { fill(t.minutes_long, &[&m]) } else { fill(t.hours_minutes_long, &[&(m / 60), &(m % 60)]) }
 }
 
 /// Time left as `h:mm` (design `remaining(short)`): `4500` -> `"1:15"`.
@@ -105,11 +106,12 @@ pub fn uptime(secs: u64) -> String {
 /// `59` -> `"59s"`, `3720` -> `"1h 2m"`, `90000` -> `"1d 1h"`.
 pub fn duration(secs: u64) -> String {
     let (d, h, m, s) = (secs / 86400, secs / 3600 % 24, secs / 60 % 60, secs % 60);
+    let t = &t().time;
     match () {
-        _ if d > 0 => format!("{d}d {h}h"),
-        _ if h > 0 => format!("{h}h {m}m"),
-        _ if m > 0 => format!("{m}m"),
-        _ => format!("{s}s"),
+        _ if d > 0 => fill(t.days_hours, &[&d, &h]),
+        _ if h > 0 => fill(t.hours_minutes, &[&h, &m]),
+        _ if m > 0 => fill(t.minutes, &[&m]),
+        _ => fill(t.seconds, &[&s]),
     }
 }
 
