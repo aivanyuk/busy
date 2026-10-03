@@ -1,7 +1,40 @@
-//! Human-readable formatting of metric values.
+//! Human-readable formatting of metric values. Numbers take the user's decimal and thousands separators
+//! (`set_separators`); unit abbreviations are the same in every language.
 
 use crate::i18n::{fill, t};
 use busy_core::{RateUnit, SensorKind, TempUnit};
+use std::sync::OnceLock;
+
+/// The user's (decimal, thousands) separators, from `set_separators`; "." and "," until then, as in tests.
+static SEPARATORS: OnceLock<(String, String)> = OnceLock::new();
+
+/// Sets the separators numbers are written with, from the user's regional format
+/// (`busy_win::number_separators`), once at startup; later calls are ignored. A separator that is empty or
+/// longer than three characters keeps the default.
+pub fn set_separators(decimal: Option<&str>, group: Option<&str>) {
+    let ok = |s: Option<&str>, default: &str| {
+        s.filter(|s| !s.is_empty() && s.chars().count() <= 3).unwrap_or(default).to_owned()
+    };
+    let _ = SEPARATORS.set((ok(decimal, "."), ok(group, ",")));
+}
+
+fn separators() -> (&'static str, &'static str) {
+    SEPARATORS.get().map_or((".", ","), |(d, g)| (d.as_str(), g.as_str()))
+}
+
+/// A number Rust formatted (`"2.5"`) with the user's decimal separator (`"2,5"`).
+fn local(s: String) -> String {
+    with_decimal(s, separators().0)
+}
+
+fn with_decimal(s: String, decimal: &str) -> String {
+    if decimal == "." { s } else { s.replacen('.', decimal, 1) }
+}
+
+/// `v` with `places` decimals and the user's decimal separator: `decimal(2.45, 1)` -> `"2.5"` (or `"2,5"`).
+pub fn decimal(v: f64, places: usize) -> String {
+    local(format!("{v:.places$}"))
+}
 
 const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
 const BIT_UNITS: [&str; 6] = ["b", "Kb", "Mb", "Gb", "Tb", "Pb"];
@@ -16,7 +49,7 @@ fn scale(mut v: f64, mut i: usize) -> (f64, usize) {
 }
 
 fn num(v: f64) -> String {
-    if v >= 99.95 { format!("{v:.0}") } else { format!("{v:.1}") }
+    if v >= 99.95 { format!("{v:.0}") } else { decimal(v, 1) }
 }
 
 /// `1536` -> `"1.5 KB"`, `0` -> `"0 B"`.
@@ -59,22 +92,25 @@ pub fn rate_short(bps: f64, unit: RateUnit) -> String {
         return format!("{k:.0}K");
     }
     let (v, suffix) = if k / 1024.0 < 999.5 { (k / 1024.0, 'M') } else { (k / 1024.0 / 1024.0, 'G') };
-    if v < 9.95 { format!("{v:.1}{suffix}") } else { format!("{v:.0}{suffix}") }
+    if v < 9.95 { format!("{}{suffix}", decimal(v, 1)) } else { format!("{v:.0}{suffix}") }
 }
 
 /// Link speed of a network adapter: `"2.5 Gbps"`, `"866 Mbps"`.
 pub fn link_speed(bps: u64) -> String {
-    if bps >= 1_000_000_000 { format!("{} Gbps", bps as f64 / 1e9) } else { format!("{} Mbps", bps / 1_000_000) }
+    if bps >= 1_000_000_000 {
+        format!("{} Gbps", local((bps as f64 / 1e9).to_string()))
+    } else {
+        format!("{} Mbps", bps / 1_000_000)
+    }
 }
 
 /// Wi-Fi band of a channel's center frequency: `"2.4 GHz"`, `"5 GHz"`, `"6 GHz"`.
 pub fn wifi_band(mhz: u32) -> String {
     match mhz {
-        ..3000 => "2.4 GHz",
-        3000..5925 => "5 GHz",
-        _ => "6 GHz",
+        ..3000 => format!("{} GHz", decimal(2.4, 1)),
+        3000..5925 => "5 GHz".into(),
+        _ => "6 GHz".into(),
     }
-    .into()
 }
 
 /// Time left in words (design `remaining(false)`): `4500` -> `"1 h 15 min"`, `600` -> `"10 min"`.
@@ -95,7 +131,7 @@ pub fn pct(v: f32) -> String {
 
 /// One decimal, for per-process shares: `"12.3%"`.
 pub fn pct1(v: f32) -> String {
-    format!("{:.1}%", v.clamp(0.0, 100.0))
+    format!("{}%", decimal(f64::from(v.clamp(0.0, 100.0)), 1))
 }
 
 /// Task Manager's up time: `"3:04:05:06"` (days:hours:minutes:seconds).
@@ -123,16 +159,20 @@ pub fn temp(c: f32, unit: TempUnit) -> String {
 }
 
 pub fn mhz(m: u32) -> String {
-    if m >= 1000 { format!("{:.2} GHz", m as f32 / 1000.0) } else { format!("{m} MHz") }
+    if m >= 1000 { format!("{} GHz", decimal(f64::from(m) / 1000.0, 2)) } else { format!("{m} MHz") }
 }
 
-/// Thousands separators: `4512` -> `"4,512"`.
+/// Thousands separators: `4512` -> `"4,512"` (or `"4.512"`, `"4 512"`).
 pub fn count(n: u64) -> String {
+    grouped(n, separators().1)
+}
+
+fn grouped(n: u64, group: &str) -> String {
     let s = n.to_string();
-    let mut out = String::with_capacity(s.len() + s.len() / 3);
+    let mut out = String::with_capacity(s.len() + s.len() / 3 * group.len());
     for (i, c) in s.chars().enumerate() {
         if i > 0 && (s.len() - i).is_multiple_of(3) {
-            out.push(',');
+            out.push_str(group);
         }
         out.push(c);
     }
@@ -140,7 +180,7 @@ pub fn count(n: u64) -> String {
 }
 
 pub fn watts(w: f32) -> String {
-    if w.abs() >= 99.95 { format!("{w:.0} W") } else { format!("{w:.1} W") }
+    if w.abs() >= 99.95 { format!("{w:.0} W") } else { format!("{} W", decimal(f64::from(w), 1)) }
 }
 
 pub fn sensor(value: f32, kind: SensorKind, unit: TempUnit) -> String {
@@ -148,10 +188,10 @@ pub fn sensor(value: f32, kind: SensorKind, unit: TempUnit) -> String {
         SensorKind::Temperature => temp(value, unit),
         SensorKind::Fan => format!("{value:.0} rpm"),
         SensorKind::Power => watts(value),
-        SensorKind::Voltage => format!("{value:.3} V"),
+        SensorKind::Voltage => format!("{} V", decimal(f64::from(value), 3)),
         SensorKind::Clock => mhz(value.max(0.0) as u32),
         SensorKind::Load => pct(value),
-        SensorKind::Other => format!("{value:.1}"),
+        SensorKind::Other => decimal(f64::from(value), 1),
     }
 }
 
@@ -210,5 +250,15 @@ mod tests {
         assert_eq!(count(1234567), "1,234,567");
         assert_eq!(count(12), "12");
         assert_eq!(watts(12.34), "12.3 W");
+    }
+
+    #[test]
+    fn separators() {
+        assert_eq!(with_decimal("2.5".into(), ","), "2,5");
+        assert_eq!(with_decimal("2.5".into(), "."), "2.5");
+        assert_eq!(with_decimal("12".into(), ","), "12");
+        assert_eq!(grouped(1_234_567, "."), "1.234.567");
+        assert_eq!(grouped(1_234_567, "\u{202f}"), "1\u{202f}234\u{202f}567");
+        assert_eq!(grouped(999, " "), "999");
     }
 }

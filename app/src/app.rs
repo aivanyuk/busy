@@ -106,6 +106,8 @@ pub fn run(open_flyout: bool) -> Result<()> {
     let cfg = Config::load();
     let system = Lang::pick(busy_win::ui_languages().iter().map(String::as_str));
     busy_ui::i18n::init(system, cfg.language);
+    let (decimal, group) = busy_win::number_separators();
+    busy_ui::fmt::set_separators(decimal.as_deref(), group.as_deref());
     let gfx = Gfx::new()?;
     win::set_handler(on_event);
     register_class(w!("busy.main"), Some(main_proc));
