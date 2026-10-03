@@ -6,3 +6,6 @@ pub(super) use it::IT;
 mod es;
 
 pub(super) use es::ES;
+mod fr;
+
+pub(super) use fr::FR;
