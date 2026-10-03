@@ -127,9 +127,9 @@ mod tests {
         assert!(s.tools.is_none());
         s.configure(SourceOptions::default());
         assert!(s.tools.is_none());
-        s.configure(SourceOptions { third_party_sensors: true });
+        s.configure(SourceOptions { third_party_sensors: true, ..SourceOptions::default() });
         assert!(s.tools.is_some());
-        s.configure(SourceOptions { third_party_sensors: false });
+        s.configure(SourceOptions::default());
         assert!(s.tools.is_none());
     }
 }

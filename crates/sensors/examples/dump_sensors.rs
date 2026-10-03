@@ -37,7 +37,10 @@ fn main() {
     let t = Instant::now();
     let mut sources = busy_sensors::sources();
     // `--third-party`: also read LibreHardwareMonitor / HWiNFO (opt-in in the app).
-    let opts = SourceOptions { third_party_sensors: std::env::args().any(|a| a == "--third-party") };
+    let opts = SourceOptions {
+        third_party_sensors: std::env::args().any(|a| a == "--third-party"),
+        ..SourceOptions::default()
+    };
     for s in &mut sources {
         s.configure(opts);
     }

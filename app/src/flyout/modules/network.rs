@@ -1,13 +1,14 @@
 use super::super::detail::{Chart, Detail, Value, series_span};
-use busy_core::{Module, ModuleCfg, NetKind};
+use super::procs;
+use busy_core::{Module, ModuleCfg, NetKind, NetRank};
 use busy_ui::ctx::Ctx;
 use busy_ui::render::nice_max;
 use busy_ui::tone::{self, SECOND};
 use busy_ui::{fmt, select};
 
 /// Design `fly('net')`: download and upload of the chosen interface (`options.network.interface`, as on the
-/// cell) in the chosen units, and what that interface is. No process list: per-process network needs the ETW
-/// opt-in.
+/// cell) in the chosen units, what that interface is, and the processes using the network most: by traffic with
+/// the `process_network` opt-in, else by open connections.
 pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
     let (snap, cfg) = (ctx.snap, ctx.cfg);
     let (Some(n), Some((rx, tx))) = (&snap.net, select::net_rates(snap, cfg)) else {
@@ -62,5 +63,13 @@ pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
     }
     d.stat("Received", Some(fmt::bytes(n.rx_total)));
     d.stat("Sent", Some(fmt::bytes(n.tx_total)));
+    let top = &snap.top;
+    d.procs = match top.net_rank {
+        NetRank::Traffic => procs(ctx, &top.by_net, |p| rate(p.net_bps)),
+        NetRank::Connections => {
+            d.procs_title = "Open connections";
+            procs(ctx, &top.by_net, |p| fmt::count(p.connections as u64))
+        }
+    };
     d
 }

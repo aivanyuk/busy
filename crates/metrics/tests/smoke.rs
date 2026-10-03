@@ -1,6 +1,6 @@
 //! Runs every source against the real machine: no panics, sane ranges.
 
-use busy_core::{Module, NetKind, Snapshot};
+use busy_core::{Module, NetKind, NetRank, Snapshot, SourceOptions, TOP_N};
 use std::time::Duration;
 use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx};
 
@@ -11,6 +11,9 @@ fn sources_sample_without_panicking() {
     let modules: Vec<Module> = sources.iter().map(|s| s.module()).collect();
     for m in [Module::Cpu, Module::Memory, Module::Disk, Module::Network, Module::Battery, Module::Processes] {
         assert!(modules.contains(&m), "missing source for {m:?}");
+    }
+    for s in &mut sources {
+        s.configure(SourceOptions { network_processes: true, ..SourceOptions::default() });
     }
 
     let mut snap = Snapshot::default();
@@ -53,4 +56,9 @@ fn sources_sample_without_panicking() {
     }
     assert!(!snap.top.by_mem.is_empty());
     assert!(snap.top.by_cpu.iter().all(|p| (0.0..=100.0).contains(&p.cpu_pct)));
+    // A runner may have no open connection at all; whatever is listed is live and in order.
+    let net = &snap.top.by_net;
+    assert_eq!(snap.top.net_rank, NetRank::Connections);
+    assert!(net.len() <= TOP_N && net.iter().all(|p| p.connections > 0 && !p.name.is_empty()), "{net:?}");
+    assert!(net.windows(2).all(|w| w[0].connections >= w[1].connections), "{net:?}");
 }

@@ -127,7 +127,7 @@ pub(super) enum Flag {
     Label(Module),
     ByLoad(Module),
     Remaining,
-    /// Processes' `flyout`: the top-process lists in the CPU, Memory and Disk flyouts.
+    /// Processes' `flyout`: the top-process lists in the CPU, Memory, Disk and Network flyouts.
     TopProcesses,
     /// `opt_in.third_party_sensors`; turning it on asks first.
     ThirdPartySensors,
@@ -315,7 +315,7 @@ fn processes(cfg: &Config) -> Vec<Item> {
         Item::Header("Flyouts"),
         toggle(
             "Top processes",
-            "List the busiest programs in the CPU, Memory and Disk flyouts",
+            "List the busiest programs in the CPU, Memory, Disk and Network flyouts",
             Flag::TopProcesses,
             on,
         ),

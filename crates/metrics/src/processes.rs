@@ -1,5 +1,6 @@
+use crate::conns::Connections;
 use crate::util::Clock;
-use busy_core::{Module, ProcEntry, Snapshot, Source, TOP_N};
+use busy_core::{Module, NetRank, ProcEntry, Snapshot, Source, SourceOptions, TOP_N};
 use std::collections::HashMap;
 use std::ops::Range;
 use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SystemProcessInformation};
@@ -60,6 +61,10 @@ pub struct Processes {
     /// This sample's counters; swapped with `prev` afterwards so both allocations are reused.
     cur: HashMap<(usize, i64), (i64, i64)>,
     rows: Vec<Row>,
+    opts: SourceOptions,
+    conns: Connections,
+    /// pid -> this sample's network use, by `snap.top.net_rank`.
+    net: HashMap<u32, u64>,
 }
 
 impl Default for Processes {
@@ -71,6 +76,9 @@ impl Default for Processes {
             prev: HashMap::new(),
             cur: HashMap::new(),
             rows: Vec::new(),
+            opts: SourceOptions::default(),
+            conns: Connections::default(),
+            net: HashMap::new(),
         }
     }
 }
@@ -82,6 +90,8 @@ struct Row {
     cpu: f32,
     mem: u64,
     io: f64,
+    /// Network use as `net` holds it; 0 unless the Network flyout lists processes.
+    net: f64,
 }
 
 /// `buf` as UTF-16 units, for image names.
@@ -123,11 +133,20 @@ impl Source for Processes {
         Module::Processes
     }
 
+    fn configure(&mut self, opts: SourceOptions) {
+        self.opts = opts;
+    }
+
     fn sample(&mut self, snap: &mut Snapshot) {
         if !self.query() {
             return;
         }
         let dt = self.clock.tick();
+        self.net.clear();
+        let rank = NetRank::Connections;
+        if self.opts.network_processes {
+            self.conns.count(&mut self.net);
+        }
         self.cur.clear();
         self.rows.clear();
         let base = self.buf.as_ptr().cast::<u8>();
@@ -147,6 +166,7 @@ impl Source for Processes {
                     cpu: dt.map_or(0.0, |dt| (dcpu as f64 / (dt * 1e7 * self.ncpu) * 100.0).min(100.0) as f32),
                     mem: if p.ws_private > 0 { p.ws_private as u64 } else { p.ws as u64 },
                     io: dt.map_or(0.0, |dt| dio as f64 / dt),
+                    net: self.net.get(&(p.pid as u32)).map_or(0.0, |&n| n as f64),
                 });
             }
             if p.next == 0 {
@@ -168,6 +188,8 @@ impl Source for Processes {
                     mem_bytes: r.mem,
                     io_bps: r.io,
                     gpu_pct: 0.0,
+                    net_bps: if rank == NetRank::Traffic { r.net } else { 0.0 },
+                    connections: if rank == NetRank::Connections { r.net as u32 } else { 0 },
                 })
                 .collect()
         };
@@ -181,6 +203,11 @@ impl Source for Processes {
             }
         });
         snap.top.by_disk = top(rows, &|r| r.io);
+        if self.opts.network_processes {
+            snap.top.by_net = top(rows, &|r| r.net);
+            snap.top.by_net.retain(|p| p.net_bps > 0.0 || p.connections > 0);
+            snap.top.net_rank = rank;
+        }
     }
 }
 

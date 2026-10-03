@@ -48,7 +48,10 @@ impl Params {
         Self {
             interval_ms: Module::ALL.map(|m| cfg.module_interval_ms(m)),
             active: Module::ALL.map(|m| cfg.is_active(m, open)),
-            sources: cfg.source_options(),
+            sources: SourceOptions {
+                network_processes: open == Some(Module::Network) && cfg.is_active(Module::Processes, open),
+                ..cfg.source_options()
+            },
             paused,
         }
     }
@@ -299,6 +302,18 @@ mod tests {
         let (closed, open) = (Params::new(&cfg, None, false), Params::new(&cfg, Some(Module::Disk), false));
         assert!(closed.is_active(Module::Cpu) && !closed.is_active(Module::Processes));
         assert!(open.is_active(Module::Disk) && open.is_active(Module::Processes) && !open.is_active(Module::Battery));
+        assert!(!closed.sources.network_processes && !open.sources.network_processes);
+    }
+
+    #[test]
+    fn only_the_network_flyout_ranks_processes_by_network_use() {
+        let mut cfg = Config::default();
+        let net = Params::new(&cfg, Some(Module::Network), false);
+        assert!(net.is_active(Module::Processes) && net.sources.network_processes);
+        assert!(!Params::new(&cfg, Some(Module::Cpu), false).sources.network_processes);
+        cfg.modules.iter_mut().filter(|c| c.module == Module::Processes).for_each(|c| c.flyout = false);
+        let net = Params::new(&cfg, Some(Module::Network), false);
+        assert!(!net.is_active(Module::Processes) && !net.sources.network_processes);
     }
 
     #[test]

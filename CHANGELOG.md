@@ -4,6 +4,9 @@ What changed for people who run busy, newest first. The format follows [Keep a C
 
 ## [Unreleased]
 
+### Added
+- The Network flyout lists the processes using the network most, by their open connections.
+
 ## [0.2.0] - 2026-10-01
 
 ### Added

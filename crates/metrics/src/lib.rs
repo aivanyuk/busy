@@ -1,6 +1,7 @@
 //! System metric collectors (CPU, memory, disk, network, battery, processes) built on Win32 APIs.
 
 mod battery;
+mod conns;
 mod cpu;
 mod disk;
 mod memory;

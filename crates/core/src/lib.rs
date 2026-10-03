@@ -49,11 +49,11 @@ impl Module {
     ];
 
     /// Modules whose data this module's flyout shows besides its own (design `fly()`): top processes for CPU,
-    /// Memory and Disk (GPU's per-process list comes from the GPU source), temperatures for CPU and Disk.
+    /// Memory, Disk and Network (GPU's per-process list comes from the GPU source), temperatures for CPU and Disk.
     pub fn flyout_needs(self) -> &'static [Module] {
         match self {
             Module::Cpu | Module::Disk => &[Module::Processes, Module::Sensors],
-            Module::Memory => &[Module::Processes],
+            Module::Memory | Module::Network => &[Module::Processes],
             _ => &[],
         }
     }
@@ -113,6 +113,7 @@ impl Snapshot {
                 self.top.by_cpu.clear();
                 self.top.by_mem.clear();
                 self.top.by_disk.clear();
+                self.top.by_net.clear();
             }
         }
     }
@@ -305,6 +306,19 @@ pub struct TopProcesses {
     pub by_mem: Vec<ProcEntry>,
     pub by_disk: Vec<ProcEntry>,
     pub by_gpu: Vec<ProcEntry>,
+    /// Filled only while the Network flyout is open (`SourceOptions::network_processes`); idle processes left out.
+    pub by_net: Vec<ProcEntry>,
+    pub net_rank: NetRank,
+}
+
+/// What `TopProcesses::by_net` is ordered by.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NetRank {
+    /// Open TCP connections (`ProcEntry::connections`): needs no rights, but says nothing about traffic.
+    #[default]
+    Connections,
+    /// Bytes sent and received (`ProcEntry::net_bps`), from the `OptIn::process_network` trace.
+    Traffic,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -315,6 +329,10 @@ pub struct ProcEntry {
     pub mem_bytes: u64,
     pub io_bps: f64,
     pub gpu_pct: f32,
+    /// Sent + received bytes/s; set in `by_net` when it ranks by traffic.
+    pub net_bps: f64,
+    /// Open TCP connections, listening sockets excluded; set in `by_net` when it ranks by connections.
+    pub connections: u32,
 }
 
 pub const TOP_N: usize = 5;
@@ -348,10 +366,17 @@ mod tests {
                 kind: SensorKind::Other,
                 value: 0.0,
             }],
-            top: TopProcesses { by_cpu: proc(), by_mem: proc(), by_disk: proc(), by_gpu: proc() },
+            top: TopProcesses {
+                by_cpu: proc(),
+                by_mem: proc(),
+                by_disk: proc(),
+                by_gpu: proc(),
+                by_net: proc(),
+                net_rank: NetRank::Traffic,
+            },
         };
         // What each module's readings look like: (cpu, memory, disks+volumes, net, gpus+by_gpu, battery, sensors,
-        // by_cpu+by_mem+by_disk).
+        // by_cpu+by_mem+by_disk+by_net).
         let shape = |s: &Snapshot| {
             [
                 s.cpu.is_some(),
@@ -361,7 +386,10 @@ mod tests {
                 !s.gpus.is_empty() && !s.top.by_gpu.is_empty(),
                 s.battery.is_some(),
                 !s.sensors.is_empty(),
-                !s.top.by_cpu.is_empty() && !s.top.by_mem.is_empty() && !s.top.by_disk.is_empty(),
+                !s.top.by_cpu.is_empty()
+                    && !s.top.by_mem.is_empty()
+                    && !s.top.by_disk.is_empty()
+                    && !s.top.by_net.is_empty(),
             ]
         };
         for (i, m) in Module::ALL.into_iter().enumerate() {
