@@ -6,7 +6,7 @@ use busy_win::utf16;
 use windows::Win32::Graphics::Direct2D::Common::*;
 use windows::Win32::Graphics::Direct2D::*;
 use windows::Win32::Graphics::DirectWrite::*;
-use windows::core::{BOOL, HSTRING, Interface, Result, w};
+use windows::core::{BOOL, HSTRING, Interface, Result};
 
 pub struct Gfx {
     pub d2d: ID2D1Factory,
@@ -84,8 +84,11 @@ impl Gfx {
         self.format_weight(size, if bold { DWRITE_FONT_WEIGHT_SEMI_BOLD } else { DWRITE_FONT_WEIGHT_NORMAL })
     }
 
-    /// `format` with any weight (the design's `font-weight: 700` is `DWRITE_FONT_WEIGHT_BOLD`).
+    /// `format` with any weight (the design's `font-weight: 700` is `DWRITE_FONT_WEIGHT_BOLD`). In the UI
+    /// language's locale, which picks the glyphs font fallback uses (Han characters differ between Japanese
+    /// and Chinese).
     pub fn format_weight(&self, size: f32, weight: DWRITE_FONT_WEIGHT) -> Result<IDWriteTextFormat> {
+        let locale = HSTRING::from(crate::i18n::lang().tag());
         unsafe {
             let f = self.dw.CreateTextFormat(
                 &self.family,
@@ -94,7 +97,7 @@ impl Gfx {
                 DWRITE_FONT_STYLE_NORMAL,
                 DWRITE_FONT_STRETCH_NORMAL,
                 size,
-                w!("en-us"),
+                &locale,
             )?;
             f.SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP)?;
             f.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER)?;

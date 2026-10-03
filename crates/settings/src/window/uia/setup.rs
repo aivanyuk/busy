@@ -60,7 +60,7 @@ pub(in crate::window) fn tree(v: &View, cfg: &Config, autostart_busy: bool, vert
     entries.push(entry(Node::Header(0), heading(READINGS), l.map(|l| l.readings)));
     for (i, (m, on)) in setup::cards(cfg).into_iter().enumerate() {
         let status = v.samples.get(i).cloned().flatten().unwrap_or_default();
-        let card = Info { status, toggle: Some(on), ..info(Role::CheckBox, m.label()) };
+        let card = Info { status, toggle: Some(on), ..info(Role::CheckBox, busy_ui::i18n::t().common.module(m)) };
         entries.push(entry(Node::Card(i), card, rect(Target::Card(i))));
     }
     entries.push(entry(Node::Header(1), heading(POSITION), l.map(|l| l.position)));

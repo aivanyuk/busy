@@ -104,7 +104,7 @@ pub struct Key {
 impl Cell<'_> {
     /// Tooltip text (design `title`): "<Module>: <value>", both rates for Io, the name alone without a value.
     pub fn tip(&self) -> String {
-        let name = self.module.label();
+        let name = crate::i18n::t().common.module(self.module);
         match &self.body {
             Body::Text { value, .. } | Body::Graph { value, .. } | Body::Bar { value, .. } if !value.is_empty() => {
                 format!("{name}: {value}")

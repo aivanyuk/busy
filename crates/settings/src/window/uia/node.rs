@@ -258,7 +258,7 @@ pub(in crate::window) fn info(v: &View, cfg: &Config, n: Node, maximized: bool, 
             Item::Order(list) => list.get(j).map(|&(m, _)| m),
             _ => None,
         })?;
-        Some(format!("Move {} {dir}", m.label()))
+        Some(format!("Move {} {dir}", busy_ui::i18n::t().common.module(m)))
     };
     Some(match n {
         Node::Min => caption("Minimize"),

@@ -13,7 +13,7 @@ use crate::taskbar::Taskbar;
 use crate::update::{self, Updates};
 use crate::win::{self, Event, register_class};
 use crate::worker::Worker;
-use busy_core::{Config, Module, Snapshot, ThemeMode};
+use busy_core::{Config, Lang, Module, Snapshot, ThemeMode};
 use busy_ui::ctx::Ctx;
 use busy_ui::history::History;
 use busy_ui::render::Gfx;
@@ -104,6 +104,8 @@ pub fn submit_config(cfg: Config) {
 
 pub fn run(open_flyout: bool) -> Result<()> {
     let cfg = Config::load();
+    let system = Lang::pick(busy_win::ui_languages().iter().map(String::as_str));
+    busy_ui::i18n::init(system, cfg.language);
     let gfx = Gfx::new()?;
     win::set_handler(on_event);
     register_class(w!("busy.main"), Some(main_proc));

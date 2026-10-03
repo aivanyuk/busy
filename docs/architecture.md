@@ -5,7 +5,7 @@
 | Crate | Path | Role |
 |---|---|---|
 | `busy-core` | `crates/core` | Shared types (`Snapshot`, `*Info`), `Source` trait, `Module`, `Config` (+ JSON persistence). No Win32. |
-| `busy-win` | `crates/win` | Win32 plumbing used by more than one crate: wide strings, registry reads, the System32-only `Dll` loader, the PDH wrapper (`pdh`), `package_family` (the package busy runs from, None for the portable exe). |
+| `busy-win` | `crates/win` | Win32 plumbing used by more than one crate: wide strings, the user's display languages (`ui_languages`), registry reads, the System32-only `Dll` loader, the PDH wrapper (`pdh`), `package_family` (the package busy runs from, None for the portable exe). |
 | `busy-metrics` | `crates/metrics` | Collectors: CPU, memory, disk, network, battery, top processes. |
 | `busy-sensors` | `crates/sensors` | GPU (DXGI/PDH/D3DKMT/NVML/ADL) and temperature/fan sensors (LHM WMI, HWiNFO shared memory). |
 | `busy-settings` | `crates/settings` | Settings window (custom-drawn with Direct2D, with UI Automation), autostart registry. |
@@ -21,10 +21,10 @@ Each crate may depend only on the crates in its row, and exposes only what its r
 | Crate | May depend on | Exposes |
 |---|---|---|
 | `busy-core` | `serde`, `serde_json` | Data types, `Source`, `Module`, `Config`. No Win32, no threads; its only I/O is `Config::load`/`save`. |
-| `busy-win` | `windows` | Win32 plumbing shared by more than one crate: wide strings, registry reads, the System32 DLL loader, the PDH wrapper, the package busy runs from. No `busy-*` dependency and no policy (it never decides *what* to read). |
+| `busy-win` | `windows` | Win32 plumbing shared by more than one crate: wide strings, the display languages, registry reads, the System32 DLL loader, the PDH wrapper, the package busy runs from. No `busy-*` dependency and no policy (it never decides *what* to read). |
 | `busy-metrics`, `busy-sensors` | `busy-core`, `busy-win` | `sources()` only (plus examples and tests). |
 | `busy-settings` | `busy-core`, `busy-win`, `busy-ui` | `Host`, `open`, `setup`, `sync`, `refresh`, `release`, `is_open`, `is_dialog_message`, `autostart` (`is_enabled`, `set`, `repair`). |
-| `busy-ui` | `busy-core`, `busy-win` | `fmt`, `select`, `history`, `tone`, `theme`, `render`, `ctx`, `cell`. |
+| `busy-ui` | `busy-core`, `busy-win` | `i18n`, `fmt`, `select`, `history`, `tone`, `theme`, `render`, `ctx`, `cell`. |
 | `busy` | all of the above | The binary. |
 
 Inside the `busy` app crate, modules form layers too. A module may use the ones below it, never above:
@@ -35,7 +35,7 @@ Inside the `busy` app crate, modules form layers too. A module may use the ones 
 | Windows | `taskbar/`, `flyout/`, `menu.rs` | Own an HWND (or a popup menu) and its GPU resources; draw from a read-only `Ctx`; report input as `win::Event`s, or return the menu's choice as a `menu::Command`. |
 | Workers | `sampler.rs`, `worker.rs` | Threads with a small, typed hand-off to the router. |
 | Support | `win.rs`, `launch.rs`, `presence.rs`, and `busy_ui::{ctx, render, theme}` | Window-class and message plumbing, starting other programs, session-lock and display-state notifications, render context, D2D/DWrite helpers, palette. |
-| Pure logic | `busy_ui::{select, tone, fmt, history}` | No Win32; unit-tested. |
+| Pure logic | `busy_ui::{i18n, select, tone, fmt, history}` | No Win32; unit-tested. |
 
 Rules:
 

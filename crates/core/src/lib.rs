@@ -64,19 +64,6 @@ impl Module {
     pub const fn index(self) -> usize {
         self as usize
     }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Module::Cpu => "CPU",
-            Module::Memory => "Memory",
-            Module::Disk => "Disk",
-            Module::Network => "Network",
-            Module::Gpu => "GPU",
-            Module::Battery => "Battery",
-            Module::Sensors => "Sensors",
-            Module::Processes => "Processes",
-        }
-    }
 }
 
 #[derive(Clone, Debug, Default)]
