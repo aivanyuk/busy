@@ -1,4 +1,4 @@
-//! Win32 plumbing shared by the busy crates: strings, the user's languages, registry reads, System32-only DLL loading, PDH, the
+//! Win32 plumbing shared by the busy crates: strings, the user's languages and number format, registry reads, System32-only DLL loading, PDH, the
 //! taskbar's edge, the package busy runs from.
 //!
 //! Depends on `windows` only and holds no policy: callers decide what to read and what a failure means.
@@ -12,7 +12,7 @@ mod taskbar;
 mod text;
 
 pub use dll::Dll;
-pub use locale::ui_languages;
+pub use locale::{number_separators, ui_languages};
 pub use package::package_family;
 pub use reg::{reg_bytes, reg_dword, reg_qword, reg_string, reg_subkeys};
 pub use taskbar::{Edge, edge_of, taskbar_edge, window_edge};
