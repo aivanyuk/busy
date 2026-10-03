@@ -212,6 +212,7 @@ fn general_rows(cfg: &Config, ch: &Choices) -> Vec<Item> {
         dropdown(s.history, s.history_desc, choices::history(cfg.history_secs)),
         Item::Header(s.appearance),
         dropdown(s.theme, s.theme_desc, choices::theme(cfg.theme)),
+        dropdown(s.language, s.language_desc, choices::language(cfg.language)),
         Item::Row(Row { title: s.setup, desc: s.setup_desc.into(), control: Control::Button(Command::RunSetup) }),
         Item::Header(s.taskbar_order),
         Item::Order(
@@ -352,6 +353,7 @@ mod tests {
                 "Default update interval",
                 "History",
                 "Theme",
+                "Language",
                 "Setup",
                 "Version"
             ]

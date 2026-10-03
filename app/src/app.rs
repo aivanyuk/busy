@@ -457,6 +457,9 @@ impl App {
         if old.theme != self.cfg.theme {
             self.refresh_theme();
         }
+        if old.language != self.cfg.language {
+            busy_ui::i18n::select(self.cfg.language);
+        }
         self.render_all();
         busy_settings::sync(&self.cfg);
         if save {
