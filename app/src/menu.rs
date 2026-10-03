@@ -3,7 +3,7 @@
 use busy_core::{Anchor, Config, Module};
 use windows::Win32::Foundation::{HWND, LPARAM, POINT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::{PCWSTR, w};
+use windows::core::PCWSTR;
 
 const ID_SETTINGS: u32 = 1;
 const ID_EXIT: u32 = 2;
@@ -22,6 +22,10 @@ pub enum Command {
 /// Shows the menu at the cursor, owned by `owner`, and returns the choice. `TrackPopupMenu` spins a modal
 /// loop, so call it outside the app state borrow.
 pub fn show(owner: HWND, cfg: &Config) -> Option<Command> {
+    let t = busy_ui::i18n::t();
+    let m = &t.menu;
+    let [next_to_tray, top, left_edge, settings, show_on_taskbar, position, exit] =
+        [m.next_to_tray, m.top, m.left_edge, m.settings, m.show_on_taskbar, m.position, m.exit].map(busy_win::wide);
     // SAFETY: the menus are created, used and destroyed here (the submenus with the menu that holds them);
     // the label buffers outlive the AppendMenuW calls that copy them.
     unsafe {
@@ -31,7 +35,7 @@ pub fn show(owner: HWND, cfg: &Config) -> Option<Command> {
         let checked = |b: bool| if b { MF_CHECKED } else { MF_UNCHECKED };
         for mc in cfg.modules.iter().filter(|mc| !mc.module.allowed_styles().is_empty()) {
             let idx = mc.module.index() as u32;
-            let label = busy_win::wide(busy_ui::i18n::t().common.module(mc.module));
+            let label = busy_win::wide(t.common.module(mc.module));
             let _ = AppendMenuW(
                 sub_mods,
                 MF_STRING | checked(mc.taskbar),
@@ -43,17 +47,22 @@ pub fn show(owner: HWND, cfg: &Config) -> Option<Command> {
             sub_pos,
             MF_STRING | checked(cfg.anchor == Anchor::NearTray),
             ID_ANCHOR_TRAY as usize,
-            w!("Next to notification area"),
+            PCWSTR(next_to_tray.as_ptr()),
         );
         // Down a vertical taskbar (design `isVert()`) the far end from the tray is its top.
-        let left = if busy_win::taskbar_edge().is_vertical() { w!("Top") } else { w!("Left edge") };
-        let _ = AppendMenuW(sub_pos, MF_STRING | checked(cfg.anchor == Anchor::Left), ID_ANCHOR_LEFT as usize, left);
-        let _ = AppendMenuW(menu, MF_STRING, ID_SETTINGS as usize, w!("Settings…"));
+        let left = if busy_win::taskbar_edge().is_vertical() { &top } else { &left_edge };
+        let _ = AppendMenuW(
+            sub_pos,
+            MF_STRING | checked(cfg.anchor == Anchor::Left),
+            ID_ANCHOR_LEFT as usize,
+            PCWSTR(left.as_ptr()),
+        );
+        let _ = AppendMenuW(menu, MF_STRING, ID_SETTINGS as usize, PCWSTR(settings.as_ptr()));
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
-        let _ = AppendMenuW(menu, MF_POPUP, sub_mods.0 as usize, w!("Show on taskbar"));
-        let _ = AppendMenuW(menu, MF_POPUP, sub_pos.0 as usize, w!("Position"));
+        let _ = AppendMenuW(menu, MF_POPUP, sub_mods.0 as usize, PCWSTR(show_on_taskbar.as_ptr()));
+        let _ = AppendMenuW(menu, MF_POPUP, sub_pos.0 as usize, PCWSTR(position.as_ptr()));
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
-        let _ = AppendMenuW(menu, MF_STRING, ID_EXIT as usize, w!("Exit"));
+        let _ = AppendMenuW(menu, MF_STRING, ID_EXIT as usize, PCWSTR(exit.as_ptr()));
         let mut pt = POINT::default();
         let _ = GetCursorPos(&mut pt);
         // Required so the menu closes when clicking elsewhere.
