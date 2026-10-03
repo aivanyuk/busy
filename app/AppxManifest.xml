@@ -21,15 +21,27 @@
   <Dependencies>
     <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22631.0" MaxVersionTested="10.0.26100.0"/>
   </Dependencies>
+  <!-- The languages busy's UI has (busy_core::Lang), the default first; build/msix.rs writes the description in
+       each. -->
   <Resources>
     <Resource Language="en-US"/>
+    <Resource Language="de-DE"/>
+    <Resource Language="es-ES"/>
+    <Resource Language="fr-FR"/>
+    <Resource Language="it-IT"/>
+    <Resource Language="ja-JP"/>
+    <Resource Language="ko-KR"/>
+    <Resource Language="pl-PL"/>
+    <Resource Language="pt-BR"/>
+    <Resource Language="ru-RU"/>
+    <Resource Language="zh-CN"/>
   </Resources>
   <Applications>
     <!-- A full-trust desktop app: its widget is a child window of explorer's taskbar. -->
     <Application Id="busy" Executable="busy.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="busy — system monitor"
-        Description="Live CPU, memory, GPU, network, disk, battery and sensor readings in the taskbar."
+        Description="ms-resource:AppDescription"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"/>
