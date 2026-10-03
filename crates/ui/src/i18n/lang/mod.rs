@@ -27,3 +27,6 @@ pub(super) use zh_hans::ZH_HANS;
 mod ko;
 
 pub(super) use ko::KO;
+mod ru;
+
+pub(super) use ru::RU;
