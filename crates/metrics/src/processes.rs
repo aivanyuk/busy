@@ -1,10 +1,11 @@
 use crate::conns::Connections;
-use crate::util::Clock;
+use crate::etw::Trace;
+use crate::util::{Clock, Every};
 use busy_core::{Module, NetRank, ProcEntry, Snapshot, Source, SourceOptions, TOP_N};
 use std::collections::HashMap;
 use std::ops::Range;
 use windows::Wdk::System::SystemInformation::{NtQuerySystemInformation, SystemProcessInformation};
-use windows::Win32::Foundation::STATUS_INFO_LENGTH_MISMATCH;
+use windows::Win32::Foundation::{ERROR_ACCESS_DENIED, STATUS_INFO_LENGTH_MISMATCH};
 use windows::Win32::System::Threading::{ALL_PROCESSOR_GROUPS, GetActiveProcessorCount};
 
 /// Full SYSTEM_PROCESS_INFORMATION (the `windows` crate only exposes the documented subset).
@@ -63,7 +64,14 @@ pub struct Processes {
     rows: Vec<Row>,
     opts: SourceOptions,
     conns: Connections,
-    /// pid -> this sample's network use, by `snap.top.net_rank`.
+    /// Runs while the Network flyout lists processes with `process_network` on.
+    trace: Option<Trace>,
+    /// Starting it was refused: not again until the opt-in is turned off and on.
+    denied: bool,
+    /// Starting it failed otherwise (e.g. no free session): retried every 30 s.
+    failed: bool,
+    retry: Every,
+    /// pid -> this sample's network use: bytes/s or connections, as `snap.top.net_rank` says.
     net: HashMap<u32, u64>,
 }
 
@@ -78,6 +86,10 @@ impl Default for Processes {
             rows: Vec::new(),
             opts: SourceOptions::default(),
             conns: Connections::default(),
+            trace: None,
+            denied: false,
+            failed: false,
+            retry: Every::default(),
             net: HashMap::new(),
         }
     }
@@ -111,6 +123,31 @@ fn name_range(buf: &[u64], ptr: *const u16, len_bytes: u16) -> Range<usize> {
 }
 
 impl Processes {
+    /// Fills `net` with each process's network use: traffic from the trace where it may run, else connections.
+    fn network_use(&mut self) -> NetRank {
+        let may_trace = self.opts.process_network && !self.denied && (!self.failed || self.retry.due(30));
+        if may_trace && self.trace.is_none() {
+            match Trace::start() {
+                Ok(t) => (self.trace, self.failed) = (Some(t), false),
+                Err(e) if e == ERROR_ACCESS_DENIED => self.denied = true,
+                Err(_) => {
+                    self.failed = true;
+                    self.retry.arm();
+                }
+            }
+        }
+        match &mut self.trace {
+            Some(t) => {
+                t.drain(&mut self.net);
+                NetRank::Traffic
+            }
+            None => {
+                self.conns.count(&mut self.net);
+                NetRank::Connections
+            }
+        }
+    }
+
     fn query(&mut self) -> bool {
         for _ in 0..4 {
             let mut len = 0u32;
@@ -134,6 +171,13 @@ impl Source for Processes {
     }
 
     fn configure(&mut self, opts: SourceOptions) {
+        // The session is machine-wide and costs a callback per transfer: it runs only while it is shown.
+        if !(opts.network_processes && opts.process_network) {
+            self.trace = None;
+        }
+        if !opts.process_network {
+            (self.denied, self.failed) = (false, false);
+        }
         self.opts = opts;
     }
 
@@ -143,10 +187,7 @@ impl Source for Processes {
         }
         let dt = self.clock.tick();
         self.net.clear();
-        let rank = NetRank::Connections;
-        if self.opts.network_processes {
-            self.conns.count(&mut self.net);
-        }
+        let rank = if self.opts.network_processes { self.network_use() } else { NetRank::Connections };
         self.cur.clear();
         self.rows.clear();
         let base = self.buf.as_ptr().cast::<u8>();

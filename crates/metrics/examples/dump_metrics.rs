@@ -38,8 +38,14 @@ fn main() {
     println!("init: {:?}", t.elapsed());
     let args: Vec<String> = std::env::args().skip(1).collect();
     let n: u32 = args.iter().find_map(|a| a.parse().ok()).unwrap_or(5);
-    // `--net`: rank processes by network use, as while the Network flyout is open.
-    let opts = SourceOptions { network_processes: args.iter().any(|a| a == "--net"), ..SourceOptions::default() };
+    // `--net`: rank processes by network use, as while the Network flyout is open; `--trace`: by traffic, as with
+    // the opt-in on (needs administrator rights).
+    let has = |flag: &str| args.iter().any(|a| a == flag);
+    let opts = SourceOptions {
+        network_processes: has("--net") || has("--trace"),
+        process_network: has("--trace"),
+        ..SourceOptions::default()
+    };
     for s in &mut sources {
         s.configure(opts);
     }

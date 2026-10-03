@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub struct OptIn {
     /// Public IP from an external lookup service (Network flyout).
     pub public_ip: bool,
-    /// Per-process network usage through an ETW kernel session; needs administrator.
+    /// Per-process network traffic through a kernel event trace session; needs administrator.
     pub process_network: bool,
     /// Per-app battery usage from the SRUM database; needs administrator.
     pub app_battery: bool,
@@ -32,11 +32,17 @@ pub struct SourceOptions {
     /// The Network flyout is open and lists processes: rank them by network use (`TopProcesses::by_net`). Not a
     /// setting: the sampler sets it from the open flyout, as the Processes source also serves other flyouts.
     pub network_processes: bool,
+    /// Rank them by traffic through an event trace session, where permitted (`OptIn::process_network`).
+    pub process_network: bool,
 }
 
 impl Config {
     pub fn source_options(&self) -> SourceOptions {
-        SourceOptions { third_party_sensors: self.opt_in.third_party_sensors, ..SourceOptions::default() }
+        SourceOptions {
+            third_party_sensors: self.opt_in.third_party_sensors,
+            process_network: self.opt_in.process_network,
+            ..SourceOptions::default()
+        }
     }
 }
 
@@ -91,5 +97,8 @@ mod tests {
         assert!(!cfg.source_options().third_party_sensors);
         cfg.opt_in.third_party_sensors = true;
         assert_eq!(cfg.source_options(), SourceOptions { third_party_sensors: true, ..SourceOptions::default() });
+        cfg.opt_in.process_network = true;
+        let opts = cfg.source_options();
+        assert!(opts.process_network && !opts.network_processes, "the open flyout is the sampler's to say");
     }
 }
