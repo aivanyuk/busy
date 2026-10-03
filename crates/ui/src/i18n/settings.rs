@@ -8,6 +8,13 @@ section! {
     /// rows. A row's title is one line, cut off with "…" when too long; its description wraps. Search matches
     /// both as shown.
     Settings {
+        /// The window's title bar and taskbar button; "busy" is the product's name.
+        window_title: &'static str = "busy Settings",
+        /// The search box's placeholder, over the nav.
+        find: &'static str = "Find a setting",
+        /// A module's state: a nav item's status (small, right of its name) and a toggle's label. Short.
+        on: &'static str = "On",
+        off: &'static str = "Off",
         /// A page: nav item (about 170 DIPs beside its status) and page title.
         general: &'static str = "General",
         /// A page (not in the design): the opt-in data sources.
@@ -53,6 +60,18 @@ section! {
         updates: &'static str = "Updates",
         flyouts: &'static str = "Flyouts",
         opt_in_sources: &'static str = "Opt-in sources",
+
+        /// The Taskbar order card's first line, one line; the vertical form is for a taskbar on a side edge.
+        order_note: &'static str = "Widgets appear left to right in this order.",
+        order_note_vertical: &'static str = "Widgets appear top to bottom in this order.",
+        /// A module's state in the Taskbar order card, between its name and its ↑/↓ buttons. Short.
+        shown: &'static str = "Shown",
+        hidden: &'static str = "Hidden",
+        /// A module page's preview card: its heading, left, and its state, right, on one line.
+        preview: &'static str = "Preview",
+        live: &'static str = "Live",
+        /// The state when the module isn't on the taskbar, quoting the "Show on taskbar" row's title.
+        preview_hidden: &'static str = "Hidden \u{2014} turn on \u{201c}Show on taskbar\u{201d}",
 
         // General's rows.
         autostart: &'static str = "Start with Windows",

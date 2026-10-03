@@ -26,10 +26,10 @@ pub(super) struct State<'a> {
 }
 
 pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
-    let (t, f) = (s.theme, s.fonts);
+    let (t, f, text) = (s.theme, s.fonts, &busy_ui::i18n::t().settings);
     // SAFETY: the render target is a live COM object inside BeginDraw/EndDraw.
     unsafe { cv.rt.Clear(Some(&t.win)) };
-    let bar = frame::Bar { title: "busy Settings", buttons: frame::ALL, hover: v.hover, maximized: s.maximized };
+    let bar = frame::Bar { title: text.window_title, buttons: frame::ALL, hover: v.hover, maximized: s.maximized };
     frame::draw(cv, v.w, &bar, t, f);
     nav::header(cv, &model::readings(s.cfg), t, f);
     nav::search(cv, v.search_rect(), &v.query, v.focus == Some(Target::Search), (s.gfx, t), f);
@@ -40,7 +40,7 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
     for (i, &p) in v.nav.iter().enumerate() {
         let (dot, status) = match p {
             Page::General | Page::Advanced => (t.fg3, ""),
-            Page::Module(m) => (dot(m), if model::is_on(s.cfg, m) { "On" } else { "Off" }),
+            Page::Module(m) => (dot(m), if model::is_on(s.cfg, m) { text.on } else { text.off }),
         };
         let item = nav::Item {
             label: p.title(),

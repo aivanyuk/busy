@@ -10,7 +10,8 @@ pub(in crate::window) const SIZE: (f32, f32) = (24.0 + 12.0 + 40.0, 20.0);
 /// `enabled` false draws it at 40 % (the autostart toggle until the registry has answered).
 pub(in crate::window) fn draw(cv: &Canvas, r: Rect, on: bool, enabled: bool, t: &Theme, f: &Fonts) {
     let a = if enabled { 1.0 } else { 0.4 };
-    cv.text(if on { "On" } else { "Off" }, &f.body, Rect::new(r.x, r.y, 24.0, r.h), alpha(t.fg, a), Align::Right);
+    let s = &busy_ui::i18n::t().settings;
+    cv.text(if on { s.on } else { s.off }, &f.body, Rect::new(r.x, r.y, 24.0, r.h), alpha(t.fg, a), Align::Right);
     let track = Rect::new(r.right() - 40.0, r.y + (r.h - 20.0) / 2.0, 40.0, 20.0);
     if on {
         cv.round(track, 10.0, alpha(t.accent, a));

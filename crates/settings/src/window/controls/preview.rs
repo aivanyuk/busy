@@ -73,8 +73,9 @@ pub(in crate::window) fn draw(
     cv.round_outline(r, 4.0, t.card_line);
     let Some(mc) = cfg.module(m) else { return };
     let head = Rect::new(r.x + PAD_X, r.y + PAD_T, r.w - 2.0 * PAD_X, LINE_12);
-    cv.text("Preview", &f.small, head, t.fg2, Align::Left);
-    let note = if mc.taskbar { "Live" } else { "Hidden \u{2014} turn on \u{201c}Show on taskbar\u{201d}" };
+    let s = &busy_ui::i18n::t().settings;
+    cv.text(s.preview, &f.small, head, t.fg2, Align::Left);
+    let note = if mc.taskbar { s.live } else { s.preview_hidden };
     cv.text(note, &f.small, head, t.fg2, Align::Right);
 
     let area = Rect::new(r.x + PAD_X, r.y + HEAD_H, r.w - 2.0 * PAD_X, r.h - HEAD_H - PAD_B);
