@@ -28,7 +28,13 @@ pub(in crate::window) fn paint(cv: &Canvas, v: &View, s: &State) {
         let bx = Rect::new(r.x + 14.0, r.y + (r.h - BOX) / 2.0, BOX, BOX);
         check(cv, bx, on, true, t);
         let name_x = bx.right() + 12.0;
-        cv.text(m.label(), &f.body, Rect::new(name_x, r.y, r.right() - 14.0 - name_x, r.h), t.fg, Align::Left);
+        cv.text(
+            busy_ui::i18n::t().common.module(m),
+            &f.body,
+            Rect::new(name_x, r.y, r.right() - 14.0 - name_x, r.h),
+            t.fg,
+            Align::Left,
+        );
         let sample = v.samples.get(i).cloned().flatten().unwrap_or_default();
         let color = t.color(Tone::Pal(s.cfg.module(m).map_or(m.default_color(), busy_core::ModuleCfg::color_index)));
         cv.text(&sample, &f.small_strong, Rect::new(name_x, r.y, r.right() - 14.0 - name_x, r.h), color, Align::Right);

@@ -30,7 +30,7 @@ impl Page {
     pub(super) fn title(self) -> &'static str {
         match self {
             Page::General => "General",
-            Page::Module(m) => m.label(),
+            Page::Module(m) => busy_ui::i18n::t().common.module(m),
             Page::Advanced => "Advanced",
         }
     }
@@ -267,8 +267,8 @@ fn module(m: Module, cfg: &Config, ch: &Choices) -> Vec<Item> {
     let Some(c) = cfg.module(m) else { return Vec::new() };
     let o = &cfg.options;
     let name = match m {
-        Module::Cpu | Module::Gpu => m.label().to_string(),
-        _ => m.label().to_lowercase(),
+        Module::Cpu | Module::Gpu => busy_ui::i18n::t().common.module(m).to_string(),
+        _ => busy_ui::i18n::t().common.module(m).to_lowercase(),
     };
     let mut r = vec![
         Item::Preview(m),

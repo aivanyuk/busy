@@ -44,7 +44,7 @@ pub trait Source {
 - `language: Option<Lang>` (`lang.rs`) — the UI language, stored by its BCP 47 tag (`"de"`, `"pt-BR"`, `"zh-Hans"`); `None` (the default) follows Windows' display languages through `Lang::pick`, the first one busy has, else English. Matching is by primary subtag (`pt-PT` gets Brazilian Portuguese); a traditional-script Chinese tag has no match rather than getting Simplified. A tag this build doesn't know (a newer busy's) reads as `None` instead of failing the file. The strings are `busy_ui::i18n`.
 - Adding a field: give it a default in `impl Default for Config` — `#[serde(default)]` keeps old files loading. Add a test.
 - A new `ModuleCfg` field needs its own `#[serde(default…)]` (the struct has no `Default`: `module` is required). A `modules` entry that still fails to parse — an unknown `Module` or `CellStyle` from a newer build, a hand-edit — is dropped on load and `normalize()` re-adds that module with its default; before, one bad entry reset the whole file.
-- Adding a `Module` variant: update `Module::ALL`, `label()`, `Config::default()`, and every exhaustive `match` in app/settings.
+- Adding a `Module` variant: update `Module::ALL`, `Config::default()`, its name in `busy_ui::i18n::Common` (and every language), and every exhaustive `match` in app/settings.
 
 ## Releases
 

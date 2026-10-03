@@ -31,7 +31,7 @@ pub fn show(owner: HWND, cfg: &Config) -> Option<Command> {
         let checked = |b: bool| if b { MF_CHECKED } else { MF_UNCHECKED };
         for mc in cfg.modules.iter().filter(|mc| !mc.module.allowed_styles().is_empty()) {
             let idx = mc.module.index() as u32;
-            let label = busy_win::wide(mc.module.label());
+            let label = busy_win::wide(busy_ui::i18n::t().common.module(mc.module));
             let _ = AppendMenuW(
                 sub_mods,
                 MF_STRING | checked(mc.taskbar),

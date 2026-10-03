@@ -59,7 +59,7 @@ fn main() {
                 let (t, a) = (Instant::now(), ALLOCS.load(Ordering::Relaxed));
                 s.sample(&mut snap);
                 let (t, a) = (t.elapsed(), ALLOCS.load(Ordering::Relaxed) - a);
-                format!("{}={t:?}/{a}", s.module().label())
+                format!("{:?}={t:?}/{a}", s.module())
             })
             .collect();
         println!("sample {i}: {}", times.join(" "));

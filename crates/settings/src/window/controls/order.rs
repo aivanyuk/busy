@@ -76,7 +76,13 @@ pub(in crate::window) fn draw(
         let (up, down) = buttons(r, i);
         let name_x = rr.x + CARD_PAD_L + 10.0 + 14.0;
         let status_x = up.x - 14.0 - STATUS_W;
-        cv.text(m.label(), &f.body, Rect::new(name_x, rr.y, status_x - 14.0 - name_x, ROW_H), t.fg, Align::Left);
+        cv.text(
+            busy_ui::i18n::t().common.module(m),
+            &f.body,
+            Rect::new(name_x, rr.y, status_x - 14.0 - name_x, ROW_H),
+            t.fg,
+            Align::Left,
+        );
         let status = if shown { "Shown" } else { "Hidden" };
         cv.text(status, &f.small, Rect::new(status_x, rr.y, STATUS_W, ROW_H), t.fg3, Align::Left);
         let arrows = [(up, "\u{2191}", i > 0, Target::Up(i)), (down, "\u{2193}", i + 1 < n, Target::Down(i))];

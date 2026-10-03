@@ -76,7 +76,7 @@ impl<'a> Detail<'a> {
     pub(super) fn new(module: Module) -> Self {
         Self {
             module,
-            title: module.label(),
+            title: busy_ui::i18n::t().common.module(module),
             sub: String::new(),
             big: String::new(),
             big_label: String::new(),
