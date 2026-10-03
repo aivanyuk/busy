@@ -5,8 +5,8 @@ Builds busy.exe (release) and packs it as the Microsoft Store package: target\ms
 .DESCRIPTION
 The build script writes the package layout (AppxManifest.xml with the version, the logos) to its OUT_DIR\msix
 (app/build/msix.rs); this finds it through cargo's JSON messages, adds busy.exe, LICENSE and
-THIRD-PARTY-LICENSES.txt, indexes the logos' scale and target-size variants into resources.pri (makepri) and
-packs it (makeappx). The package is unsigned: the Store signs it (docs/plans/store.md).
+THIRD-PARTY-LICENSES.txt, indexes the logos' scale and target-size variants and the manifest's translated strings
+into resources.pri (makepri) and packs it (makeappx). The package is unsigned: the Store signs it (docs/plans/store.md).
 
 -Layout stops after the layout, in target\msix\layout, for registering it as it is with Developer Mode on
 (docs/testing.md): Add-AppxPackage -Register target\msix\layout\AppxManifest.xml.
@@ -55,6 +55,8 @@ $xml.resources.SelectNodes('packaging') | ForEach-Object { [void]$xml.resources.
 $xml.Save($config)
 & "$sdk\makepri.exe" new /pr $layoutDir /cf $config /mn (Join-Path $layoutDir 'AppxManifest.xml') /of (Join-Path $layoutDir 'resources.pri') /o | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'makepri new failed' }
+# The strings are in resources.pri now; the .resw sources aren't needed at run time.
+Remove-Item (Join-Path $layoutDir 'Strings') -Recurse -Force
 if ($Layout) {
     Write-Output $layoutDir
     return
