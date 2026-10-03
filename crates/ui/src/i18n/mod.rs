@@ -38,6 +38,7 @@ mod common;
 mod flyout;
 mod menu;
 mod settings;
+mod setup;
 mod time;
 
 pub use cell::Cell;
@@ -46,6 +47,7 @@ pub use common::Common;
 pub use flyout::Flyout;
 pub use menu::Menu;
 pub use settings::Settings;
+pub use setup::Setup;
 pub use time::Time;
 
 use busy_core::Lang;
@@ -61,6 +63,7 @@ pub struct Strings {
     pub menu: Menu,
     pub settings: Settings,
     pub choices: Choices,
+    pub setup: Setup,
 }
 
 /// The forms of a string that depends on a count `n`, in CLDR's plural categories as far as busy's languages
@@ -85,6 +88,7 @@ impl Strings {
         v.extend(self.menu.texts());
         v.extend(self.settings.texts());
         v.extend(self.choices.texts());
+        v.extend(self.setup.texts());
         v
     }
 }
@@ -121,6 +125,7 @@ static EN: Strings = Strings {
     menu: menu::EN,
     settings: settings::EN,
     choices: choices::EN,
+    setup: setup::EN,
 };
 
 /// The language the system asks for (`init`), and the one shown, as `Lang::index`.

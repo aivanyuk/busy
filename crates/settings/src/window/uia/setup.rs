@@ -4,7 +4,7 @@
 
 use super::node::{Entry, Info, Node, Role, Tree};
 use crate::window::layout::TITLE_H;
-use crate::window::setup::{self, POSITION, READINGS, SKIP, START, STARTUP, SUB, Target, View, W};
+use crate::window::setup::{self, Target, View, W};
 use busy_core::Config;
 use busy_ui::render::Rect;
 
@@ -54,25 +54,26 @@ pub(in crate::window) fn tree(v: &View, cfg: &Config, autostart_busy: bool, vert
     let rect = |t: Target| l.and_then(|l| l.rect(t));
     let close = Info { invoke: true, focusable: false, ..info(Role::Button, "Close") };
     let mut entries = vec![entry(Node::Close, close, rect(Target::Close))];
-    let headline = Info { help: SUB.into(), focusable: false, ..info(Role::Text, setup::HEADLINE) };
+    let s = &busy_ui::i18n::t().setup;
+    let headline = Info { help: s.sub.into(), focusable: false, ..info(Role::Text, s.headline) };
     entries.push(entry(Node::Title, headline, l.map(|l| l.headline)));
     let heading = |name: &str| Info { focusable: false, ..info(Role::Text, name) };
-    entries.push(entry(Node::Header(0), heading(READINGS), l.map(|l| l.readings)));
+    entries.push(entry(Node::Header(0), heading(s.readings), l.map(|l| l.readings)));
     for (i, (m, on)) in setup::cards(cfg).into_iter().enumerate() {
         let status = v.samples.get(i).cloned().flatten().unwrap_or_default();
         let card = Info { status, toggle: Some(on), ..info(Role::CheckBox, busy_ui::i18n::t().common.module(m)) };
         entries.push(entry(Node::Card(i), card, rect(Target::Card(i))));
     }
-    entries.push(entry(Node::Header(1), heading(POSITION), l.map(|l| l.position)));
+    entries.push(entry(Node::Header(1), heading(s.position), l.map(|l| l.position)));
     let chosen = setup::place(cfg);
     for (i, (_, label, desc)) in setup::places(vertical).iter().enumerate() {
         let place =
             Info { help: (*desc).into(), selected: Some(i == chosen), invoke: true, ..info(Role::RadioButton, label) };
         entries.push(entry(Node::Place(i), place, rect(Target::Place(i))));
     }
-    let startup = Info { toggle: Some(cfg.autostart), enabled: !autostart_busy, ..info(Role::CheckBox, STARTUP) };
+    let startup = Info { toggle: Some(cfg.autostart), enabled: !autostart_busy, ..info(Role::CheckBox, s.startup) };
     entries.push(entry(Node::Startup, startup, rect(Target::Startup)));
-    for (n, t, name) in [(Node::Skip, Target::Skip, SKIP), (Node::Start, Target::Start, START)] {
+    for (n, t, name) in [(Node::Skip, Target::Skip, s.skip), (Node::Start, Target::Start, s.start)] {
         entries.push(entry(n, Info { invoke: true, ..info(Role::Button, name) }, rect(t)));
     }
     let h = l.map_or(TITLE_H, |l| l.h);

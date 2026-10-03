@@ -7,6 +7,7 @@
 use super::frame;
 use super::layout::{Fonts, LINE_12, LINE_14, TITLE_H};
 use busy_core::{Anchor, Config, Module};
+use busy_ui::i18n::t;
 use busy_ui::render::{Gfx, Rect};
 
 pub(super) mod input;
@@ -32,28 +33,19 @@ const PLACE_H: f32 = 14.0 + LINE_14 + 2.0 + LINE_12 + 14.0;
 const FOOTER_H: f32 = 1.0 + 20.0 + 32.0 + 20.0;
 pub(super) const BOX: f32 = 20.0;
 
-pub(super) const HEADLINE: &str = "Your PC\u{2019}s vitals, right on the taskbar";
-pub(super) const SUB: &str =
-    "Pick what to show. Click any reading for details \u{2014} you can change all of this later in Settings.";
-pub(super) const READINGS: &str = "Show on taskbar";
-pub(super) const POSITION: &str = "Position";
-pub(super) const STARTUP: &str = "Start with Windows";
-pub(super) const SKIP: &str = "Skip";
-pub(super) const START: &str = "Start monitoring";
-/// The positions offered: anchor, label, description.
-pub(super) const PLACES: [(Anchor, &str, &str); 2] = [
-    (Anchor::NearTray, "Next to the system tray", "Right side, beside the clock"),
-    (Anchor::Left, "Left edge of the taskbar", "Where Widgets usually sits"),
-];
-/// The same down a vertical taskbar (design `obPos`), whose far end from the tray is its top.
-const PLACES_VERTICAL: [(Anchor, &str, &str); 2] = [
-    (Anchor::NearTray, "Next to the system tray", "Bottom, just above the clock"),
-    (Anchor::Left, "Top of the taskbar", "Above the app icons"),
-];
+/// The positions offered, in order.
+pub(super) const ANCHORS: [Anchor; 2] = [Anchor::NearTray, Anchor::Left];
 
-/// The positions as a taskbar standing `vertical` or not words them.
-pub(super) fn places(vertical: bool) -> &'static [(Anchor, &'static str, &'static str); 2] {
-    if vertical { &PLACES_VERTICAL } else { &PLACES }
+/// The positions as a taskbar standing `vertical` or not words them (design `obPos`: down a vertical taskbar
+/// the far end from the tray is its top): anchor, label, description.
+pub(super) fn places(vertical: bool) -> [(Anchor, &'static str, &'static str); 2] {
+    let s = &t().setup;
+    let [tray, left] = ANCHORS;
+    if vertical {
+        [(tray, s.near_tray, s.near_tray_desc_vertical), (left, s.top, s.top_desc)]
+    } else {
+        [(tray, s.near_tray, s.near_tray_desc), (left, s.left_edge, s.left_edge_desc)]
+    }
 }
 
 /// Something the pointer or the keyboard acts on.
@@ -62,7 +54,7 @@ pub(super) enum Target {
     Close,
     /// A reading card, by its index in `cards`.
     Card(usize),
-    /// A position, by its index in `PLACES`.
+    /// A position, by its index in `ANCHORS`.
     Place(usize),
     Startup,
     Skip,
@@ -74,9 +66,9 @@ pub(super) fn cards(cfg: &Config) -> Vec<(Module, bool)> {
     cfg.modules.iter().filter(|c| c.module != Module::Processes).map(|c| (c.module, c.taskbar)).collect()
 }
 
-/// The position chosen, as an index into `PLACES`.
+/// The position chosen, as an index into `ANCHORS`.
 pub(super) fn place(cfg: &Config) -> usize {
-    PLACES.iter().position(|p| p.0 == cfg.anchor).unwrap_or(0)
+    ANCHORS.iter().position(|&a| a == cfg.anchor).unwrap_or(0)
 }
 
 /// Where everything sits, in client DIPs. Fixed once made: the window doesn't resize in setup.
@@ -104,7 +96,7 @@ impl Layout {
         let mut y = TITLE_H + PAD_T;
         let headline = Rect::new(x, y, cw, HEADLINE_H);
         y += HEADLINE_H + 6.0;
-        let sub = Rect::new(x, y, cw, gfx.metrics(&f.body_wrap, SUB, cw).1.max(LINE_14));
+        let sub = Rect::new(x, y, cw, gfx.metrics(&f.body_wrap, t().setup.sub, cw).1.max(LINE_14));
         y = sub.bottom() + SECTION_GAP;
         let readings = Rect::new(x, y, cw, LINE_14);
         y += LINE_14 + HEAD_GAP;
@@ -123,10 +115,11 @@ impl Layout {
         let footer = Rect::new(0.0, y, W, FOOTER_H);
         let by = y + 1.0 + 20.0;
         let button = |label: &str| gfx.text_width(&f.body, label) + 40.0;
-        let start = Rect::new(W - 24.0 - button(START), by, button(START), 32.0);
-        let skip = Rect::new(start.x - 8.0 - button(SKIP), by, button(SKIP), 32.0);
+        let s = &t().setup;
+        let start = Rect::new(W - 24.0 - button(s.start), by, button(s.start), 32.0);
+        let skip = Rect::new(start.x - 8.0 - button(s.skip), by, button(s.skip), 32.0);
         let check = Rect::new(24.0, by + (32.0 - BOX) / 2.0, BOX, BOX);
-        let startup = Rect::new(24.0, by, BOX + 10.0 + gfx.text_width(&f.body, STARTUP), 32.0);
+        let startup = Rect::new(24.0, by, BOX + 10.0 + gfx.text_width(&f.body, s.startup), 32.0);
         Layout {
             headline,
             sub,
