@@ -86,6 +86,9 @@ section! {
         history_desc: &'static str = "How far back the flyout charts go",
         theme: &'static str = "Theme",
         theme_desc: &'static str = "Flyouts and this window",
+        language: &'static str = "Language",
+        /// Its options are each language's own name, and `Choices::theme_system` for Windows' display language.
+        language_desc: &'static str = "Readings, flyouts, menus and this window",
         setup: &'static str = "Setup",
         setup_desc: &'static str = "Walk through choosing widgets again",
         /// A button (sized to its text): turns the window into setup.

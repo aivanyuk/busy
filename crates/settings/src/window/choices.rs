@@ -4,7 +4,8 @@
 
 use busy_core::release::Release;
 use busy_core::{
-    Anchor, CellStyle, CpuBar, Module, NetInterface, RateUnit, SensorKind, SensorPick, Snapshot, TempUnit, ThemeMode,
+    Anchor, CellStyle, CpuBar, Lang, Module, NetInterface, RateUnit, SensorKind, SensorPick, Snapshot, TempUnit,
+    ThemeMode,
 };
 use busy_ui::i18n::{self, Plural, t};
 use busy_win::Edge;
@@ -17,6 +18,8 @@ pub(super) enum Pick {
     IntervalMs(u32),
     HistorySecs(u32),
     Theme(ThemeMode),
+    /// `None` = Windows' display language.
+    Language(Option<Lang>),
     CpuBar(CpuBar),
     Drive(Option<String>),
     Units(RateUnit),
@@ -157,6 +160,13 @@ pub(super) fn theme(theme: ThemeMode) -> (Vec<Opt>, usize) {
     )
 }
 
+/// Each language under its own name, so it can be found whatever the window is shown in.
+pub(super) fn language(lang: Option<Lang>) -> (Vec<Opt>, usize) {
+    let system = std::iter::once((t().choices.theme_system.to_string(), Pick::Language(None)));
+    let langs = Lang::ALL.map(|l| (l.native_name().to_string(), Pick::Language(Some(l))));
+    list(system.chain(langs).collect(), Pick::Language(lang), |_| String::new())
+}
+
 pub(super) fn cpu_bar(b: CpuBar) -> (Vec<Opt>, usize) {
     let c = &t().choices;
     fixed(&[(c.each_core, Pick::CpuBar(CpuBar::Cores)), (c.total, Pick::CpuBar(CpuBar::Total))], Pick::CpuBar(b))
@@ -260,6 +270,9 @@ mod tests {
             (vec!["Every second".into(), "Every 2 seconds".into(), "Every 5 seconds".into()], 1)
         );
         assert_eq!(labels(theme(ThemeMode::Light)).1, 2);
+        let (langs, i) = labels(language(Some(Lang::Ja)));
+        assert_eq!((langs.len(), langs[0].as_str(), langs[i].as_str()), (12, "Use system setting", "日本語"));
+        assert_eq!(labels(language(None)).1, 0);
         assert_eq!(
             labels(anchor(Anchor::Left, false)),
             (vec!["Next to system tray".into(), "Left edge of taskbar".into()], 1)

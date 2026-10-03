@@ -30,6 +30,7 @@ pub(super) fn apply(cfg: &mut Config, e: &Edit) {
             Pick::IntervalMs(v) => cfg.interval_ms = v,
             Pick::HistorySecs(v) => cfg.history_secs = v,
             Pick::Theme(t) => cfg.theme = t,
+            Pick::Language(l) => cfg.language = l,
             Pick::CpuBar(b) => cfg.options.cpu.bar = b,
             Pick::Drive(d) => cfg.options.disk.drive = d,
             Pick::Units(u) => cfg.options.network.units = u,

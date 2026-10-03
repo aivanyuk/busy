@@ -51,10 +51,16 @@ pub(crate) fn sync(cfg: &Config) {
     if *u.cfg.borrow() == *cfg {
         return;
     }
-    let theme = u.cfg.borrow().theme != cfg.theme;
+    let (theme, language) = {
+        let old = u.cfg.borrow();
+        (old.theme != cfg.theme, old.language != cfg.language)
+    };
     *u.cfg.borrow_mut() = cfg.clone();
     if theme {
         u.apply_theme();
+    }
+    if language {
+        u.apply_language();
     }
     u.rebuild();
 }

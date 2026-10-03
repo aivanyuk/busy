@@ -250,6 +250,16 @@ impl Ui {
         self.invalidate();
     }
 
+    /// Shows the config's language at once, before the host applies the config: the next `rebuild` and paint
+    /// take their text from it. The fonts keep the locale they were made with until the window is reopened.
+    fn apply_language(&self) {
+        busy_ui::i18n::select(self.cfg.borrow().language);
+        if !self.in_setup() {
+            // SAFETY: our live window; the title outlives the call.
+            let _ = unsafe { SetWindowTextW(self.hwnd, &HSTRING::from(busy_ui::i18n::t().settings.window_title)) };
+        }
+    }
+
     fn invalidate(&self) {
         // SAFETY: our live window; a null rect invalidates the whole client area.
         unsafe {
@@ -313,10 +323,16 @@ impl Ui {
         if c == *self.cfg.borrow() {
             return;
         }
-        let theme = self.cfg.borrow().theme != c.theme;
+        let (theme, language) = {
+            let old = self.cfg.borrow();
+            (old.theme != c.theme, old.language != c.language)
+        };
         *self.cfg.borrow_mut() = c.clone();
         if theme {
             self.apply_theme();
+        }
+        if language {
+            self.apply_language();
         }
         self.rebuild();
         self.host.apply(c);
