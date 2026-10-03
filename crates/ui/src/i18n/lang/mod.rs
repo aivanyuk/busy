@@ -21,3 +21,6 @@ pub(super) use de::DE;
 mod pl;
 
 pub(super) use pl::PL;
+mod zh_hans;
+
+pub(super) use zh_hans::ZH_HANS;
