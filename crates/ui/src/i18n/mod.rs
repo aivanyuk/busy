@@ -183,7 +183,7 @@ pub fn strings(lang: Lang) -> &'static Strings {
         Lang::Pl => &lang::PL,
         Lang::ZhHans => &lang::ZH_HANS,
         Lang::Ko => &lang::KO,
-        _ => &EN,
+        Lang::Ru => &lang::RU,
     }
 }
 
