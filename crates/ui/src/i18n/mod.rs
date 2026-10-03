@@ -175,6 +175,12 @@ pub fn plural(p: &Plural, n: u64) -> String {
     fill(form(lang(), p, n), &[&n])
 }
 
+/// The form of `p` for `n` in the current language, filled with `args`: for a count that shares the string
+/// with other values, `{0}` being the count (pass `n` first) and `{1}`… the others.
+pub fn plural_with(p: &Plural, n: u64, args: &[&dyn Display]) -> String {
+    fill(form(lang(), p, n), args)
+}
+
 /// The form of `p` that `lang`'s plural rules pick for `n`.
 fn form(lang: Lang, p: &Plural, n: u64) -> &'static str {
     let (n10, n100) = (n % 10, n % 100);
@@ -212,6 +218,13 @@ mod tests {
         assert_eq!(forms(Lang::Ru), ["other", "one", "few", "other", "other", "one", "few", "other", "other"]);
         assert_eq!(forms(Lang::Pl), ["other", "one", "few", "other", "other", "other", "few", "other", "other"]);
         assert_eq!(forms(Lang::Ja), ["other"; 9]);
+    }
+
+    #[test]
+    fn a_plural_with_more_values() {
+        let p = Plural { one: "{0} file on {1}", few: "{0} files on {1}", other: "{0} files on {1}" };
+        assert_eq!(plural_with(&p, 1, &[&1, &"C:"]), "1 file on C:");
+        assert_eq!(plural_with(&p, 3, &[&3, &"C:"]), "3 files on C:");
     }
 
     /// The `{i}` slots of a pattern, sorted.
