@@ -145,7 +145,7 @@ impl Ui {
                 }
             }
             Target::Place(i) => {
-                if let Some(&(a, ..)) = super::PLACES.get(i) {
+                if let Some(&a) = super::ANCHORS.get(i) {
                     self.edit(Edit::Pick(Pick::Anchor(a)));
                 }
             }
