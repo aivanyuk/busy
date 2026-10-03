@@ -9,6 +9,7 @@ use super::layout::{Fonts, LINE_12, LINE_14, TITLE_H};
 use busy_core::{Anchor, Config, Module};
 use busy_ui::i18n::t;
 use busy_ui::render::{Gfx, Rect};
+use windows::Win32::Graphics::DirectWrite::IDWriteTextFormat;
 
 pub(super) mod input;
 mod paint;
@@ -27,8 +28,10 @@ const GAP: f32 = 6.0;
 pub(super) const HEADLINE_H: f32 = 36.0;
 const CARD_H: f32 = 52.0;
 const COLS: usize = 3;
-/// Radio card: padding 14 around a label and a description 2 apart.
+/// Radio card: padding 14 around a label and a description 2 apart, one line each; the text starts right of
+/// the radio, 12 from it.
 const PLACE_H: f32 = 14.0 + LINE_14 + 2.0 + LINE_12 + 14.0;
+pub(super) const PLACE_TEXT_X: f32 = 14.0 + BOX + 12.0;
 /// Footer: a 1-DIP top line, padding 20 around 32-high buttons.
 const FOOTER_H: f32 = 1.0 + 20.0 + 32.0 + 20.0;
 pub(super) const BOX: f32 = 20.0;
@@ -71,6 +74,13 @@ pub(super) fn place(cfg: &Config) -> usize {
     ANCHORS.iter().position(|&a| a == cfg.anchor).unwrap_or(0)
 }
 
+/// The height `s` takes in `wrap` at width `w`: `line`, the design's one line, unless it wraps to more lines,
+/// then all of them.
+fn text_h(gfx: &Gfx, wrap: &IDWriteTextFormat, s: &str, w: f32, line: f32) -> f32 {
+    let (one, all) = (gfx.metrics(wrap, s, 10_000.0).1, gfx.metrics(wrap, s, w).1);
+    if all > one { all.max(line) } else { line }
+}
+
 /// Where everything sits, in client DIPs. Fixed once made: the window doesn't resize in setup.
 pub(super) struct Layout {
     pub(super) headline: Rect,
@@ -79,6 +89,9 @@ pub(super) struct Layout {
     pub(super) cards: Vec<Rect>,
     pub(super) position: Rect,
     pub(super) places: [Rect; 2],
+    /// The heights of the radio cards' label and description, on a horizontal (0) and a vertical taskbar (1):
+    /// `LINE_14` and `LINE_12`, more when one wraps.
+    pub(super) place_text: [(f32, f32); 2],
     pub(super) footer: Rect,
     /// The Start with Windows checkbox, and the checkbox with its label (what a click hits).
     pub(super) check: Rect,
@@ -91,12 +104,12 @@ pub(super) struct Layout {
 
 impl Layout {
     pub(super) fn new(gfx: &Gfx, f: &Fonts, cards: usize) -> Self {
-        let cw = W - 2.0 * PAD_X;
-        let x = PAD_X;
+        let (s, cw, x) = (&t().setup, W - 2.0 * PAD_X, PAD_X);
         let mut y = TITLE_H + PAD_T;
-        let headline = Rect::new(x, y, cw, HEADLINE_H);
-        y += HEADLINE_H + 6.0;
-        let sub = Rect::new(x, y, cw, gfx.metrics(&f.body_wrap, t().setup.sub, cw).1.max(LINE_14));
+        // The design's one-line headline, or the lines a longer translation wraps to.
+        let headline = Rect::new(x, y, cw, text_h(gfx, &f.title_wrap, s.headline, cw, HEADLINE_H));
+        y = headline.bottom() + 6.0;
+        let sub = Rect::new(x, y, cw, gfx.metrics(&f.body_wrap, s.sub, cw).1.max(LINE_14));
         y = sub.bottom() + SECTION_GAP;
         let readings = Rect::new(x, y, cw, LINE_14);
         y += LINE_14 + HEAD_GAP;
@@ -110,12 +123,21 @@ impl Layout {
         let position = Rect::new(x, y, cw, LINE_14);
         y += LINE_14 + HEAD_GAP;
         let pw = (cw - GAP) / 2.0;
-        let places = [Rect::new(x, y, pw, PLACE_H), Rect::new(x + pw + GAP, y, pw, PLACE_H)];
-        y += PLACE_H + PAD_B;
+        // A radio card's label and description each take a line in the design, more when a translation wraps:
+        // for each way the taskbar may stand, the most either card's takes. Both cards are as tall, and as tall
+        // as the taller wording needs, so the taskbar turning doesn't resize the window.
+        let tw = pw - PLACE_TEXT_X - 14.0;
+        let place_text = [false, true].map(|vertical| {
+            places(vertical).iter().fold((LINE_14, LINE_12), |(l, d), p| {
+                (text_h(gfx, &f.body_wrap, p.1, tw, LINE_14).max(l), text_h(gfx, &f.desc, p.2, tw, LINE_12).max(d))
+            })
+        });
+        let place_h = place_text.iter().map(|(l, d)| PLACE_H - LINE_14 - LINE_12 + l + d).fold(PLACE_H, f32::max);
+        let places = [Rect::new(x, y, pw, place_h), Rect::new(x + pw + GAP, y, pw, place_h)];
+        y += place_h + PAD_B;
         let footer = Rect::new(0.0, y, W, FOOTER_H);
         let by = y + 1.0 + 20.0;
         let button = |label: &str| gfx.text_width(&f.body, label) + 40.0;
-        let s = &t().setup;
         let start = Rect::new(W - 24.0 - button(s.start), by, button(s.start), 32.0);
         let skip = Rect::new(start.x - 8.0 - button(s.skip), by, button(s.skip), 32.0);
         let check = Rect::new(24.0, by + (32.0 - BOX) / 2.0, BOX, BOX);
@@ -127,6 +149,7 @@ impl Layout {
             cards: card_rects,
             position,
             places,
+            place_text,
             footer,
             check,
             startup,

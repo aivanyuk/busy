@@ -37,6 +37,7 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
     let dot = |m: Module| {
         t.color(busy_ui::tone::Tone::Pal(s.cfg.module(m).map_or(m.default_color(), ModuleCfg::color_index)))
     };
+    let status_w = nav::status_w(s.gfx, f);
     for (i, &p) in v.nav.iter().enumerate() {
         let (dot, status) = match p {
             Page::General | Page::Advanced => (t.fg3, ""),
@@ -46,6 +47,7 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
             label: p.title(),
             dot,
             status,
+            status_w,
             selected: p == v.page && !v.searching(),
             hover: v.hover == Some(Target::Nav(i)),
         };
@@ -72,7 +74,7 @@ pub(super) fn paint(cv: &Canvas, v: &View, s: &State) {
                 let text_r = Rect::new(r.x + CARD_PAD_L, r.y + CARD_PAD_Y, p.text_w, r.h - 2.0 * CARD_PAD_Y);
                 cv.text(text, &f.desc, text_r, t.fg, Align::Left);
             }
-            Item::Order(list) => order::draw(cv, r, list, dot, v.hover, s.edge.is_vertical(), t, f),
+            Item::Order(list) => order::draw(cv, r, list, dot, v.hover, s.edge.is_vertical(), (s.gfx, t), f),
             Item::Preview(m) => {
                 preview::draw(cv, r, *m, s.cfg, s.data.as_ref(), (s.gfx, s.cell_fonts), s.edge, t, f);
             }

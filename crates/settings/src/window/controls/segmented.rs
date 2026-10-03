@@ -2,7 +2,7 @@
 //! 0 14) in a `--ctl` box with padding 2 and 2 between; the chosen one is `--accent` with `--on-accent` text.
 
 use crate::window::choices::Opt;
-use crate::window::layout::Fonts;
+use crate::window::layout::{Fonts, Label};
 use busy_ui::render::{Align, Canvas, Gfx, Rect};
 use busy_ui::theme::Theme;
 
@@ -12,7 +12,7 @@ const PAD: f32 = 2.0;
 const LINE: f32 = 1.0;
 
 fn widths(gfx: &Gfx, f: &Fonts, opts: &[Opt]) -> Vec<f32> {
-    opts.iter().map(|o| (f.seg_width(gfx, &o.label) + 28.0).ceil()).collect()
+    opts.iter().map(|o| (f.label_width(gfx, Label::Seg, &o.label) + 28.0).ceil()).collect()
 }
 
 pub(in crate::window) fn size(gfx: &Gfx, f: &Fonts, opts: &[Opt]) -> (f32, f32) {

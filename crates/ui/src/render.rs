@@ -110,7 +110,12 @@ impl Gfx {
 
     /// Wrapping format for paragraphs (hints).
     pub fn wrapping(&self, size: f32) -> Result<IDWriteTextFormat> {
-        let f = self.format(size, false)?;
+        self.wrapping_weight(size, DWRITE_FONT_WEIGHT_NORMAL)
+    }
+
+    /// `wrapping` with any weight: a heading that may take more than one line in some languages.
+    pub fn wrapping_weight(&self, size: f32, weight: DWRITE_FONT_WEIGHT) -> Result<IDWriteTextFormat> {
+        let f = self.format_weight(size, weight)?;
         unsafe {
             f.SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP)?;
             f.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR)?;
