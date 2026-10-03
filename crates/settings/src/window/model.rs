@@ -3,6 +3,7 @@
 
 use super::choices::{self, Choices, Opt};
 use busy_core::{CellStyle, Config, Module};
+use busy_ui::i18n::{self, t};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum Page {
@@ -12,43 +13,21 @@ pub(super) enum Page {
     Advanced,
 }
 
-/// Third-party sensor tools: what the opt-in reads and its risk, verbatim from the plan's Opt-in sources.
-pub(super) const THIRD_PARTY: &str = "Reading LibreHardwareMonitor (WMI) / HWiNFO (shared memory). Reads data \
-     published by another program you installed. Needed for CPU temps, fans, SSD temp/health, CPU power, \
-     throttling.";
-
-/// Per-process network traffic (`OptIn::process_network`): what it does and its risk, verbatim from the plan.
-pub(super) const PROCESS_NETWORK: &str = "Top processes by traffic in the Network flyout. Requires running busy as \
-     administrator; starts a kernel event tracing session while the Network flyout is open. Without it, the \
-     flyout lists processes by open connections.";
-
-/// The update check (`OptIn::update_check`): what it does and its risk, verbatim from docs/plans/release.md.
-pub(super) const UPDATE_CHECK: &str = "Contacts api.github.com once a day while busy runs, to see whether a newer \
-     release exists; GitHub sees your IP address. Nothing is downloaded or installed.";
-
 impl Page {
     pub(super) fn title(self) -> &'static str {
         match self {
-            Page::General => "General",
-            Page::Module(m) => busy_ui::i18n::t().common.module(m),
-            Page::Advanced => "Advanced",
+            Page::General => t().settings.general,
+            Page::Module(m) => t().common.module(m),
+            Page::Advanced => t().settings.advanced,
         }
     }
 
     pub(super) fn sub(self) -> &'static str {
+        let s = &t().settings;
         match self {
-            Page::General => "Startup, placement, refresh rate and theme",
-            Page::Module(m) => match m {
-                Module::Cpu => "Processor usage",
-                Module::Gpu => "Graphics processor usage",
-                Module::Memory => "Memory in use",
-                Module::Disk => "Drive activity and free space",
-                Module::Network => "Transfer rates",
-                Module::Battery => "Charge and time remaining",
-                Module::Sensors => "Temperatures, fans and power",
-                Module::Processes => "The busiest programs, listed in flyouts",
-            },
-            Page::Advanced => "Optional data sources, each off until you turn it on",
+            Page::General => s.general_sub,
+            Page::Module(m) => s.module_sub(m),
+            Page::Advanced => s.advanced_sub,
         }
     }
 }
@@ -68,10 +47,7 @@ pub(super) fn is_on(cfg: &Config, m: Module) -> bool {
 
 /// The nav header's subtitle (design `enabledText`), with a singular the design lacks.
 pub(super) fn readings(cfg: &Config) -> String {
-    match cfg.modules.iter().filter(|c| c.taskbar).count() {
-        1 => "1 reading on the taskbar".into(),
-        n => format!("{n} readings on the taskbar"),
-    }
+    i18n::plural(&t().settings.readings, cfg.modules.iter().filter(|c| c.taskbar).count() as u64)
 }
 
 pub(super) enum Item {
@@ -117,8 +93,8 @@ pub(super) enum Command {
 impl Command {
     pub(super) fn label(self) -> &'static str {
         match self {
-            Command::RunSetup => "Run setup",
-            Command::Releases => "Releases",
+            Command::RunSetup => t().settings.run_setup,
+            Command::Releases => t().settings.releases,
         }
     }
 }
@@ -145,10 +121,11 @@ pub(super) enum Flag {
 impl Flag {
     /// An opt-in's risk, stated when it is turned on.
     pub(super) fn risk(self) -> Option<&'static str> {
+        let s = &t().settings;
         match self {
-            Flag::ThirdPartySensors => Some(THIRD_PARTY),
-            Flag::UpdateCheck => Some(UPDATE_CHECK),
-            Flag::ProcessNetwork => Some(PROCESS_NETWORK),
+            Flag::ThirdPartySensors => Some(s.third_party_desc),
+            Flag::UpdateCheck => Some(s.update_check_desc),
+            Flag::ProcessNetwork => Some(s.process_network_desc),
             _ => None,
         }
     }
@@ -209,54 +186,40 @@ pub(super) fn search(query: &str, cfg: &Config, ch: &Choices) -> Vec<Item> {
     out
 }
 
-/// General's notice for a config file a newer busy wrote (`Config::newer`), which is never saved over.
-pub(super) const NEWER: &str =
-    "These settings were saved by a newer version of busy. Changes apply now, but aren\u{2019}t saved.";
-
+/// General opens with a notice for a config file a newer busy wrote (`Config::newer`), which is never saved over.
 fn general(cfg: &Config, ch: &Choices) -> Vec<Item> {
-    let notice = cfg.newer.then_some(Item::Notice(NEWER));
+    let notice = cfg.newer.then(|| Item::Notice(t().settings.newer));
     notice.into_iter().chain(general_rows(cfg, ch)).collect()
 }
 
 /// About's line: this build's version, and a newer one when the update check found it.
 fn version(ch: &Choices) -> String {
-    let this = env!("CARGO_PKG_VERSION");
+    let (s, this) = (&t().settings, env!("CARGO_PKG_VERSION"));
     match &ch.newer {
-        Some(r) => format!("busy {this} \u{2014} {} is available", r.version),
-        None => format!("busy {this}"),
+        Some(r) => i18n::fill(s.newer_version, &[&this, &r.version]),
+        None => i18n::fill(s.this_version, &[&this]),
     }
 }
 
 fn general_rows(cfg: &Config, ch: &Choices) -> Vec<Item> {
+    let s = &t().settings;
     vec![
-        Item::Header("Behavior"),
-        toggle("Start with Windows", "Launch busy when you sign in", Flag::Autostart, cfg.autostart),
-        dropdown(
-            "Widget position",
-            "Where readings sit on the taskbar",
-            choices::anchor(cfg.anchor, ch.edge.is_vertical()),
-        ),
-        dropdown("Offset", "Extra space between the readings and that edge", choices::offset(cfg.offset_px)),
-        dropdown(
-            "Default update interval",
-            "Each widget can override this on its own page",
-            choices::interval(cfg.interval_ms),
-        ),
-        dropdown("History", "How far back the flyout charts go", choices::history(cfg.history_secs)),
-        Item::Header("Appearance"),
-        dropdown("Theme", "Flyouts and this window", choices::theme(cfg.theme)),
-        Item::Row(Row {
-            title: "Setup",
-            desc: "Walk through choosing widgets again".into(),
-            control: Control::Button(Command::RunSetup),
-        }),
-        Item::Header("Taskbar order"),
+        Item::Header(s.behavior),
+        toggle(s.autostart, s.autostart_desc, Flag::Autostart, cfg.autostart),
+        dropdown(s.position, s.position_desc, choices::anchor(cfg.anchor, ch.edge.is_vertical())),
+        dropdown(s.offset, s.offset_desc, choices::offset(cfg.offset_px)),
+        dropdown(s.default_interval, s.default_interval_desc, choices::interval(cfg.interval_ms)),
+        dropdown(s.history, s.history_desc, choices::history(cfg.history_secs)),
+        Item::Header(s.appearance),
+        dropdown(s.theme, s.theme_desc, choices::theme(cfg.theme)),
+        Item::Row(Row { title: s.setup, desc: s.setup_desc.into(), control: Control::Button(Command::RunSetup) }),
+        Item::Header(s.taskbar_order),
         Item::Order(
             cfg.modules.iter().filter(|c| c.module != Module::Processes).map(|c| (c.module, c.taskbar)).collect(),
         ),
-        Item::Header("About"),
+        Item::Header(s.about),
         Item::Row(Row {
-            title: "Version",
+            title: s.version,
             desc: version(ch),
             control: if ch.packaged { Control::None } else { Control::Button(Command::Releases) },
         }),
@@ -264,70 +227,44 @@ fn general_rows(cfg: &Config, ch: &Choices) -> Vec<Item> {
 }
 
 fn module(m: Module, cfg: &Config, ch: &Choices) -> Vec<Item> {
-    let Some(c) = cfg.module(m) else { return Vec::new() };
+    let s = &t().settings;
+    let (Some(c), Some(show)) = (cfg.module(m), s.show_desc(m)) else { return Vec::new() };
     let o = &cfg.options;
-    let name = match m {
-        Module::Cpu | Module::Gpu => busy_ui::i18n::t().common.module(m).to_string(),
-        _ => busy_ui::i18n::t().common.module(m).to_lowercase(),
-    };
-    let mut r = vec![
-        Item::Preview(m),
-        Item::Header("Taskbar"),
-        toggle("Show on taskbar", format!("Display the {name} reading on the taskbar"), Flag::Taskbar(m), c.taskbar),
-    ];
-    r.push(segmented("Style", "How the reading is drawn", choices::style(m, c.style)));
+    let mut r =
+        vec![Item::Preview(m), Item::Header(s.taskbar), toggle(s.show_on_taskbar, show, Flag::Taskbar(m), c.taskbar)];
+    r.push(segmented(s.style, s.style_desc, choices::style(m, c.style)));
     if c.style != CellStyle::Io {
-        r.push(toggle("Show label", "Small caption above the value", Flag::Label(m), c.show_label));
+        r.push(toggle(s.show_label, s.show_label_desc, Flag::Label(m), c.show_label));
     }
     match m {
-        Module::Cpu => r.push(dropdown("Bar shows", "Used by the Bar style", choices::cpu_bar(o.cpu.bar))),
-        Module::Disk => {
-            r.push(dropdown("Drive", "Used by the Text and Bar styles", choices::drive(o.disk.drive.as_deref(), ch)));
-        }
+        Module::Cpu => r.push(dropdown(s.cpu_bar, s.cpu_bar_desc, choices::cpu_bar(o.cpu.bar))),
+        Module::Disk => r.push(dropdown(s.drive, s.drive_desc, choices::drive(o.disk.drive.as_deref(), ch))),
         Module::Network => {
-            r.push(dropdown("Units", "Transfer rate units", choices::units(o.network.units)));
-            r.push(dropdown("Interface", "Which adapter to measure", choices::interface(&o.network.interface, ch)));
+            r.push(dropdown(s.units, s.units_desc, choices::units(o.network.units)));
+            r.push(dropdown(s.interface, s.interface_desc, choices::interface(&o.network.interface, ch)));
         }
-        Module::Battery => r.push(toggle(
-            "Show time remaining",
-            "Replaces the label with hours:minutes left",
-            Flag::Remaining,
-            o.battery.show_remaining,
-        )),
+        Module::Battery => r.push(toggle(s.remaining, s.remaining_desc, Flag::Remaining, o.battery.show_remaining)),
         Module::Sensors => {
-            r.push(dropdown("Taskbar sensor", "Which temperature to show", choices::sensor(&o.sensors.sensor, ch)));
-            r.push(segmented("Unit", "Applies everywhere in busy", choices::temp_unit(cfg.temp_unit)));
+            r.push(dropdown(s.sensor, s.sensor_desc, choices::sensor(&o.sensors.sensor, ch)));
+            r.push(segmented(s.unit, s.unit_desc, choices::temp_unit(cfg.temp_unit)));
         }
         _ => {}
     }
-    let rises = if m == Module::Sensors { "temperature" } else { "usage" };
-    r.push(Item::Header("Color"));
+    r.push(Item::Header(s.color));
     r.push(Item::Row(Row {
-        title: "Widget color",
-        desc: "Used for graphs, bars and the flyout chart".into(),
+        title: s.widget_color,
+        desc: s.widget_color_desc.into(),
         control: Control::Swatches(m, c.color_index()),
     }));
-    r.push(toggle(
-        "Color by load",
-        format!("Shift green \u{2192} amber \u{2192} red as {rises} rises"),
-        Flag::ByLoad(m),
-        c.color_by_load,
-    ));
+    let by_load = if m == Module::Sensors { s.by_load_temperature } else { s.by_load_usage };
+    r.push(toggle(s.by_load, by_load, Flag::ByLoad(m), c.color_by_load));
     r.extend(updates(m, cfg));
     r
 }
 
 fn processes(cfg: &Config) -> Vec<Item> {
-    let on = cfg.module(Module::Processes).is_some_and(|c| c.flyout);
-    let mut r = vec![
-        Item::Header("Flyouts"),
-        toggle(
-            "Top processes",
-            "List the busiest programs in the CPU, Memory, Disk and Network flyouts",
-            Flag::TopProcesses,
-            on,
-        ),
-    ];
+    let (s, on) = (&t().settings, cfg.module(Module::Processes).is_some_and(|c| c.flyout));
+    let mut r = vec![Item::Header(s.flyouts), toggle(s.top_processes, s.top_processes_desc, Flag::TopProcesses, on)];
     r.extend(updates(Module::Processes, cfg));
     r
 }
@@ -335,27 +272,21 @@ fn processes(cfg: &Config) -> Vec<Item> {
 /// Only the opt-ins that are built: the others would be switches that do nothing. From the Store, which updates
 /// busy itself, there is no update check.
 fn advanced(cfg: &Config, ch: &Choices) -> Vec<Item> {
+    let (s, o) = (&t().settings, &cfg.opt_in);
     let mut r = vec![
-        Item::Header("Opt-in sources"),
-        toggle("Third-party sensor tools", THIRD_PARTY, Flag::ThirdPartySensors, cfg.opt_in.third_party_sensors),
-        toggle("Per-process network traffic", PROCESS_NETWORK, Flag::ProcessNetwork, cfg.opt_in.process_network),
+        Item::Header(s.opt_in_sources),
+        toggle(s.third_party, s.third_party_desc, Flag::ThirdPartySensors, o.third_party_sensors),
+        toggle(s.process_network, s.process_network_desc, Flag::ProcessNetwork, o.process_network),
     ];
     if !ch.packaged {
-        r.push(toggle("Check for updates", UPDATE_CHECK, Flag::UpdateCheck, cfg.opt_in.update_check));
+        r.push(toggle(s.update_check, s.update_check_desc, Flag::UpdateCheck, o.update_check));
     }
     r
 }
 
 fn updates(m: Module, cfg: &Config) -> [Item; 2] {
-    let iv = cfg.module(m).and_then(|c| c.interval_s);
-    [
-        Item::Header("Updates"),
-        dropdown(
-            "Update interval",
-            "How often this reading refreshes",
-            choices::module_interval(m, iv, cfg.interval_ms),
-        ),
-    ]
+    let (s, iv) = (&t().settings, cfg.module(m).and_then(|c| c.interval_s));
+    [Item::Header(s.updates), dropdown(s.interval, s.interval_desc, choices::module_interval(m, iv, cfg.interval_ms))]
 }
 
 #[cfg(test)]
@@ -372,7 +303,9 @@ mod tests {
         let mut cfg = Config::default();
         assert!(!items(Page::General, &cfg, &Choices::default()).iter().any(|i| matches!(i, Item::Notice(_))));
         cfg.newer = true;
-        assert!(matches!(items(Page::General, &cfg, &Choices::default())[0], Item::Notice(NEWER)));
+        assert!(
+            matches!(items(Page::General, &cfg, &Choices::default())[0], Item::Notice(n) if n == t().settings.newer)
+        );
     }
 
     #[test]
@@ -488,8 +421,8 @@ mod tests {
         cfg.opt_in.process_network = true;
         let on = items(Page::Advanced, &cfg, &ch);
         assert!(matches!(on.get(2), Some(Item::Row(Row { control: Control::Toggle(Flag::ProcessNetwork, true), .. }))));
-        assert_eq!(Flag::ProcessNetwork.risk(), Some(PROCESS_NETWORK));
-        assert_eq!(Flag::UpdateCheck.risk(), Some(UPDATE_CHECK));
+        assert_eq!(Flag::ProcessNetwork.risk(), Some(t().settings.process_network_desc));
+        assert_eq!(Flag::UpdateCheck.risk(), Some(t().settings.update_check_desc));
         assert_eq!(Flag::Autostart.risk(), None);
     }
 
