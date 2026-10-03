@@ -1,7 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 //! Standalone host for the settings window, with fixed synthetic readings for the preview and the machine
 //! lists. `BUSY_FORCE_DARK=1` forces dark mode; `BUSY_SETUP=1` opens setup (onboarding) instead of the
-//! Settings pages. Applied configs are printed, not saved.
+//! Settings pages; `BUSY_LANG=<tag>` (`de`, `ja`, …) shows it in that language instead of the config's or
+//! Windows'. Applied configs are printed, not saved.
 // link.exe's manifest schema predates <dpiAwareness> and warns (81010002); the element is still embedded.
 #![allow(linker_messages)]
 
@@ -88,6 +89,9 @@ fn snapshot(t: f32) -> Snapshot {
 
 fn main() {
     let cfg = Config::load();
+    let system = Lang::pick(busy_win::ui_languages().iter().map(String::as_str));
+    let lang = std::env::var("BUSY_LANG").ok().and_then(|t| Lang::from_tag(&t)).or(cfg.language);
+    busy_ui::i18n::init(system, lang);
     let mut hist = History::new(&cfg);
     let fresh = [true; Module::ALL.len()];
     for i in 0..40 {
