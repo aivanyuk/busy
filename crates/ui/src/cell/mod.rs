@@ -13,7 +13,7 @@ use crate::history::Series;
 use crate::render::nice_max;
 use crate::theme::Color;
 use crate::tone::{self, SECOND};
-use crate::{fmt, select};
+use crate::{fmt, i18n, select};
 use busy_core::{CellStyle, Config, CpuBar, Module, ModuleCfg, RateUnit, SensorKind, Snapshot, TempUnit};
 
 pub struct Cell<'a> {
@@ -104,12 +104,13 @@ pub struct Key {
 impl Cell<'_> {
     /// Tooltip text (design `title`): "<Module>: <value>", both rates for Io, the name alone without a value.
     pub fn tip(&self) -> String {
-        let name = crate::i18n::t().common.module(self.module);
+        let t = i18n::t();
+        let name = t.common.module(self.module);
         match &self.body {
             Body::Text { value, .. } | Body::Graph { value, .. } | Body::Bar { value, .. } if !value.is_empty() => {
-                format!("{name}: {value}")
+                i18n::fill(t.cell.tip, &[&name, value])
             }
-            Body::Io { rows: [(k1, _, v1), (k2, _, v2)], .. } => format!("{name}: {k1} {v1}  {k2} {v2}"),
+            Body::Io { rows: [(k1, _, v1), (k2, _, v2)], .. } => i18n::fill(t.cell.tip_rows, &[&name, k1, v1, k2, v2]),
             _ => name.into(),
         }
     }
@@ -218,8 +219,9 @@ pub fn cell<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Option<Cell<'a>> {
             CellStyle::Io => (!snap.disks.is_empty()).then(|| {
                 let r = snap.disks.iter().map(|d| d.read_bps).sum::<f64>();
                 let w = snap.disks.iter().map(|d| d.write_bps).sum::<f64>();
+                let keys = &i18n::t().cell;
                 Body::Io {
-                    rows: [("R", color, fmt::rate(r)), ("W", second, fmt::rate(w))],
+                    rows: [(keys.read, color, fmt::rate(r)), (keys.write, second, fmt::rate(w))],
                     short: [fmt::rate_short(r, RateUnit::Bytes), fmt::rate_short(w, RateUnit::Bytes)],
                     room: RATE_BYTES,
                 }
@@ -272,23 +274,23 @@ pub fn sample(snap: &Snapshot, cfg: &Config, m: Module) -> Option<String> {
 /// Design `MODS.short`, except: Disk Text/Bar name their drive ("C:"), Battery shows the time left (`h:mm`)
 /// on battery with `show_remaining`, and a sensor pick that isn't a temperature is named by its reading.
 fn label(m: Module, style: CellStyle, ctx: &Ctx) -> String {
-    let opts = &ctx.cfg.options;
+    let (opts, t) = (&ctx.cfg.options, &i18n::t().cell);
     match m {
-        Module::Cpu => "CPU".into(),
-        Module::Memory => "RAM".into(),
-        Module::Gpu => "GPU".into(),
-        Module::Network => "NET".into(),
+        Module::Cpu => t.cpu.into(),
+        Module::Memory => t.ram.into(),
+        Module::Gpu => t.gpu.into(),
+        Module::Network => t.net.into(),
         Module::Disk => match select::disk_volume(ctx.snap, ctx.cfg) {
             Some(v) if style != CellStyle::Io => v.mount.clone(),
-            _ => "DISK".into(),
+            _ => t.disk.into(),
         },
         Module::Battery => match ctx.snap.battery.as_ref().and_then(|b| b.secs_remaining) {
             Some(secs) if opts.battery.show_remaining => fmt::hours_minutes(secs),
-            _ => "BAT".into(),
+            _ => t.bat.into(),
         },
         Module::Sensors => match select::taskbar_sensor(ctx.snap, ctx.cfg) {
             Some(s) if s.kind != SensorKind::Temperature => s.name.chars().take(6).collect::<String>().to_uppercase(),
-            _ => "TEMP".into(),
+            _ => t.temp.into(),
         },
         Module::Processes => String::new(),
     }
