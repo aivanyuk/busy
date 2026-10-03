@@ -53,7 +53,7 @@ pub(super) fn detail<'a>(ctx: &Ctx<'a>, mc: &ModuleCfg) -> Detail<'a> {
         .collect();
     // The slowest disk: a response time is worth showing when something is slow.
     let response = snap.disks.iter().filter_map(|d| d.avg_response_ms).reduce(f32::max);
-    d.stat(f.disk_avg_response, response.map(|ms| format!("{ms:.1} ms")));
+    d.stat(f.disk_avg_response, response.map(|ms| format!("{} ms", fmt::decimal(f64::from(ms), 1))));
     d.stat(f.temperature, select::part_temp(snap, &SensorPick::Storage).map(|s| fmt::temp(s.value, ctx.cfg.temp_unit)));
     let total = |f: fn(&busy_core::DiskInfo) -> Option<u64>| snap.disks.iter().filter_map(f).reduce(|a, b| a + b);
     d.stat(f.disk_read_total, total(|d| d.read_total).map(fmt::bytes));
