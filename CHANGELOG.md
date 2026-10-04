@@ -9,6 +9,9 @@ What changed for people who run busy, newest first. The format follows [Keep a C
 - An opt-in for per-process network traffic (Settings → Advanced, off by default): with busy running as administrator, the Network flyout lists processes by how much they send and receive instead.
 - busy speaks ten more languages: German, Spanish, French, Italian, Japanese, Korean, Polish, Brazilian Portuguese, Russian and Simplified Chinese. It follows Windows' display language, or the one picked under Settings → General → Language, and writes numbers with your region's decimal and thousands separators.
 
+### Fixed
+- Readings in the taskbar keep updating after a graphics driver update or reset, instead of freezing until busy is restarted.
+
 ## [0.2.0] - 2026-10-01
 
 ### Added

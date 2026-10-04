@@ -102,6 +102,21 @@ pub struct Taskbar {
     tasks: Tasks,
 }
 
+/// A DC render target for the layered widget: premultiplied BGRA (UpdateLayeredWindow's format), grayscale
+/// text antialiasing (ClearType needs an opaque background), 96 DPI until `render` sets the taskbar's.
+fn dc_target(gfx: &Gfx) -> Result<ID2D1DCRenderTarget> {
+    let props = D2D1_RENDER_TARGET_PROPERTIES {
+        pixelFormat: D2D1_PIXEL_FORMAT { format: DXGI_FORMAT_B8G8R8A8_UNORM, alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED },
+        ..Default::default()
+    };
+    // SAFETY: `props` outlives the call; the factory is a live COM object.
+    unsafe {
+        let rt = gfx.d2d.CreateDCRenderTarget(&props)?;
+        rt.SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+        Ok(rt)
+    }
+}
+
 impl Taskbar {
     pub fn create(gfx: &Gfx) -> Option<Self> {
         let tray = explorer::find_tray()?;
@@ -124,18 +139,7 @@ impl Taskbar {
                 None,
             )
             .ok()?;
-            let props = D2D1_RENDER_TARGET_PROPERTIES {
-                pixelFormat: D2D1_PIXEL_FORMAT {
-                    format: DXGI_FORMAT_B8G8R8A8_UNORM,
-                    alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
-                },
-                ..Default::default()
-            };
-            let made = (|| -> Result<_> {
-                let rt = gfx.d2d.CreateDCRenderTarget(&props)?;
-                rt.SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
-                Ok((rt, Fonts::new(gfx)?))
-            })();
+            let made = (|| -> Result<_> { Ok((dc_target(gfx)?, Fonts::new(gfx)?)) })();
             let Ok((rt, fonts)) = made else {
                 let _ = DestroyWindow(hwnd);
                 return None;
@@ -353,7 +357,15 @@ impl Taskbar {
             }
         }
         unsafe {
-            if self.rt.EndDraw(None, None).is_err() {
+            if let Err(e) = self.rt.EndDraw(None, None) {
+                // The GPU device was lost (driver update or reset, adapter change): the target is dead for good,
+                // so make a new one and draw again on the next tick. The flyout's HWND target does the same.
+                if e.code() == D2DERR_RECREATE_TARGET
+                    && let Ok(rt) = dc_target(ctx.gfx)
+                {
+                    rt.SetDpi(dpi as f32, dpi as f32);
+                    self.rt = rt;
+                }
                 return;
             }
             let size = SIZE { cx: w_px, cy: h_px };
