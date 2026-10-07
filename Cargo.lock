@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "busy"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "busy-core",
  "busy-metrics",
@@ -18,7 +18,7 @@ dependencies = [
 
 [[package]]
 name = "busy-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -26,7 +26,7 @@ dependencies = [
 
 [[package]]
 name = "busy-metrics"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "busy-core",
  "busy-win",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "busy-sensors"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "busy-core",
  "busy-win",
@@ -44,7 +44,7 @@ dependencies = [
 
 [[package]]
 name = "busy-settings"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "busy-core",
  "busy-ui",
@@ -55,7 +55,7 @@ dependencies = [
 
 [[package]]
 name = "busy-ui"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "busy-core",
  "busy-win",
@@ -64,7 +64,7 @@ dependencies = [
 
 [[package]]
 name = "busy-win"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "windows",
 ]
