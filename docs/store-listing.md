@@ -37,7 +37,10 @@ Disk: volumes and free space, response time, temperature, bytes read and written
 Network: interface, Wi-Fi band and signal, addresses, totals sent and received.
 Battery: time left, power draw, health, cycle count.
 Sensors: every temperature, plus fans, power and voltages when a sensor tool provides them.
-CPU, Memory, GPU and Disk list the busiest processes. Every flyout links to Task Manager and to that reading's settings.
+CPU, Memory, GPU, Disk and Network list the busiest processes; Network ranks them by open connections, or by traffic sent and received if you run busy as administrator and turn on Settings, Advanced, Per-process network traffic (off by default). Every flyout links to Task Manager and to that reading's settings.
+
+In your language
+busy speaks English, German, Spanish, French, Italian, Japanese, Korean, Polish, Brazilian Portuguese, Russian and Simplified Chinese. It follows the Windows display language or the one you pick in Settings, and writes numbers with your region's decimal and thousands separators.
 
 Settings
 Settings in the Windows 11 style, with search, keyboard navigation, screen-reader support, a live preview of each reading, and light and dark themes that follow Windows or are set by hand. Changes apply at once. Right-click the readings for Settings, Show on taskbar, Position and Exit. A short setup on first start lets you pick the readings and a side of the taskbar.
@@ -62,10 +65,11 @@ CPU, memory, GPU, network, disk, battery and temperature readings in the Windows
 Each reading as text, a graph, a bar or read/write rates, in its own color or colored by load
 A flyout per reading with a chart of the last 1 to 10 minutes and the details
 Per-core CPU load, memory lists, GPU engines and VRAM, disk response time, Wi-Fi signal, battery health
-The busiest processes for CPU, memory, GPU and disk, with a link to Task Manager
+The busiest processes for CPU, memory, GPU, disk and network, with a link to Task Manager
 GPU temperatures on NVIDIA, AMD and WDDM 2.5+ drivers; CPU temperatures from LibreHardwareMonitor or HWiNFO, opt-in
 Windows 11 style settings with search, keyboard navigation, screen-reader support and live previews
 Light and dark themes that follow Windows or are set by hand
+In 11 languages, following Windows or set in Settings, with your region's number format
 Horizontal and vertical taskbars, next to the notification area or at the left edge
 No account, no telemetry, no network access, no administrator rights
 ```
@@ -78,18 +82,21 @@ Live CPU, memory, GPU, network, disk, battery and temperature readings in the Wi
 
 ### Screenshots
 
-The images the README shows, in this order, each with its caption:
+Full-screen PNGs (1366 × 768 or larger, up to 3840 × 2160) on a clean desktop, uploaded in Partner Center and not committed; the README's images are crops, too small to qualify. Keep what matters in the top two-thirds, as the Store may overlay text on the bottom third: the taskbar sits at the bottom, so show it with a flyout or the Settings window open above it. Every language's listing uses the same nine images, in this order, with its own captions:
 
-| File | Size (px) | Caption |
+| # | Scene | Caption |
 |---|---|---|
-| `docs/images/taskbar.png` | 706 × 96 | Readings in the taskbar: CPU as a graph, memory as a bar, GPU as text, network and disk rates |
-| `docs/images/flyout-cpu.png` | 720 × 964 | The CPU flyout: utilization chart, System / User / Idle, logical processors, speed, processes |
-| `docs/images/flyout-memory.png` | 720 × 912 | The Memory flyout: usage chart, In use / Modified / Standby / Free, committed, compressed, pools |
-| `docs/images/settings-dark.png` | 987 × 694 | Settings in the dark theme, with a live preview of each reading |
-| `docs/images/settings-light.png` | 987 × 694 | Settings in the light theme: Start with Windows, position, update interval, history, theme |
-| `docs/images/setup.png` | 680 × 553 | First-run setup: pick the readings and a side of the taskbar |
+| 1 | The CPU flyout open above the taskbar | Readings in the taskbar; click one for its flyout. Here: CPU utilization, System / User / Idle, logical processors, speed |
+| 2 | The Memory flyout | The Memory flyout: In use / Modified / Standby / Free, committed, compressed, pools |
+| 3 | The GPU flyout | The GPU flyout: busiest engines, dedicated and shared memory, temperature, power, clocks |
+| 4 | Settings, dark theme, a reading's page | Settings in the dark theme: style, label, color for each reading |
+| 5 | Settings with the preview | Settings, with a live preview of each reading |
+| 6 | First-run setup | First-run setup: pick the readings and a side of the taskbar |
+| 7 | A vertical taskbar with readings | A vertical taskbar: readings stack as columns |
+| 8 | Settings beside a vertical taskbar | Settings follows a vertical taskbar, preview included |
+| 9 | Setup on a vertical taskbar | Setup on a vertical taskbar |
 
-**None of them qualifies**: a desktop screenshot must be at least 1366 × 768, and these are crops (the widget, one flyout, one window). For the submission, take full-screen PNGs (1920 × 1080 or larger, up to 3840 × 2160) of the same six scenes on a clean desktop: the taskbar with readings, the CPU and Memory flyouts open, Settings dark and light, and setup; the captions above still fit. Keep what matters in the top two-thirds, as the Store may overlay text on the bottom third: the taskbar sits at the bottom, so show it with a flyout or the Settings window open above it. They are submission assets, uploaded in Partner Center and not committed.
+Partner Center's listing export (Store listings → Export listings, a CSV with a column per language) names each uploaded image by its URL; filling another language's column with the same URLs reuses the images, and Import listings takes the CSV back.
 
 ### Store logos
 
@@ -119,7 +126,11 @@ Copyright (c) 2026 busy contributors. Open source under the MIT License.
 
 ### Additional license terms
 
-Paste `LICENSE` (the MIT License) as it is. Left empty, the Store's standard application license terms apply, which grant less than the MIT License does; with it, a copy from the Store comes with the same rights as one from GitHub.
+Points to `LICENSE` (the MIT License) and the third-party licenses. Left empty, the Store's standard application license terms apply, which grant less than the MIT License does; with it, a copy from the Store comes with the same rights as one from GitHub.
+
+```
+busy is open source under the MIT License: https://github.com/aivanyuk/busy/blob/main/LICENSE. Third-party licenses: https://github.com/aivanyuk/busy/blob/main/THIRD-PARTY-LICENSES.txt
+```
 
 ## Properties
 
