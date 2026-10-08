@@ -19,7 +19,10 @@ Disco: volúmenes y espacio libre, tiempo de respuesta, temperatura, bytes leíd
 Red: interfaz, banda y señal Wi-Fi, direcciones, totales enviados y recibidos.
 Batería: tiempo restante, consumo, salud y número de ciclos.
 Sensores: todas las temperaturas, además de ventiladores, potencia y voltajes si una herramienta de sensores los proporciona.
-CPU, Memoria, GPU y Disco muestran los procesos más activos. Cada panel enlaza al Administrador de tareas y a la configuración de esa lectura.
+CPU, Memoria, GPU, Disco y Red muestran los procesos más activos; Red los ordena por conexiones abiertas, o por tráfico enviado y recibido si ejecutas busy como administrador y activas Configuración, Avanzado, Tráfico de red por proceso (desactivado de forma predeterminada). Cada panel enlaza al Administrador de tareas y a la configuración de esa lectura.
+
+En tu idioma
+busy habla inglés, alemán, español, francés, italiano, japonés, coreano, polaco, portugués de Brasil, ruso y chino simplificado. Sigue el idioma de visualización de Windows o el que elijas en Configuración, y escribe los números con los separadores decimal y de millares de tu región.
 
 Configuración
 Configuración al estilo de Windows 11, con búsqueda, navegación con el teclado, compatibilidad con lectores de pantalla, vista previa en vivo de cada lectura y temas claro y oscuro que siguen a Windows o se eligen a mano. Los cambios se aplican al instante. Haz clic con el botón derecho en las lecturas para abrir Configuración, Mostrar en la barra de tareas, Posición y Salir. Un breve asistente en el primer inicio te permite elegir las lecturas y un lado de la barra de tareas.
@@ -44,10 +47,11 @@ Uso de CPU, memoria, GPU, red, disco, batería y temperaturas en la barra de tar
 Cada lectura como texto, gráfico, barra o velocidades de lectura/escritura, en su propio color o según la carga
 Un panel por lectura con un gráfico de los últimos 1 a 10 minutos y los detalles
 Carga de la CPU por núcleo, listas de memoria, motores y VRAM de la GPU, tiempo de respuesta del disco, señal Wi-Fi, salud de la batería
-Los procesos más activos de CPU, memoria, GPU y disco, con un enlace al Administrador de tareas
+Los procesos más activos de CPU, memoria, GPU, disco y red, con un enlace al Administrador de tareas
 Temperaturas de la GPU con controladores NVIDIA, AMD y WDDM 2.5+; temperaturas de la CPU desde LibreHardwareMonitor o HWiNFO, opcionales
 Configuración al estilo de Windows 11 con búsqueda, navegación con el teclado, lectores de pantalla y vistas previas en vivo
 Temas claro y oscuro que siguen a Windows o se eligen a mano
+En 11 idiomas, según Windows o a elegir en Configuración, con el formato numérico de tu región
 Barras de tareas horizontales y verticales, junto al área de notificación o en el borde izquierdo
 Sin cuenta, sin telemetría, sin acceso a la red, sin permisos de administrador
 ```
@@ -60,14 +64,17 @@ Uso de CPU, memoria, GPU, red, disco, batería y temperaturas en tiempo real en 
 
 ## Screenshot captions
 
-| File | Caption |
+| # | Caption |
 |---|---|
-| `docs/images/taskbar.png` | Lecturas en la barra de tareas: CPU como gráfico, memoria como barra, GPU como texto, velocidades de red y disco |
-| `docs/images/flyout-cpu.png` | El panel de CPU: gráfico de uso, Sistema / Usuario / Inactivo, procesadores lógicos, velocidad, procesos |
-| `docs/images/flyout-memory.png` | El panel de Memoria: gráfico de uso, En uso / Modificada / En espera / Libre, confirmada, comprimida, grupos |
-| `docs/images/settings-dark.png` | Configuración con el tema oscuro, con una vista previa en vivo de cada lectura |
-| `docs/images/settings-light.png` | Configuración con el tema claro: Iniciar con Windows, posición, intervalo de actualización, historial, tema |
-| `docs/images/setup.png` | Configuración inicial: elige las lecturas y un lado de la barra de tareas |
+| 1 | Lecturas en la barra de tareas; haz clic en una para abrir su panel. Aquí: uso de CPU, Sistema / Usuario / Inactivo, procesadores lógicos, velocidad |
+| 2 | El panel de Memoria: En uso / Modificada / En espera / Libre, confirmada, comprimida, grupos |
+| 3 | El panel de GPU: los motores más activos, memoria dedicada y compartida, temperatura, potencia, relojes |
+| 4 | Configuración con el tema oscuro: estilo, etiqueta y color de cada lectura |
+| 5 | Configuración, con una vista previa en vivo de cada lectura |
+| 6 | Configuración inicial: elige las lecturas y un lado de la barra de tareas |
+| 7 | Una barra de tareas vertical: las lecturas se apilan en columnas |
+| 8 | Configuración se adapta a una barra de tareas vertical, vista previa incluida |
+| 9 | Configuración inicial en una barra de tareas vertical |
 
 ## Search terms
 
@@ -85,4 +92,10 @@ monitor gpu
 
 ```
 Copyright (c) 2026 colaboradores de busy. Código abierto con la licencia MIT.
+```
+
+## Additional license terms
+
+```
+busy es de código abierto con la licencia MIT: https://github.com/aivanyuk/busy/blob/main/LICENSE. Licencias de terceros: https://github.com/aivanyuk/busy/blob/main/THIRD-PARTY-LICENSES.txt
 ```
