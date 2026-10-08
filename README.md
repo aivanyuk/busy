@@ -25,10 +25,11 @@ A small, dependency-light system monitor for Windows 11, in the spirit of macOS 
   - Battery: time left, power draw, health, cycle count.
   - Sensors: every temperature, plus fans, power and voltages when a sensor tool provides them.
 
-  CPU, Memory, GPU and Disk list the busiest processes. Every flyout links to Task Manager and to that reading's settings.
+  CPU, Memory, GPU, Disk and Network list the busiest processes (Network by open connections, or by traffic with the opt-in below). Every flyout links to Task Manager and to that reading's settings.
 - **Settings** in the Windows 11 style, with search, keyboard navigation, screen-reader support (UI Automation), a live preview of each reading, and light and dark themes that follow Windows or are set by hand. Changes apply at once. Right-click the readings for Settings, Show on taskbar, Position and Exit.
+- **In eleven languages**: English, German, Spanish, French, Italian, Japanese, Korean, Polish, Brazilian Portuguese, Russian and Simplified Chinese, following Windows' display language or set in Settings → General → Language. Numbers use your region's decimal and thousands separators.
 - **First-run setup**: pick the readings and a side of the taskbar, and watch the taskbar follow as you choose. Run it again from Settings → General.
-- **Opt-ins, off until you turn them on**, each with its risk stated in Settings → Advanced: third-party sensor tools, and a daily check for a newer release.
+- **Opt-ins, off until you turn them on**, each with its risk stated in Settings → Advanced: third-party sensor tools, per-process network traffic (needs busy running as administrator), and a daily check for a newer release.
 
 <p>
   <img src="docs/images/settings-dark.png" width="480" alt="Settings, CPU page, dark theme: live preview, Show on taskbar, Style, Show label, Bar shows, Widget color">
