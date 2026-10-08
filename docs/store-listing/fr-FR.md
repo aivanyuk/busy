@@ -19,7 +19,10 @@ Disque : volumes et espace libre, temps de réponse, température, octets lus e
 Réseau : interface, bande et signal Wi-Fi, adresses, totaux envoyés et reçus.
 Batterie : temps restant, consommation, santé, nombre de cycles.
 Capteurs : toutes les températures, ainsi que les ventilateurs, la puissance et les tensions lorsqu'un outil de capteurs les fournit.
-Processeur, Mémoire, GPU et Disque listent les processus les plus actifs. Chaque menu volant renvoie au Gestionnaire des tâches et aux paramètres de cette mesure.
+Processeur, Mémoire, GPU, Disque et Réseau listent les processus les plus actifs ; Réseau les classe par connexions ouvertes, ou par trafic envoyé et reçu si vous exécutez busy en tant qu'administrateur et activez Paramètres, Avancé, Trafic réseau par processus (désactivé par défaut). Chaque menu volant renvoie au Gestionnaire des tâches et aux paramètres de cette mesure.
+
+Dans votre langue
+busy parle anglais, allemand, espagnol, français, italien, japonais, coréen, polonais, portugais (Brésil), russe et chinois simplifié. Il suit la langue d'affichage de Windows ou celle que vous choisissez dans Paramètres, et écrit les nombres avec les séparateurs décimaux et de milliers de votre région.
 
 Paramètres
 Des paramètres dans le style de Windows 11, avec recherche, navigation au clavier, prise en charge des lecteurs d'écran, aperçu en direct de chaque mesure, et thèmes clair et sombre qui suivent Windows ou se choisissent à la main. Les modifications s'appliquent immédiatement. Cliquez avec le bouton droit sur les mesures pour accéder à Paramètres, Afficher dans la barre des tâches, Position et Quitter. Une courte configuration au premier démarrage vous permet de choisir les mesures et un côté de la barre des tâches.
@@ -44,10 +47,11 @@ Processeur, mémoire, GPU, réseau, disque, batterie et températures dans la ba
 Chaque mesure en texte, graphique, barre ou débits de lecture/écriture, dans sa couleur ou colorée selon la charge
 Un menu volant par mesure, avec un graphique des 1 à 10 dernières minutes et les détails
 Charge par cœur, listes de la mémoire, moteurs et VRAM du GPU, temps de réponse du disque, signal Wi-Fi, santé de la batterie
-Les processus les plus actifs pour le processeur, la mémoire, le GPU et le disque, avec un lien vers le Gestionnaire des tâches
+Les processus les plus actifs pour le processeur, la mémoire, le GPU, le disque et le réseau, avec un lien vers le Gestionnaire des tâches
 Températures GPU sur NVIDIA, AMD et pilotes WDDM 2.5+ ; températures CPU via LibreHardwareMonitor ou HWiNFO, sur option
 Paramètres dans le style de Windows 11 avec recherche, navigation au clavier, lecteurs d'écran et aperçus en direct
 Thèmes clair et sombre qui suivent Windows ou se choisissent à la main
+En 11 langues, selon Windows ou au choix dans Paramètres, avec le format des nombres de votre région
 Barres des tâches horizontales et verticales, à côté de la zone de notification ou sur le bord gauche
 Aucun compte, aucune télémétrie, aucun accès réseau, aucun droit d'administrateur
 ```
@@ -60,14 +64,17 @@ Processeur, mémoire, GPU, réseau, disque, batterie et températures en direct 
 
 ## Screenshot captions
 
-| File | Caption |
+| # | Caption |
 |---|---|
-| `docs/images/taskbar.png` | Mesures dans la barre des tâches : processeur en graphique, mémoire en barre, GPU en texte, débits réseau et disque |
-| `docs/images/flyout-cpu.png` | Le menu volant Processeur : graphique d'utilisation, Système / Utilisateur / Inactif, processeurs logiques, vitesse, processus |
-| `docs/images/flyout-memory.png` | Le menu volant Mémoire : graphique d'utilisation, utilisée / modifiée / en attente / libre, validée, compressée, réserves |
-| `docs/images/settings-dark.png` | Les paramètres en thème sombre, avec un aperçu en direct de chaque mesure |
-| `docs/images/settings-light.png` | Les paramètres en thème clair : Démarrer avec Windows, position, intervalle d'actualisation, historique, thème |
-| `docs/images/setup.png` | Configuration au premier démarrage : choisissez les mesures et un côté de la barre des tâches |
+| 1 | Des mesures dans la barre des tâches ; cliquez sur l'une pour son menu volant. Ici : utilisation du processeur, Système / Utilisateur / Inactif, processeurs logiques, vitesse |
+| 2 | Le menu volant Mémoire : Utilisée / Modifiée / En attente / Libre, validée, compressée, réserves |
+| 3 | Le menu volant GPU : moteurs les plus actifs, mémoire dédiée et partagée, température, puissance, fréquences |
+| 4 | Les paramètres en thème sombre : style, étiquette et couleur de chaque mesure |
+| 5 | Les paramètres, avec un aperçu en direct de chaque mesure |
+| 6 | Configuration au premier démarrage : choisissez les mesures et un côté de la barre des tâches |
+| 7 | Une barre des tâches verticale : les mesures s'empilent en colonnes |
+| 8 | Les paramètres suivent une barre des tâches verticale, aperçu compris |
+| 9 | La configuration sur une barre des tâches verticale |
 
 ## Search terms
 
@@ -85,4 +92,10 @@ débit réseau
 
 ```
 Copyright (c) 2026 busy contributors. Open source sous licence MIT.
+```
+
+## Additional license terms
+
+```
+busy est open source sous licence MIT : https://github.com/aivanyuk/busy/blob/main/LICENSE. Licences tierces : https://github.com/aivanyuk/busy/blob/main/THIRD-PARTY-LICENSES.txt
 ```

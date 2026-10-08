@@ -19,7 +19,10 @@ Dysk: woluminy i wolne miejsce, czas odpowiedzi, temperatura, ilość odczytanyc
 Sieć: interfejs, pasmo i sygnał Wi-Fi, adresy, łączna ilość wysłanych i odebranych danych.
 Bateria: pozostały czas, pobór mocy, kondycja, liczba cykli.
 Czujniki: wszystkie temperatury, a także wentylatory, moc i napięcia, jeśli udostępnia je narzędzie do odczytu czujników.
-Procesor, pamięć, GPU i dysk pokazują najbardziej aktywne procesy. Każde okno zawiera łącza do Menedżera zadań i do ustawień danego wskaźnika.
+Procesor, pamięć, GPU, dysk i sieć pokazują najbardziej aktywne procesy; sieć porządkuje je według otwartych połączeń albo, jeśli uruchomisz busy jako administrator i włączysz w Ustawieniach, w sekcji Zaawansowane, opcję Ruch sieciowy poszczególnych procesów (domyślnie wyłączoną), według ilości wysłanych i odebranych danych. Każde okno zawiera łącza do Menedżera zadań i do ustawień danego wskaźnika.
+
+W Twoim języku
+busy mówi po angielsku, niemiecku, hiszpańsku, francusku, włosku, japońsku, koreańsku, polsku, portugalsku (brazylijskim), rosyjsku i chińsku (uproszczonym). Używa języka wyświetlania systemu Windows lub wybranego w Ustawieniach i zapisuje liczby z separatorem dziesiętnym i tysięcy zgodnym z Twoim regionem.
 
 Ustawienia
 Ustawienia w stylu Windows 11, z wyszukiwaniem, obsługą klawiatury i czytników ekranu, podglądem na żywo każdego wskaźnika oraz jasnym i ciemnym motywem, zgodnym z systemem Windows lub wybranym ręcznie. Zmiany obowiązują od razu. Kliknij wskaźniki prawym przyciskiem myszy, aby otworzyć Ustawienia, Pokaż na pasku zadań, Położenie i Zakończ. Krótka konfiguracja przy pierwszym uruchomieniu pozwala wybrać wskaźniki i stronę paska zadań.
@@ -44,10 +47,11 @@ Użycie procesora, pamięci, GPU, sieci, dysku, stan baterii i temperatury na pa
 Każdy wskaźnik jako tekst, wykres, słupek lub szybkość odczytu/zapisu, we własnym kolorze lub zależnym od obciążenia
 Okno szczegółów dla każdego wskaźnika z wykresem z ostatnich 1–10 minut
 Obciążenie każdego rdzenia, listy pamięci, aparaty GPU i VRAM, czas odpowiedzi dysku, sygnał Wi-Fi, kondycja baterii
-Najbardziej aktywne procesy dla procesora, pamięci, GPU i dysku, z łączem do Menedżera zadań
+Najbardziej aktywne procesy dla procesora, pamięci, GPU, dysku i sieci, z łączem do Menedżera zadań
 Temperatury GPU dla NVIDIA, AMD i sterowników WDDM 2.5+; temperatury procesora z LibreHardwareMonitor lub HWiNFO, opcjonalnie
 Ustawienia w stylu Windows 11 z wyszukiwaniem, obsługą klawiatury i czytników ekranu oraz podglądem na żywo
 Jasny i ciemny motyw, zgodny z systemem Windows lub wybrany ręcznie
+W 11 językach, zgodnie z systemem Windows lub wybranym w Ustawieniach, z formatem liczb Twojego regionu
 Poziomy i pionowy pasek zadań, obok obszaru powiadomień lub przy lewej krawędzi
 Bez konta, bez telemetrii, bez dostępu do sieci, bez uprawnień administratora
 ```
@@ -60,14 +64,17 @@ Użycie procesora, pamięci, GPU, sieci, dysku, stan baterii i temperatury na ż
 
 ## Screenshot captions
 
-| File | Caption |
+| # | Caption |
 |---|---|
-| `docs/images/taskbar.png` | Wskaźniki na pasku zadań: procesor jako wykres, pamięć jako słupek, GPU jako tekst, szybkość sieci i dysku |
-| `docs/images/flyout-cpu.png` | Okno procesora: wykres wykorzystania, system / użytkownik / bezczynność, procesory logiczne, szybkość, procesy |
-| `docs/images/flyout-memory.png` | Okno pamięci: wykres użycia, w użyciu / zmodyfikowana / w gotowości / wolna, zatwierdzona, skompresowana, pule |
-| `docs/images/settings-dark.png` | Ustawienia w ciemnym motywie, z podglądem na żywo każdego wskaźnika |
-| `docs/images/settings-light.png` | Ustawienia w jasnym motywie: uruchamianie z systemem Windows, położenie, interwał aktualizacji, historia, motyw |
-| `docs/images/setup.png` | Konfiguracja przy pierwszym uruchomieniu: wybór wskaźników i strony paska zadań |
+| 1 | Wskaźniki na pasku zadań; kliknij jeden, aby otworzyć jego okno wysuwane. Tu: użycie procesora, system / użytkownik / bezczynność, procesory logiczne, szybkość |
+| 2 | Okno wysuwane pamięci: w użyciu / zmodyfikowana / w gotowości / wolna, zatwierdzona, skompresowana, pule |
+| 3 | Okno wysuwane GPU: najbardziej obciążone aparaty, dedykowana i współużytkowana pamięć, temperatura, moc, zegary |
+| 4 | Ustawienia w ciemnym motywie: styl, etykieta i kolor każdego wskaźnika |
+| 5 | Ustawienia z podglądem na żywo każdego wskaźnika |
+| 6 | Konfiguracja przy pierwszym uruchomieniu: wybór wskaźników i strony paska zadań |
+| 7 | Pionowy pasek zadań: wskaźniki układają się w kolumny |
+| 8 | Ustawienia dopasowują się do pionowego paska zadań, razem z podglądem |
+| 9 | Konfiguracja na pionowym pasku zadań |
 
 ## Search terms
 
@@ -85,4 +92,10 @@ prędkość internetu
 
 ```
 Copyright (c) 2026 busy contributors. Oprogramowanie open source na licencji MIT.
+```
+
+## Additional license terms
+
+```
+busy jest oprogramowaniem open source na licencji MIT: https://github.com/aivanyuk/busy/blob/main/LICENSE. Licencje stron trzecich: https://github.com/aivanyuk/busy/blob/main/THIRD-PARTY-LICENSES.txt
 ```
